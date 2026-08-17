@@ -140,3 +140,57 @@ describe("lookupEntry", () => {
     assert.strictEqual(lookupEntry(dir, proj, `${proj}/src/nope.ts`), null);
   });
 });
+
+describe("raw line preservation (#61)", () => {
+  const gbMd = [
+    "# anatomy.md", "",
+    "> Auto-maintained by OpenWolf. Last scanned: t",
+    "> Files: 1 tracked | Anatomy hits: 0 | Misses: 0", "",
+    "## assets/models/", "",
+    "- `base-model.safetensors` (~16GB) — pretrained backbone",
+    "- `fine-tuned.safetensors` (~4GB) — our own fine-tune, NOT reproducible",
+    "Free-form prose note under the section header.", "",
+    "## src/", "",
+    "- `index.ts` — Main entry point (~180 tok)", "",
+  ].join("\n");
+
+  test("non-tok bullets and prose survive import → render", () => {
+    const dir = tmpDir();
+    const store = newStore();
+    importFromMarkdown(store, gbMd, dir);
+    const rendered = renderStore(store);
+    assert.ok(rendered.includes("- `base-model.safetensors` (~16GB) — pretrained backbone"));
+    assert.ok(rendered.includes("- `fine-tuned.safetensors` (~4GB) — our own fine-tune, NOT reproducible"));
+    assert.ok(rendered.includes("Free-form prose note under the section header."));
+    assert.ok(rendered.includes("- `index.ts` — Main entry point (~180 tok)"));
+  });
+
+  test("raw lines are a fixed point across repeated round-trips", () => {
+    const dir = tmpDir();
+    const store = newStore();
+    importFromMarkdown(store, gbMd, dir);
+    const first = renderStore(store);
+    importFromMarkdown(store, first, dir);
+    const second = renderStore(store);
+    assert.strictEqual(second, first);
+  });
+
+  test("tracked file count excludes raw lines", () => {
+    const dir = tmpDir();
+    const store = newStore();
+    importFromMarkdown(store, gbMd, dir);
+    saveStore(dir, store);
+    assert.strictEqual(store.meta.fileCount, 1);
+  });
+
+  test("symbol sub-bullets are not captured as raw lines", () => {
+    const store = sampleStore();
+    store.files["src/index.ts"].symbols = [
+      { name: "main", kind: "fn", startLine: 1, endLine: 40, tokens: 120 },
+    ];
+    const rendered = renderStore(store);
+    const reimported = newStore();
+    importFromMarkdown(reimported, rendered, tmpDir());
+    assert.strictEqual(reimported.rawLines, undefined);
+  });
+});

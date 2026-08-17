@@ -578,7 +578,7 @@ export function normalizePath(p: string): string {
 }
 
 /**
- * Count non-mechanical semantic entries written to memory.md today.
+ * Count non-mechanical semantic entries written to memory.md this session.
  * Mechanical entries (auto-generated file ops, session-end lines) don't count.
  * Used by the stop hook to detect whether Claude wrote a meaningful summary.
  */
@@ -586,12 +586,20 @@ export function countSemanticEntries(wolfDir: string): number {
   const memoryPath = path.join(wolfDir, "memory.md");
   try {
     const content = fs.readFileSync(memoryPath, "utf-8");
-    const mechanical = /^\|\s*[\d:]+\s*\|\s*(Created|Edited|Multi-edited|Session end:|designqc:)/;
-    const today = new Date().toISOString().slice(0, 10);
-    const todayPrefix = `| ${today}`;
+    const mechanical = /^\|\s*[\d\-: ]+\|\s*(Created|Edited|Multi-edited|Session end:|designqc:)/;
+    const tableHeader = /^\|\s*Time\s*\|/i;
+    const tableSeparator = /^\|[\s\-|]+\|?\s*$/;
+    const lines = content.split("\n");
+    let start = -1;
+    for (let i = lines.length - 1; i >= 0; i--) {
+      if (lines[i].startsWith("## Session: ")) { start = i; break; }
+    }
     let count = 0;
-    for (const line of content.split("\n")) {
-      if (line.startsWith(todayPrefix) && !mechanical.test(line)) count++;
+    for (let i = start + 1; i < lines.length; i++) {
+      const line = lines[i];
+      if (!line.startsWith("|")) continue;
+      if (tableHeader.test(line) || tableSeparator.test(line) || mechanical.test(line)) continue;
+      count++;
     }
     return count;
   } catch {

@@ -24,6 +24,7 @@ const NON_CODE_EXTS = new Set([
 interface SessionData {
   files_written: Array<{ file: string; action: string; tokens: number; at: string }>;
   edit_counts: Record<string, number>;
+  files_read?: Record<string, unknown>;
   [key: string]: unknown;
 }
 
@@ -74,7 +75,7 @@ async function main(): Promise<void> {
   // Never track files outside the project root (e.g. the Claude Code scratchpad under
   // /private/tmp). path.relative() yields ../.. section keys that pollute anatomy.md and are
   // wiped again by every full `openwolf scan`, so the index churns instead of converging.
-  if (relPath.startsWith("..")) { process.exit(0); return; }
+  if (relPath.startsWith("..") || path.isAbsolute(relPath)) { process.exit(0); return; }
 
   // Never track secret-bearing files in anatomy/memory (issue #54): .env is
   // not the only file whose *description* would leak sensitive content.
@@ -177,6 +178,10 @@ async function main(): Promise<void> {
     const editKey = normalizePath(path.relative(projectRoot, absolutePath));
     session.edit_counts[editKey] = (session.edit_counts[editKey] || 0) + 1;
 
+    if (session.files_read && session.files_read[normalizedFile]) {
+      delete session.files_read[normalizedFile];
+    }
+
     writeJSON(sessionFile, session);
 
     if (session.edit_counts[editKey] >= 3) {
@@ -206,7 +211,7 @@ function summarizeEdit(oldStr: string, newStr: string, filename: string): string
   const ext = path.extname(filename).toLowerCase();
 
   // --- Structural fixes ---
-  if (newStr.includes("try") && newStr.includes("catch") && !oldStr.includes("catch")) {
+  if (/\btry\b/.test(newStr) && hasCatchConstruct(newStr, ext) && !hasCatchConstruct(oldStr, ext)) {
     return "added error handling";
   }
   if (newStr.includes("?.") && !oldStr.includes("?.")) return "added optional chaining";
@@ -325,7 +330,7 @@ function autoDetectBugFix(wolfDir: string, absolutePath: string, projectRoot: st
   const relFile = normalizePath(path.relative(projectRoot, absolutePath));
 
   // Detect what kind of fix this is
-  const detection = detectFixPattern(oldStr, newStr, ext);
+  const detection = detectFixPattern(oldStr, newStr, ext, basename);
   if (!detection) return;
 
   // Check for recent duplicate (same file + same category within 5 min)
@@ -374,16 +379,17 @@ interface FixDetection {
   context?: string;
 }
 
-function detectFixPattern(oldStr: string, newStr: string, ext: string): FixDetection | null {
+function detectFixPattern(oldStr: string, newStr: string, ext: string, basename: string): FixDetection | null {
   const oldLines = oldStr.split("\n");
   const newLines = newStr.split("\n");
+  const isTest = isTestFile(basename);
 
   // --- Error handling added ---
-  if (newStr.includes("catch") && !oldStr.includes("catch")) {
-    const fn = newStr.match(/(?:function|def|async)\s+(\w+)/)?.[1] || "unknown";
+  if (!isTest && hasCatchConstruct(newStr, ext) && !hasCatchConstruct(oldStr, ext)) {
+    const fn = newStr.match(/(?:function|def|async)\s+(\w+)/)?.[1];
     return {
       category: "error-handling",
-      summary: `Missing error handling in ${path.basename(fn)}`,
+      summary: `Missing error handling in ${fn ? `${fn}()` : basename}`,
       rootCause: "Code path had no error handling — exceptions would propagate uncaught",
       fix: `Added try/catch block`,
       context: extractChangedLines(oldStr, newStr),
@@ -396,7 +402,7 @@ function detectFixPattern(oldStr: string, newStr: string, ext: string): FixDetec
       (/!==?\s*(null|undefined)/.test(newStr) && !/!==?\s*(null|undefined)/.test(oldStr))) {
     return {
       category: "null-safety",
-      summary: `Null/undefined access in ${path.basename(path.basename(""))}`,
+      summary: `Null/undefined access in ${basename}`,
       rootCause: "Property access on potentially null/undefined value",
       fix: `Added null safety (optional chaining or null check)`,
       context: extractChangedLines(oldStr, newStr),
@@ -404,7 +410,8 @@ function detectFixPattern(oldStr: string, newStr: string, ext: string): FixDetec
   }
 
   // --- Guard clause / early return added ---
-  if (/if\s*\([^)]*\)\s*(return|throw|continue|break)/.test(newStr) &&
+  if (!isTest &&
+      /if\s*\([^)]*\)\s*(return|throw|continue|break)/.test(newStr) &&
       !/if\s*\([^)]*\)\s*(return|throw|continue|break)/.test(oldStr)) {
     const condition = newStr.match(/if\s*\(([^)]+)\)/)?.[1]?.trim().slice(0, 60) || "condition";
     return {
@@ -560,7 +567,7 @@ function detectFixPattern(oldStr: string, newStr: string, ext: string): FixDetec
     if (removedLines.length >= 2) {
       return {
         category: "refactor",
-        summary: `Significant refactor of ${path.basename("")}`,
+        summary: `Significant refactor of ${basename}`,
         rootCause: `${removedLines.length} lines replaced/restructured`,
         fix: `Rewrote ${oldLines.length}→${newLines.length} lines (${removedLines.length} removed)`,
         context: removedLines.slice(0, 2).map(l => l.trim().slice(0, 50)).join("; "),
@@ -569,6 +576,16 @@ function detectFixPattern(oldStr: string, newStr: string, ext: string): FixDetec
   }
 
   return null;
+}
+
+function hasCatchConstruct(code: string, ext: string): boolean {
+  if (ext === ".py") return /\bexcept\b[^\n]*:/.test(code);
+  return /\bcatch\s*[({]/.test(code);
+}
+
+function isTestFile(basename: string): boolean {
+  return /(\.test\.|\.spec\.|_test\.|_spec\.)/i.test(basename) ||
+    /(Test|Tests|IT|Spec)\.\w+$/.test(basename);
 }
 
 function extractChangedLines(oldStr: string, newStr: string): string {

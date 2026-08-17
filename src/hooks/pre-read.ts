@@ -8,7 +8,7 @@ import { lookupEntry } from "./anatomy-store.js";
 
 interface SessionData {
   session_id: string;
-  files_read: Record<string, { count: number; tokens: number; first_read: string }>;
+  files_read: Record<string, { count: number; tokens: number; first_read: string; read_mtime?: number }>;
   anatomy_hits: number;
   anatomy_misses: number;
   repeated_reads_warned: number;
@@ -54,14 +54,22 @@ async function main(): Promise<void> {
   // Check if already read this session
   if (session.files_read[normalizedFile]) {
     const prev = session.files_read[normalizedFile];
-    process.stderr.write(
-      `⚡ OpenWolf: ${path.basename(normalizedFile)} was already read this session (~${prev.tokens} tokens). Consider using your existing knowledge of this file.\n`
-    );
-    session.files_read[normalizedFile].count++;
-    session.repeated_reads_warned++;
-    writeJSON(sessionFile, session);
-    process.exit(0);
-    return;
+    let modifiedSinceRead = true;
+    try {
+      const mtime = fs.statSync(filePath).mtimeMs;
+      modifiedSinceRead = prev.read_mtime === undefined || mtime > prev.read_mtime;
+    } catch {}
+    if (!modifiedSinceRead) {
+      process.stderr.write(
+        `⚡ OpenWolf: ${path.basename(normalizedFile)} was already read this session (~${prev.tokens} tokens), unchanged since. If you only need the gist, your earlier read may suffice; if you need exact text (an edit anchor, verbatim lines, line numbers), re-read rather than reconstructing from memory.\n`
+      );
+      session.files_read[normalizedFile].count++;
+      session.repeated_reads_warned++;
+      writeJSON(sessionFile, session);
+      process.exit(0);
+      return;
+    }
+    delete session.files_read[normalizedFile];
   }
 
   // Anatomy lookup: O(1) against the durable store, legacy md scan fallback.
@@ -99,10 +107,15 @@ async function main(): Promise<void> {
   }
 
   // Record initial read entry (tokens will be updated in post-read)
+  let readMtime: number | undefined;
+  try {
+    readMtime = fs.statSync(filePath).mtimeMs;
+  } catch {}
   session.files_read[normalizedFile] = {
     count: 1,
     tokens: 0,
     first_read: new Date().toISOString(),
+    read_mtime: readMtime,
   };
 
   writeJSON(sessionFile, session);

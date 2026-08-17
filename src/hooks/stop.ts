@@ -26,6 +26,7 @@ interface SessionData {
   repeated_reads_warned: number;
   cerebrum_warnings: number;
   stop_count: number;
+  reminders_sent: Record<string, number>;
 }
 
 interface SessionEntry {
@@ -73,6 +74,7 @@ async function main(): Promise<void> {
     repeated_reads_warned: 0,
     cerebrum_warnings: 0,
     stop_count: 0,
+    reminders_sent: {},
   });
 
   session.stop_count++;
@@ -88,11 +90,20 @@ async function main(): Promise<void> {
   }
 
   // Collect end-of-turn reminders — returned as strings, then surfaced via additionalContext
-  const reminders = [
-    checkForMissingBugLogs(wolfDir, session),
-    checkCerebrumFreshness(wolfDir, session),
-    checkSemanticSummaries(wolfDir, session),
-  ].filter((r): r is string => r !== null);
+  if (!session.reminders_sent) session.reminders_sent = {};
+  const reminderChecks: Array<[string, string | null]> = [
+    ["buglog", checkForMissingBugLogs(wolfDir, session)],
+    ["cerebrum", checkCerebrumFreshness(wolfDir, session)],
+    ["semantic", checkSemanticSummaries(wolfDir, session)],
+  ];
+  const reminders: string[] = [];
+  for (const [key, message] of reminderChecks) {
+    if (message === null) continue;
+    const sent = session.reminders_sent[key] ?? 0;
+    if (sent >= 2) continue;
+    session.reminders_sent[key] = sent + 1;
+    reminders.push(message);
+  }
 
   // Check if STATUS.md is stale relative to this session
   checkStatusFreshness(wolfDir, session);
@@ -224,9 +235,12 @@ function checkForMissingBugLogs(wolfDir: string, session: SessionData): string |
 
   if (multiEditFiles.length === 0) return null;
 
-  const buglogWritten = session.files_written.some(w =>
-    w.file.includes("buglog.json")
-  );
+  let buglogWritten = false;
+  try {
+    const stat = fs.statSync(path.join(wolfDir, "buglog.json"));
+    const sessionStartMs = session.started ? Date.parse(session.started) : 0;
+    buglogWritten = sessionStartMs > 0 && stat.mtimeMs >= sessionStartMs;
+  } catch {}
 
   if (!buglogWritten) {
     return `ACTION REQUIRED: Files edited 3+ times this session (${multiEditFiles.join(", ")}) but buglog.json was not updated. Log the bug fixes to .wolf/buglog.json now.`;

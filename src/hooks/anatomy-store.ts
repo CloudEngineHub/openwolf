@@ -54,6 +54,8 @@ export interface AnatomyStoreData {
   };
   /** Keyed by full normalized relative path, e.g. "src/hooks/shared.ts". */
   files: Record<string, StoreFileEntry>;
+  /** Non-conforming anatomy.md lines preserved verbatim, keyed by section. */
+  rawLines?: Record<string, string[]>;
 }
 
 export const STORE_FILE = "anatomy-index.json";
@@ -104,8 +106,12 @@ export function saveStore(wolfDir: string, store: AnatomyStoreData): void {
 
 // ── Markdown format (canonical — the legacy contract, unchanged) ────────────
 
-export function parseAnatomy(content: string): Map<string, AnatomyEntry[]> {
+export function parseAnatomyWithRaw(content: string): {
+  sections: Map<string, AnatomyEntry[]>;
+  rawLines: Map<string, string[]>;
+} {
   const sections = new Map<string, AnatomyEntry[]>();
+  const rawLines = new Map<string, string[]>();
   let currentSection = "";
   for (const raw of content.split("\n")) {
     const line = raw.replace(/\r$/, "");
@@ -123,9 +129,18 @@ export function parseAnatomy(content: string): Map<string, AnatomyEntry[]> {
         description: em[2] || "",
         tokens: parseInt(em[3], 10),
       });
+      continue;
     }
+    if (line.trim() === "") continue;
+    if (/^\s+- /.test(line)) continue;
+    if (!rawLines.has(currentSection)) rawLines.set(currentSection, []);
+    rawLines.get(currentSection)!.push(line);
   }
-  return sections;
+  return { sections, rawLines };
+}
+
+export function parseAnatomy(content: string): Map<string, AnatomyEntry[]> {
+  return parseAnatomyWithRaw(content).sections;
 }
 
 export function serializeAnatomy(
@@ -183,11 +198,17 @@ export function renderStore(store: AnatomyStoreData): string {
     `> Files: ${Object.keys(store.files).length} tracked | Anatomy hits: ${store.meta.hits} | Misses: ${store.meta.misses}`,
     "",
   ];
-  const keys = [...bySection.keys()].sort();
+  const rawBySection = store.rawLines ?? {};
+  const keys = [...new Set([...bySection.keys(), ...Object.keys(rawBySection)])].sort();
   for (const key of keys) {
     lines.push(`## ${key}`);
     lines.push("");
-    const entries = bySection.get(key)!.sort((a, b) => a.file.localeCompare(b.file));
+    const raws = rawBySection[key] ?? [];
+    for (const raw of raws) {
+      lines.push(raw);
+    }
+    const entries = (bySection.get(key) ?? []).sort((a, b) => a.file.localeCompare(b.file));
+    if (raws.length > 0 && entries.length > 0) lines.push("");
     for (const { file, entry } of entries) {
       const desc = entry.description ? ` — ${entry.description}` : "";
       lines.push(`- \`${file}\`${desc} (~${entry.tokens} tok)`);
@@ -229,7 +250,12 @@ export function importFromMarkdown(
   mdContent: string,
   projectRoot: string
 ): void {
-  const sections = parseAnatomy(mdContent);
+  const { sections, rawLines } = parseAnatomyWithRaw(mdContent);
+  if (rawLines.size > 0) {
+    store.rawLines = Object.fromEntries(rawLines);
+  } else {
+    delete store.rawLines;
+  }
   const seen = new Set<string>();
   for (const [sectionKey, entries] of sections) {
     const dir = sectionKey === "./" ? "" : sectionKey;
