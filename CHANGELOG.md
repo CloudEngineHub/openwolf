@@ -4,6 +4,54 @@ All notable changes to OpenWolf are documented here. The format follows
 [Keep a Changelog](https://keepachangelog.com/), and OpenWolf uses
 [Semantic Versioning](https://semver.org/).
 
+## [2.0.3] - 2026-08-17
+
+### Fixed
+
+- The post-write hook no longer crashes on every write. `symbol-extractor.js`
+  was imported by the installed hook but missing from the install, update, and
+  status file lists, which silently disabled write tracking, memory.md logging,
+  and anatomy.md updates on every v2 install. `openwolf status` now checks all
+  11 hook files, and a regression test verifies that every file imported by an
+  installed hook is present in the copy lists. Reported with a full root-cause
+  analysis by Laptopcorei7 (#68).
+- The Stop hook no longer reports "no semantic summary was written" on every
+  session. `countSemanticEntries()` looked for a UTC date prefix that no writer
+  ever emits; it now counts entries under the newest session heading. This also
+  fixes sessions that cross midnight looping forever on the reminder. Reported
+  by statik1 (#62) and Laptopcorei7 (#68).
+- End-of-turn reminders now fire at most twice per session, so a reminder whose
+  condition cannot be cleared degrades into a stale message instead of a
+  non-terminating loop (#68).
+- The buglog reminder now checks buglog.json's modification time. The old check
+  read a session list that buglog.json could never appear in, so the reminder
+  fired even right after the file was updated (#68).
+- On Windows, files on a different drive than the project are no longer indexed
+  into anatomy (#68).
+- Auto-detected buglog entries now name the file they refer to. Error-handling
+  detection requires a real catch/except construct instead of a substring match,
+  so a comment containing the word "catch" no longer files a bug, and test
+  files are skipped by the error-handling and guard-clause rules. Reported with
+  verified repros by spignataro (#73).
+- The anatomy store now preserves anatomy.md lines it does not recognize, such
+  as prose notes or entries sized in GB/MB instead of tokens, instead of
+  silently deleting them on the next write. Reported with a proposed patch by
+  prghbla (#61).
+- The repeated-read notice only fires when the file is unchanged since the last
+  read. A file modified during the session, by the agent or externally, can be
+  re-read without a false warning, and writing a file clears its read record.
+  The notice wording now leaves the gist-vs-exact decision to the model.
+  Reported by 1re2turn1 (#41).
+- `openwolf cron list` and `openwolf status` now say when the scheduler cannot
+  run (pm2 missing, daemon not running, or heartbeat stale) instead of showing
+  tasks as enabled that will never fire. Reported by Esturban (#75).
+
+### Added
+
+- `openwolf daemon status` shows whether the daemon is running.
+- `openwolf cron enable <id>` and `openwolf cron disable <id>` toggle tasks
+  without hand-editing cron-manifest.json.
+
 ## [2.0.2] - 2026-07-15
 
 ### Added
