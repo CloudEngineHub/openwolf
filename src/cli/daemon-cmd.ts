@@ -30,7 +30,7 @@ function pm2Bin(): string {
   return isWindows() ? "pm2.cmd" : "pm2";
 }
 
-function hasPm2(): boolean {
+export function hasPm2(): boolean {
   try {
     execFileSync(isWindows() ? "where" : "which", ["pm2"], { stdio: "ignore" });
     return true;
@@ -168,6 +168,35 @@ export function daemonRestart(): void {
     console.log(`  Stopped old daemon (PID ${pid}).`);
   }
   console.log("  Use 'openwolf dashboard' to start a new daemon.");
+}
+
+export function daemonStatus(): void {
+  const projectRoot = findProjectRoot();
+  const wolfDir = path.join(projectRoot, ".wolf");
+
+  if (!fs.existsSync(wolfDir)) {
+    console.log("OpenWolf not initialized. Run: openwolf init");
+    return;
+  }
+
+  if (!hasPm2()) {
+    console.log("  ✗ Daemon cannot run: pm2 not installed. Install with: pnpm add -g pm2");
+    return;
+  }
+
+  const name = getPm2Name();
+  try {
+    const output = execFileSync(pm2Bin(), ["jlist"], { encoding: "utf-8" });
+    const processes = JSON.parse(output) as Array<{ name: string; pm2_env?: { status?: string } }>;
+    const proc = processes.find((p) => p.name === name);
+    if (proc) {
+      const procStatus = proc.pm2_env?.status ?? "unknown";
+      const mark = procStatus === "online" ? "✓" : "✗";
+      console.log(`  ${mark} Daemon ${name}: ${procStatus}`);
+      return;
+    }
+  } catch {}
+  console.log(`  ✗ Daemon not running (${name}). Start with: openwolf daemon start`);
 }
 
 export function daemonLogs(): void {

@@ -453,7 +453,7 @@ function copyHookScripts(wolfDir: string): void {
   const hookFiles = [
     "session-start.js", "pre-read.js", "pre-write.js",
     "post-read.js", "post-write.js", "precompact.js", "stop.js", "shared.js",
-    "anatomy-store.js", "anatomy-lock.js",
+    "anatomy-store.js", "anatomy-lock.js", "symbol-extractor.js",
   ];
 
   if (sourceDir) {

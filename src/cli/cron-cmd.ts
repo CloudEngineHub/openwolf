@@ -5,6 +5,7 @@ import { readJSON, writeJSON } from "../utils/fs-safe.js";
 import { getDashboardToken } from "../utils/dashboard-auth.js";
 import { Logger } from "../utils/logger.js";
 import { CronEngine } from "../daemon/cron-engine.js";
+import { hasPm2 } from "./daemon-cmd.js";
 
 interface CronTask {
   id: string;
@@ -21,8 +22,25 @@ interface CronManifest {
 
 interface CronState {
   engine_status: string;
+  last_heartbeat?: string | null;
   execution_log: Array<{ task_id: string; status: string; timestamp: string }>;
   dead_letter_queue: Array<{ task_id: string; error: string; timestamp: string }>;
+}
+
+const HEARTBEAT_STALE_MS = 10 * 60 * 1000;
+
+function schedulerUnavailableReason(state: CronState): string | null {
+  if (!hasPm2()) {
+    return "pm2 not installed (pnpm add -g pm2)";
+  }
+  if (!state.last_heartbeat) {
+    return "daemon not running (openwolf daemon start)";
+  }
+  const elapsed = Date.now() - new Date(state.last_heartbeat).getTime();
+  if (Number.isNaN(elapsed) || elapsed > HEARTBEAT_STALE_MS) {
+    return "daemon heartbeat stale (openwolf daemon start)";
+  }
+  return null;
 }
 
 export function cronList(): void {
@@ -48,13 +66,19 @@ export function cronList(): void {
   console.log("Cron Tasks");
   console.log("==========\n");
 
+  const unavailable = schedulerUnavailableReason(state);
+  if (unavailable) {
+    console.log(`  ⚠ Scheduler unavailable: ${unavailable}. Tasks will not fire until this is resolved.\n`);
+  }
+
   if (manifest.tasks.length === 0) {
     console.log("  No tasks configured.");
     return;
   }
 
   for (const task of manifest.tasks) {
-    const status = task.enabled ? "enabled" : "disabled";
+    let status = task.enabled ? "enabled" : "disabled";
+    if (task.enabled && unavailable) status = "enabled (scheduler unavailable)";
     const lastRun = state.execution_log
       .filter((e) => e.task_id === task.id)
       .sort((a, b) => b.timestamp.localeCompare(a.timestamp))[0];
@@ -114,6 +138,34 @@ export async function cronRun(id: string): Promise<void> {
     console.error(`Task ${id} failed: ${err instanceof Error ? err.message : String(err)}`);
     process.exit(1);
   }
+}
+
+export function cronSetEnabled(id: string, enabled: boolean): void {
+  const projectRoot = findProjectRoot();
+  const wolfDir = path.join(projectRoot, ".wolf");
+
+  if (!fs.existsSync(wolfDir)) {
+    console.log("OpenWolf not initialized. Run: openwolf init");
+    return;
+  }
+
+  const manifestPath = path.join(wolfDir, "cron-manifest.json");
+  const manifest = readJSON<CronManifest>(manifestPath, { version: 1, tasks: [] });
+  const task = manifest.tasks.find((t) => t.id === id);
+  if (!task) {
+    const known = manifest.tasks.map((t) => t.id).join(", ") || "none";
+    console.log(`Task ${id} not found. Known tasks: ${known}`);
+    return;
+  }
+
+  if (task.enabled === enabled) {
+    console.log(`Task ${id} is already ${enabled ? "enabled" : "disabled"}.`);
+    return;
+  }
+
+  task.enabled = enabled;
+  writeJSON(manifestPath, manifest);
+  console.log(`Task ${id} ${enabled ? "enabled" : "disabled"}.`);
 }
 
 export function cronRetry(id: string): void {

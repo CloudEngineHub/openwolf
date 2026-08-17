@@ -88,6 +88,14 @@ export function createProgram(): Command {
     });
 
   daemon
+    .command("status")
+    .description("Show whether the daemon is running")
+    .action(async () => {
+      const { daemonStatus } = await import("./daemon-cmd.js");
+      daemonStatus();
+    });
+
+  daemon
     .command("logs")
     .description("Show last 50 lines of daemon log")
     .action(async () => {
@@ -113,6 +121,22 @@ export function createProgram(): Command {
     .action(async (id: string) => {
       const { cronRun } = await import("./cron-cmd.js");
       await cronRun(id);
+    });
+
+  cron
+    .command("enable <id>")
+    .description("Enable a cron task")
+    .action(async (id: string) => {
+      const { cronSetEnabled } = await import("./cron-cmd.js");
+      cronSetEnabled(id, true);
+    });
+
+  cron
+    .command("disable <id>")
+    .description("Disable a cron task")
+    .action(async (id: string) => {
+      const { cronSetEnabled } = await import("./cron-cmd.js");
+      cronSetEnabled(id, false);
     });
 
   cron

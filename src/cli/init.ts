@@ -593,6 +593,7 @@ function copyHookScripts(wolfDir: string): void {
     "shared.js",
     "anatomy-store.js",
     "anatomy-lock.js",
+    "symbol-extractor.js",
   ];
 
   let copiedAny = false;
