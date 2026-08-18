@@ -175,13 +175,11 @@ export function sectionKeyOf(relPath: string): string {
 }
 
 /**
- * Render the store to markdown. For entries without symbols the output is
- * byte-identical to the legacy serializeAnatomy format. Symbols render as
- * two-space-indented sub-bullets, which every legacy parser skips (they match
- * neither the section nor the entry regex):
- *
- *   - `shared.ts` — Shared hook utilities (~3200 tok)
- *     - fn `parseAnatomy` L82-104 (~180 tok)
+ * Render the store to markdown, byte-identical to the legacy serializeAnatomy
+ * format. Symbols deliberately do NOT render: they live in anatomy-index.json
+ * and reach the model through the per-file pre-read hint. Rendering them
+ * roughly 2.4x'd anatomy.md (59% of lines on a mid-size repo), and agents
+ * instructed to consult anatomy.md paid that bill wholesale every session.
  */
 export function renderStore(store: AnatomyStoreData): string {
   const bySection = new Map<string, Array<{ file: string; entry: StoreFileEntry }>>();
@@ -212,9 +210,6 @@ export function renderStore(store: AnatomyStoreData): string {
     for (const { file, entry } of entries) {
       const desc = entry.description ? ` — ${entry.description}` : "";
       lines.push(`- \`${file}\`${desc} (~${entry.tokens} tok)`);
-      for (const sym of entry.symbols ?? []) {
-        lines.push(`  - ${sym.kind} \`${sym.name}\` L${sym.startLine}-${sym.endLine} (~${sym.tokens} tok)`);
-      }
     }
     lines.push("");
   }

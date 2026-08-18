@@ -82,19 +82,8 @@ function buildSessionDigest(wolfDir: string, budget: number): string {
     }
   } catch {}
 
-  // 4. Anatomy pointer (one line — the index itself stays on disk).
-  try {
-    const store = loadStore(wolfDir);
-    let count: number | null = store ? Object.keys(store.files).length : null;
-    if (count === null) {
-      const anatomy = fs.readFileSync(path.join(wolfDir, "anatomy.md"), "utf-8");
-      const m = anatomy.match(/Files:\s*(\d+)\s*tracked/i);
-      if (m) count = parseInt(m[1], 10);
-    }
-    if (count !== null && count > 0) {
-      tryAdd(`anatomy.md tracks ${count} files with descriptions + token sizes — check it before reading any file.`);
-    }
-  } catch {}
+  // (No anatomy pointer here: the CLAUDE.md/rules instructions already tell
+  // the model to grep anatomy.md, and repeating it in the digest paid twice.)
 
   return parts.join("\n\n");
 }

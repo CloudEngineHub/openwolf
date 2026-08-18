@@ -183,12 +183,15 @@ describe("raw line preservation (#61)", () => {
     assert.strictEqual(store.meta.fileCount, 1);
   });
 
-  test("symbol sub-bullets are not captured as raw lines", () => {
+  test("symbols never render into anatomy.md (they stay in the index)", () => {
     const store = sampleStore();
     store.files["src/index.ts"].symbols = [
       { name: "main", kind: "fn", startLine: 1, endLine: 40, tokens: 120 },
     ];
     const rendered = renderStore(store);
+    assert.ok(!/^[ \t]+- /m.test(rendered), "rendered anatomy.md must contain no indented sub-bullets");
+    assert.ok(!rendered.includes("`main`"), "symbol names must not appear in the render");
+    // And the round-trip keeps the symbols in the store untouched.
     const reimported = newStore();
     importFromMarkdown(reimported, rendered, tmpDir());
     assert.strictEqual(reimported.rawLines, undefined);
