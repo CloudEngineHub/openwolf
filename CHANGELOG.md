@@ -4,7 +4,90 @@ All notable changes to OpenWolf are documented here. The format follows
 [Keep a Changelog](https://keepachangelog.com/), and OpenWolf uses
 [Semantic Versioning](https://semver.org/).
 
-## [2.0.3] - 2026-08-17
+## [2.0.4] - 2026-08-18
+
+The repair release. A full audit against the Claude Code hooks reference
+found that most of OpenWolf's guidance never reached the model, that the
+measurement layer inflated and misattributed numbers, and that anatomy.md
+could destroy hand-written content. This release fixes all of it.
+
+### Fixed
+
+- Every hook nudge now actually reaches the model. Anatomy hints, symbol
+  slice hints, repeated-read notes, cerebrum Do-Not-Repeat warnings, buglog
+  matches, and edit-count warnings were written to stderr with exit code 0,
+  which Claude Code sends to the debug log only; the model never saw any of
+  them, in 1.x or 2.x. They now flow through the documented
+  `hookSpecificOutput.additionalContext` channel.
+- End-of-turn reminders no longer burn a full extra model turn each. The Stop
+  hook queues them and a new UserPromptSubmit hook delivers them with the next
+  user prompt. Reminders fire at most once per session, and the STATUS.md
+  staleness nudge (previously stderr-only, a no-op) joins the same queue.
+- The token ledger is idempotent. The Stop hook fires every turn, and the old
+  flush appended a cumulative session entry each time while re-adding running
+  totals (including full-transcript measured usage) to lifetime, producing
+  duplicate entries and quadratically inflated metrics. Session entries are
+  now upserted by id, lifetime is derived from the retained sessions plus an
+  archived baseline, sessions are capped at 200, and `openwolf update`
+  repairs existing inflated ledgers. A new SessionEnd hook writes the single
+  memory.md session summary that used to be appended once per turn.
+- Read-token tracking works again: the post-read hook read a `tool_output`
+  field that does not exist in the PostToolUse payload; it now parses
+  `tool_response` in all its shapes.
+- Savings are honest. The old formula credited 200 tokens per anatomy hit and
+  the full token count of every repeated read that in fact went through and
+  was paid for. Savings are now credited only for duplicate reads OpenWolf
+  verifiably prevented, and `openwolf report` leads with measured transcript
+  usage instead of estimates.
+- anatomy.md no longer destroys hand-written content above the first section
+  heading (#61, including the follow-up report): preambles survive rewrites,
+  hand-written indented notes are preserved, and an empty or unreadable
+  anatomy.md can no longer wipe preserved content on import.
+- The OpenCode plugin is de-forked from the canonical hook logic, closing a
+  cluster of already-fixed bugs it still shipped: pre-#61 anatomy data loss,
+  an .env-only sensitive-file guard (#54), missing outside-root guard, stale
+  read warnings after edits (#41), boundary-less path matching, ledger
+  inflation, and crashes on pre-2.0 ledger files.
+- Windows installs get working hooks: `$CLAUDE_PROJECT_DIR` never expands
+  under cmd.exe, which silently disabled all hooks; settings now use the
+  platform's own variable syntax.
+- `openwolf scan --check` no longer reports out-of-date immediately after a
+  scan; it compares against the exact merged render a scan would write.
+- Scanner lock contention no longer clobbers curated descriptions; the write
+  is skipped and the next scan converges.
+- Daemon and dashboard reliability: the launcher reuses this project's own
+  daemon instead of forking an orphan per invocation and persists the served
+  port; a bind race no longer kills the daemon silently; `/api/health`
+  reports real degraded states; AI cron tasks no longer freeze the daemon
+  event loop for up to two minutes; cron-state and token-ledger writers are
+  file-locked against each other; `daemon stop` kills every listener on the
+  port; memory consolidation is idempotent across runs.
+- Dashboard data: live anatomy.md updates no longer wipe symbol data derived
+  from the index; the anatomy metadata regex is anchored; memory table rows
+  with empty cells no longer shift columns.
+- CLI paper cuts: `openwolf restore` works from subdirectories; the Node 20
+  version guard runs before the CLI loads; registry writes are atomic and
+  read-only listings no longer unregister projects on unmounted volumes;
+  buglog ids no longer collide after manual deletions; the daemon staleness
+  threshold respects the configured heartbeat interval.
+- The Codex adapter merges `.codex/hooks.json` instead of clobbering user
+  hooks, and skill/rule installs never overwrite user-customized files.
+
+### Changed
+
+- The always-on context bill is much smaller. anatomy.md no longer renders
+  symbol sub-bullets (symbols stay in `anatomy-index.json` and reach the
+  model through the per-file pre-read hint), roughly halving the rendered
+  index. OPENWOLF.md is rewritten at about a third of its size; DesignQC and
+  Reframe move to on-demand skills (`/designqc` is new). The navigation rule
+  is now "grep anatomy.md for the path", never "read anatomy.md".
+- New config `openwolf.reads.duplicate_mode`: `warn` (default) injects a
+  context note on a repeated unchanged full-file read; `deny` blocks it with
+  a reason the model sees (never for ranged reads, never in subagents, never
+  after compaction, at most once per file per session); `off` only counts.
+
+Thanks to prghbla and laihenyi (#61) for the anatomy data-loss reports and
+analyses that triggered the full audit.
 
 ### Fixed
 

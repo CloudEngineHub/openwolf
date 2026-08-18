@@ -200,20 +200,24 @@ openwolf report
 ```
 
 ```
-  Estimated (char-ratio heuristic)
-    Total tokens:           1,549,658
-    Est. savings vs bare:   1,772,690
-
   Measured (from harness transcripts)
     API calls:              29
     Input tokens:           57,489
     Cache reads:            309,141
+
+  Duplicate reads denied:   14
+
+  Estimated (char-ratio heuristic; treat as rough)
+    Tokens tracked:         1,549,658
+    Saved by denied reads:  61,240
 ```
 
-Field results from 1.x deployments (20 projects, 132+ sessions) averaged a
-65.8% estimated token reduction, with 71% of repeated file reads caught and
-blocked. Those figures are heuristic estimates; 2.0 exists so your own
-numbers are measured, not modeled.
+A note on honesty: earlier releases reported large "estimated savings"
+figures produced by a heuristic that also counted tokens that were actually
+spent. 2.0.4 retires that math. Savings are now credited only for reads
+OpenWolf verifiably prevented, and the headline numbers come from the
+harness's own transcripts, measured, not modeled. If a context tool cannot
+show you measured numbers, doubt it, including this one.
 
 ## Security
 
