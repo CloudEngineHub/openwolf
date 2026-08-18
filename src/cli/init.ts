@@ -276,13 +276,13 @@ export async function initCommand(options?: { agent?: string[] }): Promise<void>
   if (isUpgrade) {
     console.log(`  ✓ OpenWolf upgraded to v${version}`);
     console.log(`  ✓ All .wolf data preserved (${skippedCount} files: cerebrum, memory, anatomy, buglog, ledger)`);
-    console.log(`  ✓ Hook scripts updated (8 hooks)`);
+    console.log(`  ✓ Hook scripts updated (9 hooks)`);
     console.log(`  ✓ ${createdCount} config files updated`);
     console.log(`  ✓ Anatomy: ${fileCount} files tracked (unchanged)`);
   } else {
     console.log(`  ✓ OpenWolf v${version} initialized`);
     console.log(`  ✓ .wolf/ created with ${createdCount} files`);
-    console.log(`  ✓ Claude Code hooks registered (8 hooks)`);
+    console.log(`  ✓ Claude Code hooks registered (9 hooks)`);
     console.log(`  ✓ CLAUDE.md updated`);
     console.log(`  ✓ .claude/rules/openwolf.md created`);
     console.log(`  ✓ Anatomy scan: ${fileCount} files indexed`);

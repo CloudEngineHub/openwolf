@@ -8,7 +8,7 @@ import { lookupEntry } from "./anatomy-store.js";
 
 interface SessionData {
   session_id: string;
-  files_read: Record<string, { count: number; tokens: number; first_read: string; read_mtime?: number }>;
+  files_read: Record<string, { count: number; tokens: number; first_read: string; read_mtime?: number; anatomy_hit?: boolean }>;
   anatomy_hits: number;
   anatomy_misses: number;
   repeated_reads_warned: number;
@@ -118,6 +118,7 @@ async function main(): Promise<void> {
     tokens: 0,
     first_read: new Date().toISOString(),
     read_mtime: readMtime,
+    anatomy_hit: found,
   };
 
   writeJSON(sessionFile, session);

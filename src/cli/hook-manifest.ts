@@ -23,6 +23,7 @@ export const HOOK_SETTINGS = {
     ],
     PreCompact: [{ matcher: "", hooks: [cmd("precompact.js", 5)] }],
     Stop: [{ matcher: "", hooks: [cmd("stop.js", 10)] }],
+    SessionEnd: [{ matcher: "", hooks: [cmd("session-end.js", 10)] }],
   },
 };
 
@@ -38,6 +39,8 @@ export const HOOK_FILES = [
   "post-write.js",
   "precompact.js",
   "stop.js",
+  "session-end.js",
+  "ledger.js",
   "shared.js",
   "anatomy-store.js",
   "anatomy-lock.js",

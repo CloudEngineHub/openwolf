@@ -17,6 +17,7 @@ import { resolveAgents, availableAgents } from "../agents/index.js";
 import { newStore, importFromMarkdown, saveStore, STORE_FILE, sha256 as storeSha256 } from "../hooks/anatomy-store.js";
 import { installSkills } from "../agents/skills.js";
 import { HOOK_SETTINGS, HOOK_FILES } from "./hook-manifest.js";
+import { emptyLedger, recomputeLifetime, type LedgerData } from "../hooks/ledger.js";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -210,6 +211,36 @@ async function updateProject(
           store.meta.renderedHash = storeSha256(md);
           saveStore(wolfDir, store);
           console.log(`    ✓ anatomy-index.json created (migrated from anatomy.md)`);
+        }
+      }
+    } catch {}
+
+    // 5a2b. One-time ledger repair: earlier stop hooks appended one CUMULATIVE
+    // session entry per turn and re-added totals to lifetime each time, so a
+    // 10-turn session shows as 10 duplicate entries with quadratically
+    // inflated lifetime numbers. Dedupe by session id (keep the last, most
+    // complete entry) and rebuild lifetime from the deduped sessions.
+    try {
+      const ledgerPath = path.join(wolfDir, "token-ledger.json");
+      if (fs.existsSync(ledgerPath)) {
+        const ledger = readJSON<LedgerData>(ledgerPath, emptyLedger());
+        if (Array.isArray(ledger.sessions) && ledger.sessions.length > 0) {
+          const before = ledger.sessions.length;
+          const byId = new Map<string, (typeof ledger.sessions)[number]>();
+          for (const s of ledger.sessions) {
+            if (s && s.id) byId.set(s.id, s);
+          }
+          if (byId.size < before || !ledger.lifetime_baseline) {
+            ledger.sessions = [...byId.values()];
+            ledger.lifetime_baseline = ledger.lifetime_baseline ?? {};
+            // total_sessions was also inflated (counted again on resume and
+            // never tied to real entries): reset it to the sessions we can
+            // actually account for.
+            ledger.lifetime.total_sessions = byId.size;
+            recomputeLifetime(ledger);
+            writeJSON(ledgerPath, ledger);
+            console.log(`    ✓ Token ledger repaired (${before} entries -> ${byId.size} sessions, lifetime recomputed)`);
+          }
         }
       }
     } catch {}
