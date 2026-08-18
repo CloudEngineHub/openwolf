@@ -11,6 +11,7 @@ import { registerProject, getRegisteredProjects } from "./registry.js";
 import { resolveAgents, detectInstalledAgents } from "../agents/index.js";
 import { installSkills } from "../agents/skills.js";
 import { newStore, importFromMarkdown, saveStore, loadStore, STORE_FILE, sha256 as storeSha256 } from "../hooks/anatomy-store.js";
+import { HOOK_SETTINGS, HOOK_FILES } from "./hook-manifest.js";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -51,91 +52,6 @@ const CREATE_IF_MISSING = [
   "suggestions.json",
 ];
 
-// Use $CLAUDE_PROJECT_DIR so hooks resolve correctly even if CWD changes during a session
-const HOOK_SETTINGS = {
-  hooks: {
-    SessionStart: [
-      {
-        matcher: "",
-        hooks: [
-          {
-            type: "command",
-            command: 'node "$CLAUDE_PROJECT_DIR/.wolf/hooks/session-start.js"',
-            timeout: 5,
-          },
-        ],
-      },
-    ],
-    PreToolUse: [
-      {
-        matcher: "Read",
-        hooks: [
-          {
-            type: "command",
-            command: 'node "$CLAUDE_PROJECT_DIR/.wolf/hooks/pre-read.js"',
-            timeout: 5,
-          },
-        ],
-      },
-      {
-        matcher: "Write|Edit|MultiEdit",
-        hooks: [
-          {
-            type: "command",
-            command: 'node "$CLAUDE_PROJECT_DIR/.wolf/hooks/pre-write.js"',
-            timeout: 5,
-          },
-        ],
-      },
-    ],
-    PostToolUse: [
-      {
-        matcher: "Read",
-        hooks: [
-          {
-            type: "command",
-            command: 'node "$CLAUDE_PROJECT_DIR/.wolf/hooks/post-read.js"',
-            timeout: 5,
-          },
-        ],
-      },
-      {
-        matcher: "Write|Edit|MultiEdit",
-        hooks: [
-          {
-            type: "command",
-            command: 'node "$CLAUDE_PROJECT_DIR/.wolf/hooks/post-write.js"',
-            timeout: 10,
-          },
-        ],
-      },
-    ],
-    PreCompact: [
-      {
-        matcher: "",
-        hooks: [
-          {
-            type: "command",
-            command: 'node "$CLAUDE_PROJECT_DIR/.wolf/hooks/precompact.js"',
-            timeout: 5,
-          },
-        ],
-      },
-    ],
-    Stop: [
-      {
-        matcher: "",
-        hooks: [
-          {
-            type: "command",
-            command: 'node "$CLAUDE_PROJECT_DIR/.wolf/hooks/stop.js"',
-            timeout: 10,
-          },
-        ],
-      },
-    ],
-  },
-};
 
 export async function initCommand(options?: { agent?: string[] }): Promise<void> {
   // Check Node.js version
@@ -360,13 +276,13 @@ export async function initCommand(options?: { agent?: string[] }): Promise<void>
   if (isUpgrade) {
     console.log(`  ✓ OpenWolf upgraded to v${version}`);
     console.log(`  ✓ All .wolf data preserved (${skippedCount} files: cerebrum, memory, anatomy, buglog, ledger)`);
-    console.log(`  ✓ Hook scripts updated (7 hooks)`);
+    console.log(`  ✓ Hook scripts updated (8 hooks)`);
     console.log(`  ✓ ${createdCount} config files updated`);
     console.log(`  ✓ Anatomy: ${fileCount} files tracked (unchanged)`);
   } else {
     console.log(`  ✓ OpenWolf v${version} initialized`);
     console.log(`  ✓ .wolf/ created with ${createdCount} files`);
-    console.log(`  ✓ Claude Code hooks registered (7 hooks)`);
+    console.log(`  ✓ Claude Code hooks registered (8 hooks)`);
     console.log(`  ✓ CLAUDE.md updated`);
     console.log(`  ✓ .claude/rules/openwolf.md created`);
     console.log(`  ✓ Anatomy scan: ${fileCount} files indexed`);
@@ -582,19 +498,7 @@ function copyHookScripts(wolfDir: string): void {
     }
   }
 
-  const hookFiles = [
-    "session-start.js",
-    "pre-read.js",
-    "pre-write.js",
-    "post-read.js",
-    "post-write.js",
-    "precompact.js",
-    "stop.js",
-    "shared.js",
-    "anatomy-store.js",
-    "anatomy-lock.js",
-    "symbol-extractor.js",
-  ];
+  const hookFiles = HOOK_FILES;
 
   let copiedAny = false;
   if (sourceDir) {

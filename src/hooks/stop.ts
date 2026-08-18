@@ -27,6 +27,8 @@ interface SessionData {
   cerebrum_warnings: number;
   stop_count: number;
   reminders_sent: Record<string, number>;
+  /** Reminders queued here are drained by the UserPromptSubmit hook next turn. */
+  pending_reminders?: string[];
 }
 
 interface SessionEntry {
@@ -89,24 +91,32 @@ async function main(): Promise<void> {
     return;
   }
 
-  // Collect end-of-turn reminders — returned as strings, then surfaced via additionalContext
+  // Collect end-of-turn reminders. Each fires at most ONCE per session, and
+  // they are QUEUED rather than emitted: Stop additionalContext forces a full
+  // continuation turn (the model re-sends the whole conversation to respond),
+  // so the UserPromptSubmit hook drains the queue into the next user turn's
+  // context instead — same visibility, zero extra turns.
   if (!session.reminders_sent) session.reminders_sent = {};
   const reminderChecks: Array<[string, string | null]> = [
     ["buglog", checkForMissingBugLogs(wolfDir, session)],
     ["cerebrum", checkCerebrumFreshness(wolfDir, session)],
     ["semantic", checkSemanticSummaries(wolfDir, session)],
+    ["status", checkStatusFreshness(wolfDir, session)],
   ];
   const reminders: string[] = [];
   for (const [key, message] of reminderChecks) {
     if (message === null) continue;
     const sent = session.reminders_sent[key] ?? 0;
-    if (sent >= 2) continue;
+    if (sent >= 1) continue;
     session.reminders_sent[key] = sent + 1;
     reminders.push(message);
   }
-
-  // Check if STATUS.md is stale relative to this session
-  checkStatusFreshness(wolfDir, session);
+  if (reminders.length > 0) {
+    if (!session.pending_reminders) session.pending_reminders = [];
+    session.pending_reminders.push(
+      `OpenWolf end-of-turn reminders:\n${reminders.map((r) => `- ${r}`).join("\n")}`
+    );
+  }
 
   // Build session entry for ledger
   const reads = Object.entries(session.files_read).map(([file, data]) => ({
@@ -210,15 +220,6 @@ async function main(): Promise<void> {
   }
 
   writeJSON(sessionFile, session);
-
-  // Surface reminders via additionalContext so they appear in Claude's next context window.
-  // Using process.stdout JSON is the only reliable way for Stop hooks to inject content
-  // into Claude Code's context — process.stderr output goes to the terminal only.
-  if (reminders.length > 0) {
-    const additionalContext = `⚠️ OpenWolf end-of-turn reminders:\n${reminders.map(r => `• ${r}`).join("\n")}`;
-    process.stdout.write(JSON.stringify({ hookSpecificOutput: { hookEventName: "Stop", additionalContext } }));
-  }
-
   process.exit(0);
 }
 
@@ -253,29 +254,25 @@ function checkForMissingBugLogs(wolfDir: string, session: SessionData): string |
  * code activity (3+ writes outside .wolf/). If so, nudge Claude to update
  * STATUS.md so the next /clear has fresh handoff context.
  */
-function checkStatusFreshness(wolfDir: string, session: SessionData): void {
+function checkStatusFreshness(wolfDir: string, session: SessionData): string | null {
   const statusPath = path.join(wolfDir, "STATUS.md");
   const codeWrites = session.files_written.filter(
     (w) => !w.file.includes("/.wolf/") && !w.file.endsWith(".tmp")
   );
+  if (codeWrites.length < 3) return null;
 
   try {
     const stat = fs.statSync(statusPath);
     const sessionStartMs = session.started ? Date.parse(session.started) : 0;
-    if (!sessionStartMs) return;
+    if (!sessionStartMs) return null;
 
-    if (codeWrites.length >= 3 && stat.mtimeMs < sessionStartMs) {
-      process.stderr.write(
-        `📌 OpenWolf: STATUS.md not updated this session despite ${codeWrites.length} code writes. Update .wolf/STATUS.md (✅ done / 🚀 next quest) before /clear so next session resumes in 1 read.\n`
-      );
+    if (stat.mtimeMs < sessionStartMs) {
+      return `STATUS.md not updated this session despite ${codeWrites.length} code writes. Update .wolf/STATUS.md (done / next quest) so the next session resumes in one read.`;
     }
+    return null;
   } catch {
-    // STATUS.md doesn't exist — nudge to create it if there were code writes
-    if (codeWrites.length >= 3) {
-      process.stderr.write(
-        `📌 OpenWolf: .wolf/STATUS.md missing. Create it with current quest summary + next steps so /clear stays cheap.\n`
-      );
-    }
+    // STATUS.md doesn't exist yet.
+    return `.wolf/STATUS.md missing. Create it with the current quest summary and next steps so /clear stays cheap.`;
   }
 }
 

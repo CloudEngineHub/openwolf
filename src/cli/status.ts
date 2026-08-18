@@ -2,6 +2,7 @@ import * as fs from "node:fs";
 import * as path from "node:path";
 import { findProjectRoot } from "../scanner/project-root.js";
 import { readJSON, readText } from "../utils/fs-safe.js";
+import { HOOK_FILES } from "./hook-manifest.js";
 
 export async function statusCommand(): Promise<void> {
   const projectRoot = findProjectRoot();
@@ -35,11 +36,7 @@ export async function statusCommand(): Promise<void> {
   }
 
   // Hook scripts check
-  const hookFiles = [
-    "session-start.js", "pre-read.js", "pre-write.js",
-    "post-read.js", "post-write.js", "precompact.js", "stop.js", "shared.js",
-    "anatomy-store.js", "anatomy-lock.js", "symbol-extractor.js",
-  ];
+  const hookFiles = HOOK_FILES;
   const hooksDir = path.join(wolfDir, "hooks");
   let hooksMissing = 0;
   for (const file of hookFiles) {

@@ -4,7 +4,7 @@ import * as crypto from "node:crypto";
 import {
   getWolfDir, ensureWolfDir, readJSON, writeJSON, readMarkdown,
   extractDescription, estimateTokens, appendMarkdown, timeShort, readStdin, normalizePath,
-  isSensitiveFile, getProjectDir
+  isSensitiveFile, getProjectDir, emitHookJSON
 } from "./shared.js";
 import { loadStoreReconciled, saveStore, renderToFile, sha256 } from "./anatomy-store.js";
 import { withAnatomyLock, HOOK_LOCK_BUDGET_MS } from "./anatomy-lock.js";
@@ -185,9 +185,9 @@ async function main(): Promise<void> {
     writeJSON(sessionFile, session);
 
     if (session.edit_counts[editKey] >= 3) {
-      process.stderr.write(
-        `⚠️ OpenWolf: ${baseName} has been edited ${session.edit_counts[editKey]} times this session. If you're fixing a bug, remember to log it to .wolf/buglog.json.\n`
-      );
+      emitHookJSON("PostToolUse", {
+        additionalContext: `OpenWolf: ${baseName} has been edited ${session.edit_counts[editKey]} times this session. If you're fixing a bug, log it to .wolf/buglog.json.`,
+      });
     }
   } catch {}
 

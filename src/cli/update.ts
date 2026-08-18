@@ -16,6 +16,7 @@ import { ensureDir } from "../utils/paths.js";
 import { resolveAgents, availableAgents } from "../agents/index.js";
 import { newStore, importFromMarkdown, saveStore, STORE_FILE, sha256 as storeSha256 } from "../hooks/anatomy-store.js";
 import { installSkills } from "../agents/skills.js";
+import { HOOK_SETTINGS, HOOK_FILES } from "./hook-manifest.js";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -56,21 +57,6 @@ const BACKUP_FILES = [
   ...USER_DATA_FILES,
 ];
 
-const HOOK_SETTINGS = {
-  hooks: {
-    SessionStart: [{ matcher: "", hooks: [{ type: "command", command: 'node "$CLAUDE_PROJECT_DIR/.wolf/hooks/session-start.js"', timeout: 5 }] }],
-    PreToolUse: [
-      { matcher: "Read", hooks: [{ type: "command", command: 'node "$CLAUDE_PROJECT_DIR/.wolf/hooks/pre-read.js"', timeout: 5 }] },
-      { matcher: "Write|Edit|MultiEdit", hooks: [{ type: "command", command: 'node "$CLAUDE_PROJECT_DIR/.wolf/hooks/pre-write.js"', timeout: 5 }] },
-    ],
-    PostToolUse: [
-      { matcher: "Read", hooks: [{ type: "command", command: 'node "$CLAUDE_PROJECT_DIR/.wolf/hooks/post-read.js"', timeout: 5 }] },
-      { matcher: "Write|Edit|MultiEdit", hooks: [{ type: "command", command: 'node "$CLAUDE_PROJECT_DIR/.wolf/hooks/post-write.js"', timeout: 10 }] },
-    ],
-    PreCompact: [{ matcher: "", hooks: [{ type: "command", command: 'node "$CLAUDE_PROJECT_DIR/.wolf/hooks/precompact.js"', timeout: 5 }] }],
-    Stop: [{ matcher: "", hooks: [{ type: "command", command: 'node "$CLAUDE_PROJECT_DIR/.wolf/hooks/stop.js"', timeout: 10 }] }],
-  },
-};
 
 interface UpdateResult {
   project: RegisteredProject;
@@ -450,11 +436,7 @@ function copyHookScripts(wolfDir: string): void {
     }
   }
 
-  const hookFiles = [
-    "session-start.js", "pre-read.js", "pre-write.js",
-    "post-read.js", "post-write.js", "precompact.js", "stop.js", "shared.js",
-    "anatomy-store.js", "anatomy-lock.js", "symbol-extractor.js",
-  ];
+  const hookFiles = HOOK_FILES;
 
   if (sourceDir) {
     for (const file of hookFiles) {

@@ -98,7 +98,7 @@ describe("hook install completeness (#68)", () => {
       "utf-8"
     );
     const lists: string[][] = [];
-    for (const m of source.matchAll(/const hookFiles = \[([\s\S]*?)\]/g)) {
+    for (const m of source.matchAll(/const (?:hookFiles|HOOK_FILES) = \[([\s\S]*?)\]/g)) {
       const names = [...m[1].matchAll(/"([^"]+\.js)"/g)].map((x) => x[1]);
       if (names.length > 0) lists.push(names);
     }
@@ -110,7 +110,9 @@ describe("hook install completeness (#68)", () => {
     return [...source.matchAll(/from\s+"\.\/([\w-]+)\.js"/g)].map((m) => `${m[1]}.js`);
   }
 
-  for (const cliFile of ["init.ts", "update.ts", "status.ts"]) {
+  // init.ts, update.ts, and status.ts all consume the shared manifest;
+  // hook-manifest.ts is the single list that must stay complete.
+  for (const cliFile of ["hook-manifest.ts"]) {
     test(`every file imported by an installed hook is listed in ${cliFile}`, () => {
       const lists = extractHookFileLists(cliFile);
       assert.ok(lists.length > 0, `no hookFiles list found in ${cliFile}`);
@@ -127,6 +129,23 @@ describe("hook install completeness (#68)", () => {
           }
         }
       }
+    });
+  }
+
+  for (const cliFile of ["init.ts", "update.ts", "status.ts"]) {
+    test(`${cliFile} consumes the shared hook manifest`, () => {
+      const source = fs.readFileSync(
+        path.join(import.meta.dirname, "..", "src", "cli", cliFile),
+        "utf-8"
+      );
+      assert.ok(
+        source.includes('from "./hook-manifest.js"'),
+        `${cliFile} must import HOOK_SETTINGS/HOOK_FILES from hook-manifest.ts`
+      );
+      assert.ok(
+        !/const hookFiles = \[/.test(source),
+        `${cliFile} must not carry its own hookFiles list`
+      );
     });
   }
 });

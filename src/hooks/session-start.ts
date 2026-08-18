@@ -148,7 +148,9 @@ async function main(): Promise<void> {
     appendMarkdown(memoryPath, header);
   }
 
-  // Check cerebrum freshness — remind Claude to learn
+  // Startup nudges — folded into the injected digest below (stderr from an
+  // exit-0 hook never reaches the model).
+  const startupNotes: string[] = [];
   try {
     const cerebrumPath = path.join(wolfDir, "cerebrum.md");
     const cerebrumContent = fs.readFileSync(cerebrumPath, "utf-8");
@@ -162,23 +164,22 @@ async function main(): Promise<void> {
     });
 
     if (entryLines.length < 3) {
-      process.stderr.write(
-        `💡 OpenWolf: cerebrum.md has only ${entryLines.length} entries. Learn from this session — record user preferences, project conventions, and mistakes to .wolf/cerebrum.md.\n`
+      startupNotes.push(
+        `cerebrum.md has only ${entryLines.length} entries. Record user preferences, project conventions, and mistakes to .wolf/cerebrum.md as you learn them this session.`
       );
     } else if (daysSinceUpdate > 3) {
-      process.stderr.write(
-        `💡 OpenWolf: cerebrum.md hasn't been updated in ${Math.floor(daysSinceUpdate)} days. Look for opportunities to add learnings this session.\n`
+      startupNotes.push(
+        `cerebrum.md hasn't been updated in ${Math.floor(daysSinceUpdate)} days. Look for opportunities to add learnings this session.`
       );
     }
   } catch {}
 
-  // Check buglog — remind if empty
   try {
     const buglogPath = path.join(wolfDir, "buglog.json");
     const buglog = readJSON<{ bugs: unknown[] }>(buglogPath, { bugs: [] });
     if (buglog.bugs.length === 0) {
-      process.stderr.write(
-        `📋 OpenWolf: buglog.json is empty. If you encounter or fix any bugs, errors, or failed tests this session, log them to .wolf/buglog.json.\n`
+      startupNotes.push(
+        `buglog.json is empty. If you encounter or fix any bugs, errors, or failed tests this session, log them to .wolf/buglog.json.`
       );
     }
   } catch {}
@@ -217,6 +218,12 @@ async function main(): Promise<void> {
       if (files.length > 0) {
         digest = `## Session in progress (context was just compacted)\nFiles already modified this session: ${files.slice(-15).join(", ")}. Do not re-read them wholesale — check .wolf/memory.md for what was done.\n\n` + digest;
       }
+    }
+
+    if (startupNotes.length > 0) {
+      digest = digest
+        ? `${digest}\n\n${startupNotes.map((n) => `- ${n}`).join("\n")}`
+        : startupNotes.map((n) => `- ${n}`).join("\n");
     }
 
     if (digest) {

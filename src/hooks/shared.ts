@@ -577,6 +577,34 @@ export function normalizePath(p: string): string {
   return p.replace(/\\/g, "/");
 }
 
+// ─── Hook JSON output (the only channel the model sees) ─────────────────────
+// Claude Code treats hook stdout as ONE JSON object; two concatenated objects
+// are invalid JSON and the whole output is silently dropped. stderr from a
+// hook that exits 0 goes to the debug log only — the model NEVER sees it, so
+// every nudge meant for the model must go through hookSpecificOutput.
+// Callers must accumulate all messages for a run and call this exactly once.
+//
+// permissionDecision "allow" is deliberately not accepted: it bypasses the
+// user's permission system (auto-approves gated tool calls). To pass through
+// with context attached, omit the decision entirely.
+
+export interface HookJSONFields {
+  additionalContext?: string;
+  permissionDecision?: "deny" | "ask";
+  permissionDecisionReason?: string;
+}
+
+export function emitHookJSON(hookEventName: string, fields: HookJSONFields): void {
+  const out: Record<string, unknown> = { hookEventName };
+  if (fields.additionalContext) out.additionalContext = fields.additionalContext;
+  if (fields.permissionDecision) {
+    out.permissionDecision = fields.permissionDecision;
+    out.permissionDecisionReason = fields.permissionDecisionReason ?? "";
+  }
+  if (Object.keys(out).length === 1) return;
+  process.stdout.write(JSON.stringify({ hookSpecificOutput: out }));
+}
+
 /**
  * Count non-mechanical semantic entries written to memory.md this session.
  * Mechanical entries (auto-generated file ops, session-end lines) don't count.

@@ -1,6 +1,6 @@
 import * as fs from "node:fs";
 import * as path from "node:path";
-import { getWolfDir, ensureWolfDir, readJSON, readMarkdown, readStdin } from "./shared.js";
+import { getWolfDir, ensureWolfDir, readJSON, readMarkdown, readStdin, emitHookJSON } from "./shared.js";
 
 interface BugEntry {
   id: string;
@@ -38,26 +38,33 @@ async function main(): Promise<void> {
 
   if (!allContent.trim()) { process.exit(0); return; }
 
+  // Model-visible notes — flushed as ONE additionalContext at exit.
+  const notes: string[] = [];
+
   // 1. Cerebrum Do-Not-Repeat check
-  checkCerebrum(wolfDir, allContent);
+  notes.push(...checkCerebrum(wolfDir, allContent));
 
   // 2. Bug log: search for similar past bugs when editing code
   // This fires when Claude is about to edit a file — if the edit looks like a fix
   // (changing error handling, modifying catch blocks, etc.), check the bug log
   if (filePath && (oldStr || content)) {
-    checkBugLog(wolfDir, filePath, oldStr, newStr, content);
+    notes.push(...checkBugLog(wolfDir, filePath, oldStr, newStr, content));
   }
 
+  if (notes.length > 0) {
+    emitHookJSON("PreToolUse", { additionalContext: notes.join("\n") });
+  }
   process.exit(0);
 }
 
-function checkCerebrum(wolfDir: string, content: string): void {
+function checkCerebrum(wolfDir: string, content: string): string[] {
   const cerebrumContent = readMarkdown(path.join(wolfDir, "cerebrum.md"));
   const doNotRepeatSection = cerebrumContent.split("## Do-Not-Repeat")[1];
-  if (!doNotRepeatSection) return;
+  if (!doNotRepeatSection) return [];
 
   const entries = doNotRepeatSection.split("## ")[0];
   const lines = entries.split("\n").filter((l) => l.trim().startsWith("[") || l.trim().startsWith("-"));
+  const warnings: string[] = [];
 
   for (const line of lines) {
     const trimmed = line.trim().replace(/^[-*]\s*/, "").replace(/^\[[\d-]+\]\s*/, "");
@@ -79,13 +86,13 @@ function checkCerebrum(wolfDir: string, content: string): void {
       try {
         const regex = new RegExp(`\\b${pattern.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}\\b`, "i");
         if (regex.test(content)) {
-          process.stderr.write(
-            `⚠️ OpenWolf cerebrum warning: "${trimmed}" — check your code before proceeding.\n`
-          );
+          warnings.push(`OpenWolf cerebrum warning: "${trimmed}". Check this edit against that rule before proceeding.`);
+          break;
         }
       } catch {}
     }
   }
+  return warnings.slice(0, 3);
 }
 
 // Common words that appear in most code — must be excluded from similarity matching
@@ -98,12 +105,12 @@ const STOP_WORDS = new Set([
   "when", "then", "else", "each", "some", "every", "only",
 ]);
 
-function checkBugLog(wolfDir: string, filePath: string, oldStr: string, newStr: string, content: string): void {
+function checkBugLog(wolfDir: string, filePath: string, oldStr: string, newStr: string, content: string): string[] {
   const bugLogPath = path.join(wolfDir, "buglog.json");
-  if (!fs.existsSync(bugLogPath)) return;
+  if (!fs.existsSync(bugLogPath)) return [];
 
   const bugLog = readJSON<BugLog>(bugLogPath, { version: 1, bugs: [] });
-  if (bugLog.bugs.length === 0) return;
+  if (bugLog.bugs.length === 0) return [];
 
   const basename = path.basename(filePath);
 
@@ -114,7 +121,7 @@ function checkBugLog(wolfDir: string, filePath: string, oldStr: string, newStr: 
     return bugBasename === basename;
   });
 
-  if (fileMatches.length === 0) return;
+  if (fileMatches.length === 0) return [];
 
   // Further filter: require tag or error_message overlap with the edit content
   const editText = (oldStr + " " + newStr + " " + content).toLowerCase();
@@ -132,17 +139,18 @@ function checkBugLog(wolfDir: string, filePath: string, oldStr: string, newStr: 
     return overlap.length >= 3;
   });
 
-  if (relevant.length === 0) return;
+  if (relevant.length === 0) return [];
 
   // Surface as a FYI, not a directive — Claude should evaluate, not blindly apply
-  process.stderr.write(
-    `📋 OpenWolf buglog: ${relevant.length} past bug(s) found for ${basename} — review for context, do NOT apply blindly:\n`
-  );
+  const lines = [
+    `OpenWolf buglog: ${relevant.length} past bug(s) recorded for ${basename}. Review for context; do NOT apply blindly:`,
+  ];
   for (const bug of relevant.slice(0, 2)) {
-    process.stderr.write(
-      `   [${bug.id}] "${bug.error_message.slice(0, 70)}"\n   Cause: ${bug.root_cause.slice(0, 80)}\n   Fix: ${bug.fix.slice(0, 80)}\n`
+    lines.push(
+      `[${bug.id}] "${bug.error_message.slice(0, 70)}" | Cause: ${bug.root_cause.slice(0, 80)} | Fix: ${bug.fix.slice(0, 80)}`
     );
   }
+  return lines;
 }
 
 function tokenize(text: string): Set<string> {

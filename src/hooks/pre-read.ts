@@ -2,7 +2,7 @@ import * as fs from "node:fs";
 import * as path from "node:path";
 import {
   getWolfDir, ensureWolfDir, readJSON, writeJSON,
-  estimateTokens, readStdin, normalizePath, getProjectDir
+  estimateTokens, readStdin, normalizePath, getProjectDir, emitHookJSON
 } from "./shared.js";
 import { lookupEntry } from "./anatomy-store.js";
 
@@ -51,6 +51,9 @@ async function main(): Promise<void> {
     repeated_reads_warned: 0,
   });
 
+  // Model-visible notes for this run — flushed as ONE additionalContext at exit.
+  const notes: string[] = [];
+
   // Check if already read this session
   if (session.files_read[normalizedFile]) {
     const prev = session.files_read[normalizedFile];
@@ -60,12 +63,13 @@ async function main(): Promise<void> {
       modifiedSinceRead = prev.read_mtime === undefined || mtime > prev.read_mtime;
     } catch {}
     if (!modifiedSinceRead) {
-      process.stderr.write(
-        `⚡ OpenWolf: ${path.basename(normalizedFile)} was already read this session (~${prev.tokens} tokens), unchanged since. If you only need the gist, your earlier read may suffice; if you need exact text (an edit anchor, verbatim lines, line numbers), re-read rather than reconstructing from memory.\n`
+      notes.push(
+        `OpenWolf: ${path.basename(normalizedFile)} was already read this session (~${prev.tokens} tok), unchanged since. If you only need the gist, your earlier read may suffice; for exact text (edit anchors, line numbers), the re-read is fine.`
       );
       session.files_read[normalizedFile].count++;
       session.repeated_reads_warned++;
       writeJSON(sessionFile, session);
+      emitHookJSON("PreToolUse", { additionalContext: notes.join("\n") });
       process.exit(0);
       return;
     }
@@ -76,9 +80,9 @@ async function main(): Promise<void> {
   const entry = lookupEntry(wolfDir, projectDir, normalizedFile);
   const found = entry !== null;
   if (entry) {
-    process.stderr.write(
-      `📋 OpenWolf anatomy: ${entry.file} — ${entry.description} (~${entry.tokens} tok)\n`
-    );
+    if (entry.description) {
+      notes.push(`OpenWolf anatomy: ${entry.file}: ${entry.description} (~${entry.tokens} tok)`);
+    }
 
     // Symbol hint (F2b Phase B): point at slices of big files. Suppressed if
     // the on-disk file no longer matches what was indexed — a stale line
@@ -93,9 +97,7 @@ async function main(): Promise<void> {
       if (fresh) {
         const top = [...entry.symbols].sort((a, b) => b.tokens - a.tokens).slice(0, 5);
         const list = top.map((s) => `${s.kind} ${s.name} L${s.startLine}-${s.endLine} ~${s.tokens} tok`).join("; ");
-        process.stderr.write(
-          `   ↳ symbols: ${list}. Read with offset/limit to fetch just the part you need.\n`
-        );
+        notes.push(`Largest sections: ${list}. Read with offset/limit to fetch just the part you need.`);
       }
     }
   }
@@ -119,6 +121,9 @@ async function main(): Promise<void> {
   };
 
   writeJSON(sessionFile, session);
+  if (notes.length > 0) {
+    emitHookJSON("PreToolUse", { additionalContext: notes.join("\n") });
+  }
   process.exit(0);
 }
 
