@@ -81,12 +81,12 @@ function trySteal(lockPath: string): void {
 }
 
 /**
- * Run `fn` while holding the anatomy lock. Returns fn's result, or null if
+ * Run `fn` while holding the named lockfile. Returns fn's result, or null if
  * the lock could not be acquired within `budgetMs` (caller must degrade
- * gracefully — skip the update, never block).
+ * gracefully — skip the update, never block). Same mechanism as the anatomy
+ * lock; used for the other multi-writer JSON files (cron-state, token-ledger).
  */
-export function withAnatomyLock<T>(wolfDir: string, budgetMs: number, fn: () => T): T | null {
-  const lockPath = path.join(wolfDir, LOCK_FILE);
+export function withFileLock<T>(lockPath: string, budgetMs: number, fn: () => T): T | null {
   const deadline = Date.now() + budgetMs;
 
   while (true) {
@@ -101,4 +101,12 @@ export function withAnatomyLock<T>(wolfDir: string, budgetMs: number, fn: () => 
   } finally {
     try { fs.unlinkSync(lockPath); } catch {}
   }
+}
+
+/**
+ * Run `fn` while holding the anatomy lock. Returns fn's result, or null if
+ * the lock could not be acquired within `budgetMs`.
+ */
+export function withAnatomyLock<T>(wolfDir: string, budgetMs: number, fn: () => T): T | null {
+  return withFileLock(path.join(wolfDir, LOCK_FILE), budgetMs, fn);
 }

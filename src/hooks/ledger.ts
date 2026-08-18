@@ -1,5 +1,6 @@
 import * as path from "node:path";
 import { readJSON, writeJSON, readTranscriptUsage, detectAgent, type RealUsage } from "./shared.js";
+import { withFileLock, HOOK_LOCK_BUDGET_MS } from "./anatomy-lock.js";
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Token-ledger writer shared by the Stop and SessionEnd hooks.
@@ -212,20 +213,25 @@ export function recomputeLifetime(ledger: LedgerData): void {
 export function flushSessionToLedger(wolfDir: string, entry: SessionEntry): void {
   if (!entry.id) return;
   const ledgerPath = path.join(wolfDir, "token-ledger.json");
-  const ledger = readJSON<LedgerData>(ledgerPath, emptyLedger());
-  if (!Array.isArray(ledger.sessions)) ledger.sessions = [];
+  // Locked read-modify-write: the daemon's report generator writes this file
+  // too, and an unlocked interleave dropped whole sessions. On contention we
+  // skip — the upsert is idempotent, so the next Stop converges the state.
+  withFileLock(ledgerPath + ".lock", HOOK_LOCK_BUDGET_MS, () => {
+    const ledger = readJSON<LedgerData>(ledgerPath, emptyLedger());
+    if (!Array.isArray(ledger.sessions)) ledger.sessions = [];
 
-  const idx = ledger.sessions.findIndex((s) => s && s.id === entry.id);
-  if (idx >= 0) ledger.sessions[idx] = entry;
-  else ledger.sessions.push(entry);
+    const idx = ledger.sessions.findIndex((s) => s && s.id === entry.id);
+    if (idx >= 0) ledger.sessions[idx] = entry;
+    else ledger.sessions.push(entry);
 
-  while (ledger.sessions.length > MAX_LEDGER_SESSIONS) {
-    const oldest = ledger.sessions.shift()!;
-    const baseline = numericFields(ledger.lifetime_baseline);
-    foldEntry(baseline, oldest);
-    ledger.lifetime_baseline = baseline;
-  }
+    while (ledger.sessions.length > MAX_LEDGER_SESSIONS) {
+      const oldest = ledger.sessions.shift()!;
+      const baseline = numericFields(ledger.lifetime_baseline);
+      foldEntry(baseline, oldest);
+      ledger.lifetime_baseline = baseline;
+    }
 
-  recomputeLifetime(ledger);
-  writeJSON(ledgerPath, ledger);
+    recomputeLifetime(ledger);
+    writeJSON(ledgerPath, ledger);
+  });
 }

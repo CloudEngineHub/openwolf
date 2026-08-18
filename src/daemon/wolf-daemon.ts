@@ -6,6 +6,8 @@ import type { Request, Response, NextFunction } from "express";
 import { WebSocketServer, WebSocket } from "ws";
 import { findProjectRoot } from "../scanner/project-root.js";
 import { readJSON, writeJSON, readText } from "../utils/fs-safe.js";
+import { getHealth } from "./health.js";
+import { withFileLock } from "../hooks/anatomy-lock.js";
 import { Logger } from "../utils/logger.js";
 import { getDashboardToken, validateDashboardToken } from "../utils/dashboard-auth.js";
 import { CronEngine } from "./cron-engine.js";
@@ -140,22 +142,9 @@ const projectMeta = detectProjectMeta();
 app.use("/api", requireDashboardAuth);
 
 app.get("/api/health", (_req, res) => {
-  const cronState = readJSON<{ engine_status: string; last_heartbeat: string | null; dead_letter_queue: unknown[] }>(
-    path.join(wolfDir, "cron-state.json"),
-    { engine_status: "unknown", last_heartbeat: null, dead_letter_queue: [] }
-  );
-  const cronManifest = readJSON<{ tasks?: unknown[] }>(
-    path.join(wolfDir, "cron-manifest.json"),
-    { tasks: [] }
-  );
-  const taskCount = Array.isArray(cronManifest.tasks) ? cronManifest.tasks.length : 0;
-  res.json({
-    status: "healthy",
-    uptime_seconds: Math.floor((Date.now() - startTime) / 1000),
-    last_heartbeat: cronState.last_heartbeat,
-    tasks: taskCount,
-    dead_letters: cronState.dead_letter_queue.length,
-  });
+  // getHealth computes real degraded/unhealthy states from the dead-letter
+  // queue; the route used to hardcode "healthy" regardless.
+  res.json(getHealth(wolfDir, startTime));
 });
 
 app.get("/api/project", (_req, res) => {
@@ -220,6 +209,13 @@ const port = Number.isInteger(envPort) && envPort > 0 ? envPort : config.openwol
 const host = config.openwolf.dashboard.host || "127.0.0.1";
 const server = app.listen(port, host, () => {
   logger.info(`Dashboard server listening on ${host}:${port}`);
+});
+server.on("error", (err: NodeJS.ErrnoException) => {
+  // Without this handler a bind race (EADDRINUSE between the launcher's port
+  // probe and our listen) is an uncaught exception that kills the daemon
+  // silently under stdio:"ignore".
+  logger.error(`Dashboard server failed to bind ${host}:${port}: ${err.code ?? err.message}`);
+  process.exit(1);
 });
 
 // WebSocket server
@@ -286,13 +282,15 @@ function handleDashboardCommand(msg: { type: string; task_id?: string }): void {
     case "retry_dead_letter":
       if (msg.task_id) {
         const statePath = path.join(wolfDir, "cron-state.json");
-        const state = readJSON<{ dead_letter_queue: Array<{ task_id: string }> }>(statePath, {
-          dead_letter_queue: [],
+        withFileLock(statePath + ".lock", 2000, () => {
+          const state = readJSON<{ dead_letter_queue: Array<{ task_id: string }> }>(statePath, {
+            dead_letter_queue: [],
+          });
+          state.dead_letter_queue = state.dead_letter_queue.filter(
+            (d) => d.task_id !== msg.task_id
+          );
+          writeJSON(statePath, state);
         });
-        state.dead_letter_queue = state.dead_letter_queue.filter(
-          (d) => d.task_id !== msg.task_id
-        );
-        writeJSON(statePath, state);
       }
       break;
     case "force_scan":
@@ -340,18 +338,22 @@ startFileWatcher(wolfDir, logger, broadcast);
 const heartbeatInterval = config.openwolf.cron.heartbeat_interval_minutes * 60 * 1000;
 const heartbeatTimer = setInterval(() => {
   const statePath = path.join(wolfDir, "cron-state.json");
-  const state = readJSON<Record<string, unknown>>(statePath, {});
-  state.last_heartbeat = new Date().toISOString();
-  writeJSON(statePath, state);
+  withFileLock(statePath + ".lock", 2000, () => {
+    const state = readJSON<Record<string, unknown>>(statePath, {});
+    state.last_heartbeat = new Date().toISOString();
+    writeJSON(statePath, state);
+  });
   broadcast({ type: "health", status: "healthy", uptime: Math.floor((Date.now() - startTime) / 1000) });
 }, heartbeatInterval);
 
 // Update cron-state to running
 const cronStatePath = path.join(wolfDir, "cron-state.json");
-const cronState = readJSON<Record<string, unknown>>(cronStatePath, {});
-cronState.engine_status = "running";
-cronState.last_heartbeat = new Date().toISOString();
-writeJSON(cronStatePath, cronState);
+withFileLock(cronStatePath + ".lock", 2000, () => {
+  const cronState = readJSON<Record<string, unknown>>(cronStatePath, {});
+  cronState.engine_status = "running";
+  cronState.last_heartbeat = new Date().toISOString();
+  writeJSON(cronStatePath, cronState);
+});
 
 logger.info("OpenWolf daemon started");
 

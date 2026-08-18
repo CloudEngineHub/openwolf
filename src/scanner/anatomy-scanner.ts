@@ -197,31 +197,46 @@ export function buildAnatomy(wolfDir: string, projectRoot: string): { content: s
   return { content: renderStore(store), fileCount: Object.keys(store.files).length, store };
 }
 
+/**
+ * Merge a fresh disk walk into the reconciled store WITHOUT writing anything:
+ * the fresh file set wins (only code path allowed to delete entries), but
+ * curated descriptions, symbols, preamble, and raw lines survive. Shared by
+ * scanProject (which writes under the lock) and `scan --check` (which must
+ * compare against exactly what a scan would write).
+ */
+export function buildMergedStore(
+  wolfDir: string,
+  projectRoot: string,
+  fresh: AnatomyStoreData
+): AnatomyStoreData {
+  const existing = loadStoreReconciled(wolfDir, projectRoot);
+  for (const [relPath, entry] of Object.entries(fresh.files)) {
+    const prev = existing.files[relPath];
+    if (prev && ((prev.hash && prev.hash === entry.hash) || prev.source === "md-import")) {
+      // Content unchanged or human-edited: keep the curated description.
+      if (prev.description) entry.description = prev.description;
+      if (prev.hash === entry.hash && prev.symbols) entry.symbols = prev.symbols;
+    }
+  }
+  existing.files = fresh.files;
+  return existing;
+}
+
 export function scanProject(wolfDir: string, projectRoot: string): number {
   const { fileCount, store: fresh } = buildAnatomy(wolfDir, projectRoot);
 
   const result = withAnatomyLock(wolfDir, CLI_LOCK_BUDGET_MS, () => {
-    // Absorb md-side edits, then full-replace: the fresh disk walk defines
-    // the file set (this is the only code path allowed to delete entries).
-    const existing = loadStoreReconciled(wolfDir, projectRoot);
-    for (const [relPath, entry] of Object.entries(fresh.files)) {
-      const prev = existing.files[relPath];
-      if (prev && ((prev.hash && prev.hash === entry.hash) || prev.source === "md-import")) {
-        // Content unchanged or human-edited: keep the curated description.
-        if (prev.description) entry.description = prev.description;
-        if (prev.hash === entry.hash && prev.symbols) entry.symbols = prev.symbols;
-      }
-    }
-    existing.files = fresh.files;
+    const existing = buildMergedStore(wolfDir, projectRoot, fresh);
     existing.meta.lastScanned = new Date().toISOString();
     renderToFile(wolfDir, existing);
     saveStore(wolfDir, existing);
     return true;
   });
   if (result === null) {
-    // Lock contention: fall back to writing the render directly (rare; the
-    // next locked writer reconciles via the md import path).
-    writeText(path.join(wolfDir, "anatomy.md"), renderStore(fresh));
+    // Lock contention: skip the write entirely. The old fallback wrote the
+    // fresh render straight to anatomy.md, and the next locked writer's
+    // "md wins" reconcile then permanently overwrote curated descriptions.
+    console.warn("  ! anatomy is being updated by another process; scan results not written (re-run to converge)");
   }
 
   // Record scan state so hooks can detect staleness (git switches, editor

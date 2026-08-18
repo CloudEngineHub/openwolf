@@ -39,24 +39,32 @@ export function hasPm2(): boolean {
   }
 }
 
-function findPidOnPort(port: number): number | null {
+function findPidsOnPort(port: number): number[] {
+  const pids = new Set<number>();
   try {
     if (isWindows()) {
       const output = execFileSync("netstat", ["-ano", "-p", "tcp"], { encoding: "utf-8" });
       for (const line of output.split("\n")) {
-        if (line.includes(`:${port}`) && line.includes("LISTENING")) {
-          const parts = line.trim().split(/\s+/);
-          const pid = parseInt(parts[parts.length - 1], 10);
-          if (pid > 0) return pid;
-        }
+        // Match the local-address column only; a bare `:port` substring also
+        // matched the foreign-address column and killed unrelated processes.
+        if (!line.includes("LISTENING")) continue;
+        const parts = line.trim().split(/\s+/);
+        const local = parts[1] ?? "";
+        if (!local.endsWith(`:${port}`)) continue;
+        const pid = parseInt(parts[parts.length - 1], 10);
+        if (pid > 0) pids.add(pid);
       }
     } else {
+      // lsof -ti can return several newline-separated pids; the old parseInt
+      // of the whole output killed only the first and left stale listeners.
       const output = execFileSync("lsof", ["-ti", `:${port}`], { encoding: "utf-8" });
-      const pid = parseInt(output.trim(), 10);
-      if (pid > 0) return pid;
+      for (const part of output.split("\n")) {
+        const pid = parseInt(part.trim(), 10);
+        if (pid > 0) pids.add(pid);
+      }
     }
   } catch {}
-  return null;
+  return [...pids];
 }
 
 function killPid(pid: number): boolean {
@@ -127,12 +135,14 @@ export function daemonStop(): void {
 
   // Fall back to killing whatever is listening on the dashboard port
   const port = getDashboardPort();
-  const pid = findPidOnPort(port);
-  if (pid) {
-    if (killPid(pid)) {
-      console.log(`  ✓ Daemon stopped (PID ${pid} on port ${port})`);
-    } else {
-      console.error(`  Failed to kill process ${pid} on port ${port}.`);
+  const pids = findPidsOnPort(port);
+  if (pids.length > 0) {
+    for (const pid of pids) {
+      if (killPid(pid)) {
+        console.log(`  ✓ Daemon stopped (PID ${pid} on port ${port})`);
+      } else {
+        console.error(`  Failed to kill process ${pid} on port ${port}.`);
+      }
     }
   } else {
     console.log(`  No daemon running on port ${port}.`);
@@ -162,8 +172,7 @@ export function daemonRestart(): void {
 
   // Fall back: stop then start via dashboard command flow
   const port = getDashboardPort();
-  const pid = findPidOnPort(port);
-  if (pid) {
+  for (const pid of findPidsOnPort(port)) {
     killPid(pid);
     console.log(`  Stopped old daemon (PID ${pid}).`);
   }

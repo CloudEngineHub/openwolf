@@ -52,9 +52,35 @@ export const codexAdapter: AgentAdapter = {
     const codexDir = path.join(ctx.projectRoot, ".codex");
     fs.mkdirSync(codexDir, { recursive: true });
 
-    // 1. Register hooks
+    // 1. Register hooks. MERGE with any existing hooks.json: the file may
+    // carry the user's own hooks, and a blind overwrite clobbered them.
+    // OpenWolf entries are recognized by their .wolf/hooks/ command path and
+    // replaced; everything else is preserved.
     const hooksPath = path.join(codexDir, "hooks.json");
-    fs.writeFileSync(hooksPath, JSON.stringify(buildCodexHooks(ctx.projectRoot), null, 2) + "\n", "utf-8");
+    const ours = buildCodexHooks(ctx.projectRoot);
+    let merged: { hooks: Record<string, unknown[]> } = ours;
+    try {
+      if (fs.existsSync(hooksPath)) {
+        const existing = JSON.parse(fs.readFileSync(hooksPath, "utf-8")) as { hooks?: Record<string, unknown[]> };
+        if (existing && typeof existing === "object" && existing.hooks) {
+          const isOurs = (matcherEntry: unknown): boolean => {
+            const s = JSON.stringify(matcherEntry);
+            return s.includes(".wolf/hooks") || s.includes(".wolf\\\\hooks");
+          };
+          const combined: Record<string, unknown[]> = {};
+          const events = new Set([...Object.keys(existing.hooks), ...Object.keys(ours.hooks)]);
+          for (const event of events) {
+            const theirs = (existing.hooks[event] ?? []).filter((m) => !isOurs(m));
+            const ourEvent = (ours.hooks as Record<string, unknown[]>)[event] ?? [];
+            combined[event] = [...theirs, ...ourEvent];
+          }
+          merged = { hooks: combined };
+        }
+      }
+    } catch {
+      // Unparseable existing file: fall back to writing just our hooks.
+    }
+    fs.writeFileSync(hooksPath, JSON.stringify(merged, null, 2) + "\n", "utf-8");
     actions.push("Codex hooks registered (.codex/hooks.json)");
 
     // 2. Enable the hooks feature — but never corrupt an existing config.toml.
@@ -64,7 +90,9 @@ export const codexAdapter: AgentAdapter = {
       actions.push("Codex hooks feature enabled (.codex/config.toml)");
     } else {
       const existing = fs.readFileSync(configPath, "utf-8");
-      if (!/hooks\s*=\s*true/.test(existing)) {
+      // Anchored: the old /hooks\s*=\s*true/ also matched "webhooks = true"
+      // or a commented "# hooks = true" and suppressed the warning.
+      if (!/^\s*hooks\s*=\s*true\s*$/m.test(existing)) {
         warnings.push('add "hooks = true" under [features] in .codex/config.toml');
       }
     }

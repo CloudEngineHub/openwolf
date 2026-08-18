@@ -1,10 +1,11 @@
 import * as fs from "node:fs";
 import * as path from "node:path";
-import { execFileSync, spawnSync } from "node:child_process";
+import { execFileSync, spawn } from "node:child_process";
 import cron from "node-cron";
 import { readJSON, writeJSON, readText, writeText, appendText } from "../utils/fs-safe.js";
 import { scanProject } from "../scanner/anatomy-scanner.js";
 import { detectWaste } from "../tracker/waste-detector.js";
+import { withFileLock } from "../hooks/anatomy-lock.js";
 import type { Logger } from "../utils/logger.js";
 
 interface CronAction {
@@ -117,6 +118,27 @@ export class CronEngine {
     writeJSON(path.join(this.wolfDir, "cron-state.json"), state);
   }
 
+  /**
+   * Locked read-modify-write for cron-state.json: the daemon heartbeat and
+   * websocket handlers write it concurrently, and unlocked interleaves
+   * dropped execution-log / dead-letter entries.
+   */
+  private mutateState(mutator: (state: CronState) => void): void {
+    const lockPath = path.join(this.wolfDir, "cron-state.json.lock");
+    const done = withFileLock(lockPath, 2000, () => {
+      const state = this.readState();
+      mutator(state);
+      this.writeState(state);
+      return true;
+    });
+    if (done === null) {
+      // Contention beyond budget: apply last-writer-wins rather than losing the entry.
+      const state = this.readState();
+      mutator(state);
+      this.writeState(state);
+    }
+  }
+
   private async executeTask(task: CronTask): Promise<void> {
     const startTime = Date.now();
     this.logger.info(`Executing task: ${task.name}`);
@@ -126,18 +148,18 @@ export class CronEngine {
       const duration = Date.now() - startTime;
 
       // Log success
-      const state = this.readState();
-      state.execution_log.push({
-        task_id: task.id,
-        status: "success",
-        timestamp: new Date().toISOString(),
-        duration_ms: duration,
+      this.mutateState((state) => {
+        state.execution_log.push({
+          task_id: task.id,
+          status: "success",
+          timestamp: new Date().toISOString(),
+          duration_ms: duration,
+        });
+        // Keep last 100 entries
+        if (state.execution_log.length > 100) {
+          state.execution_log = state.execution_log.slice(-100);
+        }
       });
-      // Keep last 100 entries
-      if (state.execution_log.length > 100) {
-        state.execution_log = state.execution_log.slice(-100);
-      }
-      this.writeState(state);
 
       this.failureCounts.set(task.id, 0);
       this.broadcast({
@@ -164,25 +186,24 @@ export class CronEngine {
         }, delay);
       } else {
         // Dead letter or skip
-        const state = this.readState();
-        state.execution_log.push({
-          task_id: task.id,
-          status: "failed",
-          timestamp: new Date().toISOString(),
-          duration_ms: duration,
-          error: errorMsg,
-        });
-
-        if (task.failsafe.dead_letter) {
-          state.dead_letter_queue.push({
+        this.mutateState((state) => {
+          state.execution_log.push({
             task_id: task.id,
-            error: errorMsg,
+            status: "failed",
             timestamp: new Date().toISOString(),
-            attempts: failures,
+            duration_ms: duration,
+            error: errorMsg,
           });
-        }
 
-        this.writeState(state);
+          if (task.failsafe.dead_letter) {
+            state.dead_letter_queue.push({
+              task_id: task.id,
+              error: errorMsg,
+              timestamp: new Date().toISOString(),
+              attempts: failures,
+            });
+          }
+        });
         this.failureCounts.set(task.id, 0);
       }
 
@@ -292,13 +313,17 @@ export class CronEngine {
   private generateTokenReport(): void {
     const flags = detectWaste(this.wolfDir);
     const ledgerPath = path.join(this.wolfDir, "token-ledger.json");
-    const ledger = readJSON<Record<string, unknown>>(ledgerPath, {});
-    (ledger as { waste_flags: unknown[] }).waste_flags = flags;
-    (ledger as { optimization_report: { last_generated: string; patterns: unknown[] } }).optimization_report = {
-      last_generated: new Date().toISOString(),
-      patterns: flags.map((f) => f.pattern),
-    };
-    writeJSON(ledgerPath, ledger);
+    // Same lock the hooks' ledger writer uses: an unlocked rewrite here could
+    // clobber a concurrent Stop-hook flush and lose whole sessions.
+    withFileLock(ledgerPath + ".lock", 2000, () => {
+      const ledger = readJSON<Record<string, unknown>>(ledgerPath, {});
+      (ledger as { waste_flags: unknown[] }).waste_flags = flags;
+      (ledger as { optimization_report: { last_generated: string; patterns: unknown[] } }).optimization_report = {
+        last_generated: new Date().toISOString(),
+        patterns: flags.map((f) => f.pattern),
+      };
+      writeJSON(ledgerPath, ledger);
+    });
   }
 
   private hasClaude(): boolean {
@@ -339,14 +364,12 @@ export class CronEngine {
       delete env.ANTHROPIC_API_KEY;
 
       const claudeBin = process.platform === "win32" ? "claude.cmd" : "claude";
-      const proc = spawnSync(claudeBin, ["-p", "--output-format", "text"], {
-        input: fullPrompt,
+      // Async spawn: spawnSync froze the daemon's whole event loop (HTTP API,
+      // websockets, heartbeat, other cron tasks) for up to 2 minutes per task.
+      const proc = await runClaudeAsync(claudeBin, ["-p", "--output-format", "text"], fullPrompt, {
         timeout: 120000,
-        encoding: "utf-8",
         cwd: this.projectRoot,
         env,
-        stdio: ["pipe", "pipe", "pipe"],
-        windowsHide: true,
       });
 
       if (proc.error) {
@@ -402,4 +425,51 @@ export class CronEngine {
 
     return resolved;
   }
+}
+
+/**
+ * Async replacement for spawnSync with the same result shape the caller
+ * checks (error/status/stdout/stderr). Pipes the prompt via stdin to avoid
+ * command-line length limits on Windows.
+ */
+function runClaudeAsync(
+  bin: string,
+  args: string[],
+  input: string,
+  opts: { timeout: number; cwd: string; env: NodeJS.ProcessEnv }
+): Promise<{ error?: Error; status: number | null; stdout: string; stderr: string }> {
+  return new Promise((resolve) => {
+    const child = spawn(bin, args, {
+      cwd: opts.cwd,
+      env: opts.env,
+      stdio: ["pipe", "pipe", "pipe"],
+      windowsHide: true,
+    });
+    let stdout = "";
+    let stderr = "";
+    let settled = false;
+    const timer = setTimeout(() => {
+      if (settled) return;
+      settled = true;
+      try { child.kill("SIGKILL"); } catch {}
+      resolve({ error: new Error(`Timed out after ${opts.timeout}ms`), status: null, stdout, stderr });
+    }, opts.timeout);
+
+    child.stdout.on("data", (d) => { stdout += String(d); });
+    child.stderr.on("data", (d) => { stderr += String(d); });
+    child.on("error", (err) => {
+      if (settled) return;
+      settled = true;
+      clearTimeout(timer);
+      resolve({ error: err, status: null, stdout, stderr });
+    });
+    child.on("close", (code) => {
+      if (settled) return;
+      settled = true;
+      clearTimeout(timer);
+      resolve({ status: code, stdout, stderr });
+    });
+    child.stdin.on("error", () => {});
+    child.stdin.end(input);
+  });
 }

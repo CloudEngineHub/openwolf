@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useRef } from "react";
 import { dashboardFetch, WolfClient } from "../lib/wolf-client.js";
 import { parseAnatomy, parseMemory, parseCerebrum } from "../lib/file-parsers.js";
 import type { AnatomyEntry, MemorySession, CerebrumData } from "../lib/file-parsers.js";
@@ -123,6 +123,11 @@ export function useWolfData(): WolfData {
   const [client, setClient] = useState<WolfClient | null>(null);
   const [authError, setAuthError] = useState(false);
 
+  // True once anatomy state came from the store: a later file_changed event
+  // carrying only anatomy.md (which the hooks re-render after every write)
+  // must not overwrite the richer index-derived state and drop the symbols.
+  const anatomyFromIndex = useRef(false);
+
   const processFiles = useCallback((files: Record<string, string>) => {
     if (files["anatomy-index.json"]) {
       try {
@@ -141,10 +146,11 @@ export function useWolfData(): WolfData {
           entries,
           metadata: { files: entries.length, hits: store.meta?.hits ?? 0, misses: store.meta?.misses ?? 0 },
         });
+        anatomyFromIndex.current = true;
       } catch {
-        if (files["anatomy.md"]) setAnatomy(parseAnatomy(files["anatomy.md"]));
+        if (files["anatomy.md"] && !anatomyFromIndex.current) setAnatomy(parseAnatomy(files["anatomy.md"]));
       }
-    } else if (files["anatomy.md"]) setAnatomy(parseAnatomy(files["anatomy.md"]));
+    } else if (files["anatomy.md"] && !anatomyFromIndex.current) setAnatomy(parseAnatomy(files["anatomy.md"]));
     if (files["cerebrum.md"]) setCerebrum(parseCerebrum(files["cerebrum.md"]));
     if (files["memory.md"]) setMemory(parseMemory(files["memory.md"]));
     if (files["token-ledger.json"]) {

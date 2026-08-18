@@ -2,10 +2,15 @@
 // registered in Claude Code settings. init.ts and update.ts both consume this
 // so the two can never drift (they used to carry hand-mirrored copies).
 
-// Use $CLAUDE_PROJECT_DIR so hooks resolve correctly even if CWD changes during a session
+// Use the CLAUDE_PROJECT_DIR env var so hooks resolve correctly even if CWD
+// changes during a session. The expansion syntax is platform-specific:
+// $VAR never expands under cmd.exe, which silently disabled all hooks for
+// Windows installs. Settings are generated per machine at init/update time,
+// so baking in the local platform's syntax is safe.
+const PROJECT_DIR_VAR = process.platform === "win32" ? "%CLAUDE_PROJECT_DIR%" : "$CLAUDE_PROJECT_DIR";
 const cmd = (file: string, timeout: number) => ({
   type: "command" as const,
-  command: `node "$CLAUDE_PROJECT_DIR/.wolf/hooks/${file}"`,
+  command: `node "${PROJECT_DIR_VAR}/.wolf/hooks/${file}"`,
   timeout,
 });
 

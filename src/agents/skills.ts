@@ -29,14 +29,30 @@ export function installSkills(projectRoot: string, templatesDir: string, agents:
   for (const { agent, dir } of destinations) {
     fs.mkdirSync(dir, { recursive: true });
     let installed = 0;
+    const skipped: string[] = [];
     for (const skill of SKILLS) {
       const src = path.join(skillsDir, `${skill}.md`);
       if (!fs.existsSync(src)) continue;
-      safeCopyFile(src, path.join(dir, `${skill}.md`));
+      const dest = path.join(dir, `${skill}.md`);
+      // Idempotency contract (types.ts): never clobber a file the user has
+      // customized. Overwrite only when missing or identical to our template;
+      // a differing file is theirs now — skip it and say so.
+      if (fs.existsSync(dest)) {
+        const existing = fs.readFileSync(dest, "utf-8");
+        const template = fs.readFileSync(src, "utf-8");
+        if (existing !== template) {
+          skipped.push(`/${skill}`);
+          continue;
+        }
+      }
+      safeCopyFile(src, dest);
       installed++;
     }
     if (installed > 0) {
       actions.push(`Skills installed for ${agent}: ${SKILLS.map((s) => `/${s}`).join(", ")}`);
+    }
+    if (skipped.length > 0) {
+      actions.push(`Skills left untouched for ${agent} (customized): ${skipped.join(", ")} (delete the file to get the updated template)`);
     }
   }
   return actions;

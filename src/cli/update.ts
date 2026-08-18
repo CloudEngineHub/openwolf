@@ -11,6 +11,7 @@ import * as fs from "node:fs";
 import * as path from "node:path";
 import { fileURLToPath } from "node:url";
 import { getRegisteredProjects, registerProject, type RegisteredProject } from "./registry.js";
+import { findProjectRoot } from "../scanner/project-root.js";
 import { readJSON, writeJSON, readText, writeText, safeCopyFile } from "../utils/fs-safe.js";
 import { ensureDir } from "../utils/paths.js";
 import { resolveAgents, availableAgents } from "../agents/index.js";
@@ -537,7 +538,9 @@ export function listProjects(): void {
  * Restore a project's .wolf from a backup
  */
 export function restoreCommand(backupName?: string): void {
-  const wolfDir = path.join(process.cwd(), ".wolf");
+  // findProjectRoot, not cwd: run from a subdirectory, cwd has no .wolf and
+  // restore reported "No backups found" while every other command worked.
+  const wolfDir = path.join(findProjectRoot(), ".wolf");
   const backupsDir = path.join(wolfDir, "backups");
 
   if (!fs.existsSync(backupsDir)) {

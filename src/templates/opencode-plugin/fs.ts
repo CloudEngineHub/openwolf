@@ -10,9 +10,50 @@ export function wolfDirExists(directory: string): boolean {
   return fs.existsSync(getWolfDir(directory))
 }
 
+function isPlainObject(v: unknown): v is Record<string, unknown> {
+  return (
+    typeof v === "object" &&
+    v !== null &&
+    !Array.isArray(v) &&
+    Object.getPrototypeOf(v) === Object.prototype
+  )
+}
+
+/**
+ * Recursively fills missing keys in `loaded` from `defaults`.
+ * Loaded values always win; defaults only fill gaps. Arrays and scalars
+ * are replaced wholesale (not merged).
+ */
+function deepMergeDefaults<T>(defaults: T, loaded: T): T {
+  if (!isPlainObject(defaults) || !isPlainObject(loaded)) return loaded
+  const result: Record<string, unknown> = { ...(defaults as Record<string, unknown>) }
+  for (const key of Object.keys(loaded as Record<string, unknown>)) {
+    const lv = (loaded as Record<string, unknown>)[key]
+    const dv = (defaults as Record<string, unknown>)[key]
+    if (isPlainObject(lv) && isPlainObject(dv)) {
+      result[key] = deepMergeDefaults(dv, lv)
+    } else {
+      result[key] = lv
+    }
+  }
+  return result as T
+}
+
+/**
+ * Reads JSON from `filePath`. If the file exists and parses, its values are
+ * deep-merged over `fallback` so that missing nested keys fall back to the
+ * provided defaults (loaded values always win). If the file is missing or
+ * unparseable, `fallback` is returned as-is.
+ *
+ * This prevents `TypeError: Cannot read properties of undefined` when a
+ * user's file predates a section a newer release reads (e.g. a pre-2.0
+ * token-ledger.json without `lifetime`).
+ */
 export function readJSON<T>(filePath: string, fallback: T): T {
   try {
-    return JSON.parse(fs.readFileSync(filePath, "utf-8")) as T
+    const raw = fs.readFileSync(filePath, "utf-8")
+    const parsed = JSON.parse(raw) as T
+    return deepMergeDefaults(fallback, parsed)
   } catch {
     return fallback
   }
@@ -61,4 +102,23 @@ export function normalizePath(p: string): string {
 export function estimateTokens(text: string, type: "code" | "prose" | "mixed" = "mixed"): number {
   const ratio = type === "code" ? 3.5 : type === "prose" ? 4.0 : 3.75
   return Math.ceil(text.length / ratio)
+}
+
+// Files whose contents (or content-derived descriptions) must never reach
+// anatomy.md / memory.md because they hold secrets (issue #54). Mirrors
+// isSensitiveFile in src/hooks/shared.ts.
+const SENSITIVE_EXTENSIONS = new Set([
+  ".pem", ".key", ".p8", ".p12", ".pfx", ".keystore", ".jks", ".ppk", ".kdbx", ".tfstate",
+])
+const SENSITIVE_BASENAMES = new Set([".npmrc", ".netrc", ".htpasswd", ".pgpass"])
+
+export function isSensitiveFile(basename: string): boolean {
+  const lower = basename.toLowerCase()
+  if (lower === ".env" || lower.startsWith(".env.")) return true
+  if (SENSITIVE_BASENAMES.has(lower)) return true
+  const dot = lower.lastIndexOf(".")
+  if (dot >= 0 && SENSITIVE_EXTENSIONS.has(lower.slice(dot))) return true
+  if (/^id_(rsa|dsa|ecdsa|ed25519)/.test(lower)) return true
+  if (lower.includes("credential") || /^secrets\.(json|ya?ml|toml)$/.test(lower)) return true
+  return false
 }

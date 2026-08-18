@@ -55,7 +55,13 @@ export function logBug(
     }
   }
 
-  const id = `bug-${String(bugLog.bugs.length + 1).padStart(3, "0")}`;
+  // Next id from the max existing numeric id, not the array length: agents
+  // edit buglog.json directly and deletions made length-based ids collide.
+  const maxId = bugLog.bugs.reduce((max, b) => {
+    const n = parseInt(String(b.id ?? "").replace(/^bug-/, ""), 10);
+    return Number.isFinite(n) && n > max ? n : max;
+  }, 0);
+  const id = `bug-${String(maxId + 1).padStart(3, "0")}`;
   bugLog.bugs.push({
     id,
     timestamp: now,
@@ -101,10 +107,14 @@ export function findSimilarBugs(wolfDir: string, errorMessage: string): ScoredBu
   for (const bug of bugLog.bugs) {
     let score = 0;
 
-    // Exact substring match
+    // Exact substring match. Guard against empty/near-empty normalized
+    // strings: "".includes matches everything, so "!!!" scored 1.0 against
+    // every bug and silently incremented the wrong entry.
+    const normalizedBug = normalize(bug.error_message);
     if (
-      normalize(bug.error_message).includes(normalizedInput) ||
-      normalizedInput.includes(normalize(bug.error_message))
+      normalizedInput.length >= 4 &&
+      normalizedBug.length >= 4 &&
+      (normalizedBug.includes(normalizedInput) || normalizedInput.includes(normalizedBug))
     ) {
       score += 1.0;
     }

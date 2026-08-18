@@ -92,17 +92,22 @@ export async function statusCommand(): Promise<void> {
     { engine_status: "unknown", last_heartbeat: null }
   );
   const { hasPm2 } = await import("./daemon-cmd.js");
-  if (!hasPm2()) {
-    console.log(`\nDaemon: ⚠ cannot run: pm2 not installed (pnpm add -g pm2). Cron tasks will not fire.`);
+  // A recorded heartbeat is direct evidence the daemon runs (it can be
+  // fork-spawned by `openwolf dashboard` without pm2) — report it before
+  // complaining about pm2, which is only the persistence mechanism.
+  if (cronState.last_heartbeat) {
+    console.log(`\nDaemon: ${cronState.engine_status}`);
+    const elapsed = Date.now() - new Date(cronState.last_heartbeat).getTime();
+    const mins = Math.floor(elapsed / 60000);
+    console.log(`  Last heartbeat: ${mins} minutes ago`);
+    if (!hasPm2()) {
+      console.log(`  Note: pm2 not installed; the daemon will not survive reboots (pnpm add -g pm2)`);
+    }
+  } else if (!hasPm2()) {
+    console.log(`\nDaemon: ⚠ never run; pm2 not installed (pnpm add -g pm2). Cron tasks will not fire.`);
   } else {
     console.log(`\nDaemon: ${cronState.engine_status}`);
-    if (cronState.last_heartbeat) {
-      const elapsed = Date.now() - new Date(cronState.last_heartbeat).getTime();
-      const mins = Math.floor(elapsed / 60000);
-      console.log(`  Last heartbeat: ${mins} minutes ago`);
-    } else {
-      console.log(`  ⚠ No heartbeat recorded — daemon has never run. Start with: openwolf daemon start`);
-    }
+    console.log(`  ⚠ No heartbeat recorded — daemon has never run. Start with: openwolf daemon start`);
   }
 
   console.log("");

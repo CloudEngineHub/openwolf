@@ -42,7 +42,18 @@ export function writeRegistry(registry: Registry): void {
   if (!fs.existsSync(dir)) {
     fs.mkdirSync(dir, { recursive: true });
   }
-  fs.writeFileSync(getRegistryPath(), JSON.stringify(registry, null, 2), "utf-8");
+  // Atomic tmp+rename: concurrent `openwolf init` runs in two projects used
+  // to interleave plain writes and corrupt or lose registry entries.
+  const target = getRegistryPath();
+  const tmp = target + "." + Math.random().toString(16).slice(2, 10) + ".tmp";
+  const body = JSON.stringify(registry, null, 2);
+  try {
+    fs.writeFileSync(tmp, body, "utf-8");
+    fs.renameSync(tmp, target);
+  } catch {
+    try { fs.writeFileSync(target, body, "utf-8"); } catch {}
+    try { fs.unlinkSync(tmp); } catch {}
+  }
 }
 
 /**
@@ -101,12 +112,9 @@ export function getRegisteredProjects(validateExists: boolean = false): Register
     }
   }
 
-  // Clean up stale entries
-  if (removed.length > 0) {
-    registry.projects = valid;
-    writeRegistry(registry);
-  }
-
+  // Do NOT persist the prune: a temporarily unmounted volume (network drive,
+  // external disk) must not permanently unregister its projects just because
+  // a read-only listing ran while it was offline.
   return valid;
 }
 

@@ -27,20 +27,35 @@ interface CronState {
   dead_letter_queue: Array<{ task_id: string; error: string; timestamp: string }>;
 }
 
-const HEARTBEAT_STALE_MS = 10 * 60 * 1000;
+function heartbeatStaleMs(wolfDir: string): number {
+  // The daemon writes a heartbeat every heartbeat_interval_minutes (default
+  // 30). The old fixed 10-minute threshold was SHORTER than that interval, so
+  // a perfectly healthy daemon read as "stale" two-thirds of the time. Allow
+  // two intervals plus slack.
+  const cfg = readJSON<{ openwolf?: { cron?: { heartbeat_interval_minutes?: number } } }>(
+    path.join(wolfDir, "config.json"), {}
+  );
+  const intervalMin = cfg.openwolf?.cron?.heartbeat_interval_minutes ?? 30;
+  return (intervalMin * 2 + 5) * 60 * 1000;
+}
 
-function schedulerUnavailableReason(state: CronState): string | null {
+function schedulerUnavailableReason(state: CronState, wolfDir: string): string | null {
+  // A fresh heartbeat is direct evidence the daemon runs (it can be
+  // fork-spawned by `openwolf dashboard` without pm2), so check it before
+  // complaining about pm2.
+  if (state.last_heartbeat) {
+    const elapsed = Date.now() - new Date(state.last_heartbeat).getTime();
+    if (!Number.isNaN(elapsed) && elapsed <= heartbeatStaleMs(wolfDir)) {
+      return null;
+    }
+    return hasPm2()
+      ? "daemon heartbeat stale (openwolf daemon start)"
+      : "daemon heartbeat stale; pm2 not installed for persistence (pnpm add -g pm2)";
+  }
   if (!hasPm2()) {
     return "pm2 not installed (pnpm add -g pm2)";
   }
-  if (!state.last_heartbeat) {
-    return "daemon not running (openwolf daemon start)";
-  }
-  const elapsed = Date.now() - new Date(state.last_heartbeat).getTime();
-  if (Number.isNaN(elapsed) || elapsed > HEARTBEAT_STALE_MS) {
-    return "daemon heartbeat stale (openwolf daemon start)";
-  }
-  return null;
+  return "daemon not running (openwolf daemon start)";
 }
 
 export function cronList(): void {
@@ -66,7 +81,7 @@ export function cronList(): void {
   console.log("Cron Tasks");
   console.log("==========\n");
 
-  const unavailable = schedulerUnavailableReason(state);
+  const unavailable = schedulerUnavailableReason(state, wolfDir);
   if (unavailable) {
     console.log(`  ⚠ Scheduler unavailable: ${unavailable}. Tasks will not fire until this is resolved.\n`);
   }
