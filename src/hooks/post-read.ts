@@ -7,6 +7,29 @@ interface SessionData {
   [key: string]: unknown;
 }
 
+/**
+ * The PostToolUse payload carries the tool result in `tool_response`, whose
+ * shape depends on the tool and harness version: a plain string, an array of
+ * content blocks, or a structured object ({content} or {file:{content}}).
+ * Older builds of this hook read a `tool_output` field that never existed in
+ * Claude Code's payload, so read-token tracking was always zero (issue: the
+ * ledger under-reported every session).
+ */
+function extractToolResponseText(resp: unknown): string {
+  if (typeof resp === "string") return resp;
+  if (Array.isArray(resp)) {
+    return resp
+      .map((block) => (block && typeof block === "object" && typeof (block as { text?: unknown }).text === "string" ? (block as { text: string }).text : ""))
+      .join("");
+  }
+  if (resp && typeof resp === "object") {
+    const obj = resp as { content?: unknown; file?: { content?: unknown } };
+    if (typeof obj.content === "string") return obj.content;
+    if (obj.file && typeof obj.file.content === "string") return obj.file.content;
+  }
+  return "";
+}
+
 async function main(): Promise<void> {
   ensureWolfDir();
   const wolfDir = getWolfDir();
@@ -14,7 +37,11 @@ async function main(): Promise<void> {
   const sessionFile = path.join(hooksDir, "_session.json");
 
   const raw = await readStdin();
-  let input: { tool_input?: { file_path?: string; path?: string }; tool_output?: { content?: string } };
+  let input: {
+    tool_input?: { file_path?: string; path?: string };
+    tool_response?: unknown;
+    tool_output?: { content?: string };
+  };
   try {
     input = JSON.parse(raw);
   } catch {
@@ -23,7 +50,7 @@ async function main(): Promise<void> {
   }
 
   const filePath = input.tool_input?.file_path ?? input.tool_input?.path ?? "";
-  const content = input.tool_output?.content ?? "";
+  const content = extractToolResponseText(input.tool_response) || input.tool_output?.content || "";
   if (!filePath) { process.exit(0); return; }
 
   const normalizedFile = normalizePath(filePath);

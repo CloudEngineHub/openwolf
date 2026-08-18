@@ -183,15 +183,19 @@ async function main(): Promise<void> {
     }
   } catch {}
 
-  // Increment total_sessions in token-ledger
-  const ledgerPath = path.join(wolfDir, "token-ledger.json");
-  const ledger = readJSON(ledgerPath, { version: 1, lifetime: { total_sessions: 0 } }) as {
-    version: number;
-    lifetime: { total_sessions: number };
-    [key: string]: unknown;
-  };
-  ledger.lifetime.total_sessions++;
-  writeJSON(ledgerPath, ledger);
+  // Increment total_sessions in token-ledger — only for a genuinely new
+  // session. Resume/compact re-fires SessionStart for a session already
+  // counted, which used to inflate the lifetime count.
+  if (!continuing) {
+    const ledgerPath = path.join(wolfDir, "token-ledger.json");
+    const ledger = readJSON(ledgerPath, { version: 1, lifetime: { total_sessions: 0 } }) as {
+      version: number;
+      lifetime: { total_sessions: number };
+      [key: string]: unknown;
+    };
+    ledger.lifetime.total_sessions++;
+    writeJSON(ledgerPath, ledger);
+  }
 
   // Inject the budget-capped digest into the model's context.
   try {
