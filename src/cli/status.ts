@@ -78,8 +78,8 @@ export async function statusCommand(): Promise<void> {
   console.log(`  Sessions: ${ledger.lifetime.total_sessions}`);
   console.log(`  Total reads: ${ledger.lifetime.total_reads}`);
   console.log(`  Total writes: ${ledger.lifetime.total_writes}`);
-  console.log(`  Tokens tracked: ~${ledger.lifetime.total_tokens_estimated.toLocaleString()}`);
-  console.log(`  Estimated savings: ~${ledger.lifetime.estimated_savings_vs_bare_cli.toLocaleString()} tokens`);
+  console.log(`  Tokens tracked (estimate): ~${ledger.lifetime.total_tokens_estimated.toLocaleString()}`);
+  console.log(`  Saved by denied reads: ~${ledger.lifetime.estimated_savings_vs_bare_cli.toLocaleString()} tokens (run 'openwolf report' for measured usage)`);
 
   // Anatomy stats
   const anatomyContent = readText(path.join(wolfDir, "anatomy.md"));
