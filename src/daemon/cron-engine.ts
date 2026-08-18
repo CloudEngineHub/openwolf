@@ -244,15 +244,26 @@ export class CronEngine {
     let oldSessionLines: string[] = [];
     let currentSessionDate: Date | null = null;
 
+    // Idempotent: a session already reduced to its "> Consolidated session"
+    // marker has zero table rows; recounting would rewrite it as "(0 actions)"
+    // and destroy the original count on every re-run.
+    const flushOldSession = () => {
+      if (!inOldSession || oldSessionLines.length === 0) return;
+      const existingMarker = oldSessionLines.find((l) => l.startsWith("> Consolidated session"));
+      if (existingMarker) {
+        result.push(existingMarker);
+        result.push("");
+        return;
+      }
+      const actionCount = oldSessionLines.filter((l) => l.startsWith("|") && !l.startsWith("|--") && !l.startsWith("| Time")).length;
+      result.push(`> Consolidated session (${actionCount} actions)`);
+      result.push("");
+    };
+
     for (const line of lines) {
       const sessionMatch = line.match(/^## Session: (\d{4}-\d{2}-\d{2})/);
       if (sessionMatch) {
-        // Flush previous old session
-        if (inOldSession && oldSessionLines.length > 0) {
-          const actionCount = oldSessionLines.filter((l) => l.startsWith("|") && !l.startsWith("|--") && !l.startsWith("| Time")).length;
-          result.push(`> Consolidated session (${actionCount} actions)`);
-          result.push("");
-        }
+        flushOldSession();
 
         currentSessionDate = new Date(sessionMatch[1]);
         if (currentSessionDate < cutoff) {
@@ -273,12 +284,7 @@ export class CronEngine {
       }
     }
 
-    // Flush last old session
-    if (inOldSession && oldSessionLines.length > 0) {
-      const actionCount = oldSessionLines.filter((l) => l.startsWith("|") && !l.startsWith("|--") && !l.startsWith("| Time")).length;
-      result.push(`> Consolidated session (${actionCount} actions)`);
-      result.push("");
-    }
+    flushOldSession();
 
     writeText(memoryPath, result.join("\n"));
   }
