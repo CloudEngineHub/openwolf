@@ -4,7 +4,7 @@
   "description": "The second brain for Claude Code, now for every AI coding assistant: context management, architecture scaffolding, and smarter token utilization through lifecycle hooks.",
   "type": "module",
   "bin": {
-    "openwolf": "./dist/bin/openwolf.js"
+    "openwolf": "dist/bin/openwolf.js"
   },
   "scripts": {
     "prebuild": "node -e \"const fs=require('fs');if(fs.existsSync('dist'))fs.rmSync('dist',{recursive:true})\"",
@@ -53,7 +53,7 @@
   "author": "Cytostack Pvt Ltd",
   "repository": {
     "type": "git",
-    "url": "https://github.com/cytostack/openwolf.git"
+    "url": "git+https://github.com/cytostack/openwolf.git"
   },
   "homepage": "https://github.com/cytostack/openwolf",
   "bugs": {
