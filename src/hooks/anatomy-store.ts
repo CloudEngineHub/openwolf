@@ -56,6 +56,13 @@ export interface AnatomyStoreData {
   files: Record<string, StoreFileEntry>;
   /** Non-conforming anatomy.md lines preserved verbatim, keyed by section. */
   rawLines?: Record<string, string[]>;
+  /**
+   * Hand-written content above the first `## ` heading (issue #61). A typed
+   * field rather than a reserved rawLines key: old compiled hooks still
+   * installed in projects ignore an unknown field and round-trip it safely,
+   * whereas a magic "" section key would render as a stray `## ` heading.
+   */
+  preamble?: string[];
 }
 
 export const STORE_FILE = "anatomy-index.json";
@@ -106,12 +113,30 @@ export function saveStore(wolfDir: string, store: AnatomyStoreData): void {
 
 // ── Markdown format (canonical — the legacy contract, unchanged) ────────────
 
+// The auto-generated header block: never captured as preamble, or every
+// import→render cycle would duplicate it.
+const AUTO_HEADER = /^(?:# anatomy\.md\s*$|> Auto-maintained by OpenWolf\.|> Files:\s*\d+\s*tracked)/;
+// Legacy symbol sub-bullets (2.0.0–2.0.3 renders): mechanical output, dropped
+// rather than preserved. Any OTHER indented bullet is hand-written and kept.
+const SYMBOL_SUBBULLET = /^ {2}- (?:fn|class|method|section) `[^`]+` L\d+-\d+ \(~\d+ tok\)$/;
+
+/** Strip leading/trailing blank lines so preserved blocks don't grow by two lines per write. */
+function trimBlankEdges(lines: string[]): string[] {
+  let start = 0;
+  let end = lines.length;
+  while (start < end && lines[start].trim() === "") start++;
+  while (end > start && lines[end - 1].trim() === "") end--;
+  return lines.slice(start, end);
+}
+
 export function parseAnatomyWithRaw(content: string): {
   sections: Map<string, AnatomyEntry[]>;
   rawLines: Map<string, string[]>;
+  preamble: string[];
 } {
   const sections = new Map<string, AnatomyEntry[]>();
   const rawLines = new Map<string, string[]>();
+  const preamble: string[] = [];
   let currentSection = "";
   for (const raw of content.split("\n")) {
     const line = raw.replace(/\r$/, "");
@@ -121,7 +146,12 @@ export function parseAnatomyWithRaw(content: string): {
       if (!sections.has(currentSection)) sections.set(currentSection, []);
       continue;
     }
-    if (!currentSection) continue;
+    if (!currentSection) {
+      // Above the first section heading: preserve everything hand-written
+      // (issue #61), skipping only our own generated header block.
+      if (!AUTO_HEADER.test(line)) preamble.push(line);
+      continue;
+    }
     const em = line.match(/^- `([^`]+)`(?:\s+—\s+(.+?))?\s*\(~(\d+)\s+tok\)$/);
     if (em) {
       sections.get(currentSection)!.push({
@@ -132,41 +162,20 @@ export function parseAnatomyWithRaw(content: string): {
       continue;
     }
     if (line.trim() === "") continue;
-    if (/^\s+- /.test(line)) continue;
+    if (SYMBOL_SUBBULLET.test(line)) continue;
     if (!rawLines.has(currentSection)) rawLines.set(currentSection, []);
     rawLines.get(currentSection)!.push(line);
   }
-  return { sections, rawLines };
+  return { sections, rawLines, preamble: trimBlankEdges(preamble) };
 }
 
 export function parseAnatomy(content: string): Map<string, AnatomyEntry[]> {
   return parseAnatomyWithRaw(content).sections;
 }
 
-export function serializeAnatomy(
-  sections: Map<string, AnatomyEntry[]>,
-  metadata: { lastScanned: string; fileCount: number; hits: number; misses: number }
-): string {
-  const lines: string[] = [
-    "# anatomy.md",
-    "",
-    `> Auto-maintained by OpenWolf. Last scanned: ${metadata.lastScanned}`,
-    `> Files: ${metadata.fileCount} tracked | Anatomy hits: ${metadata.hits} | Misses: ${metadata.misses}`,
-    "",
-  ];
-  const keys = [...sections.keys()].sort();
-  for (const key of keys) {
-    lines.push(`## ${key}`);
-    lines.push("");
-    const entries = sections.get(key)!.sort((a, b) => a.file.localeCompare(b.file));
-    for (const e of entries) {
-      const desc = e.description ? ` — ${e.description}` : "";
-      lines.push(`- \`${e.file}\`${desc} (~${e.tokens} tok)`);
-    }
-    lines.push("");
-  }
-  return lines.join("\n");
-}
+// serializeAnatomy was removed: it had no callers, could not carry rawLines or
+// preamble, and every writer must go through renderStore so preserved content
+// survives (issue #61).
 
 /** Section key for a relpath: "src/hooks/" or "./" for root files. */
 export function sectionKeyOf(relPath: string): string {
@@ -196,6 +205,10 @@ export function renderStore(store: AnatomyStoreData): string {
     `> Files: ${Object.keys(store.files).length} tracked | Anatomy hits: ${store.meta.hits} | Misses: ${store.meta.misses}`,
     "",
   ];
+  const preamble = trimBlankEdges(store.preamble ?? []);
+  if (preamble.length > 0) {
+    lines.push(...preamble, "");
+  }
   const rawBySection = store.rawLines ?? {};
   const keys = [...new Set([...bySection.keys(), ...Object.keys(rawBySection)])].sort();
   for (const key of keys) {
@@ -245,11 +258,20 @@ export function importFromMarkdown(
   mdContent: string,
   projectRoot: string
 ): void {
-  const { sections, rawLines } = parseAnatomyWithRaw(mdContent);
+  // Corruption guard: an empty/unreadable anatomy.md must never wipe the
+  // preserved hand-written content in the store.
+  if (!mdContent.trim()) return;
+
+  const { sections, rawLines, preamble } = parseAnatomyWithRaw(mdContent);
   if (rawLines.size > 0) {
     store.rawLines = Object.fromEntries(rawLines);
   } else {
     delete store.rawLines;
+  }
+  if (preamble.length > 0) {
+    store.preamble = preamble;
+  } else {
+    delete store.preamble;
   }
   const seen = new Set<string>();
   for (const [sectionKey, entries] of sections) {

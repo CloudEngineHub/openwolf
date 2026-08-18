@@ -197,3 +197,125 @@ describe("raw line preservation (#61)", () => {
     assert.strictEqual(reimported.rawLines, undefined);
   });
 });
+
+describe("preamble preservation (#61, laihenyi case)", () => {
+  const preambleMd = `# anatomy.md
+
+> Auto-maintained by OpenWolf. Last scanned: 2026-01-01T00:00:00.000Z
+> Files: 1 tracked | Anatomy hits: 0 | Misses: 0
+
+## Goal contracts (curated, do not regenerate)
+
+These describe the project's goal contracts, kept above the generated
+sections because they are curated rather than scanned.
+
+## src/
+
+- \`index.ts\` — Main entry (~100 tok)
+`;
+
+  // Content above the FIRST ## heading, not inside any section.
+  const pureTopMd = `# anatomy.md
+
+> Auto-maintained by OpenWolf. Last scanned: 2026-01-01T00:00:00.000Z
+> Files: 1 tracked | Anatomy hits: 0 | Misses: 0
+
+Curated project overview line one.
+Curated line two, wrapped across lines with no token suffix.
+
+## src/
+
+- \`index.ts\` — Main entry (~100 tok)
+`;
+
+  test("preamble above the first section survives import → render", () => {
+    const store = newStore();
+    importFromMarkdown(store, pureTopMd, tmpDir());
+    assert.deepStrictEqual(store.preamble, [
+      "Curated project overview line one.",
+      "Curated line two, wrapped across lines with no token suffix.",
+    ]);
+    const rendered = renderStore(store);
+    assert.ok(rendered.includes("Curated project overview line one."));
+    assert.ok(rendered.includes("Curated line two, wrapped across lines with no token suffix."));
+  });
+
+  test("preamble is a fixed point across repeated round-trips (no blank-line growth)", () => {
+    const store = newStore();
+    importFromMarkdown(store, pureTopMd, tmpDir());
+    let md = renderStore(store);
+    for (let i = 0; i < 3; i++) {
+      const next = newStore();
+      importFromMarkdown(next, md, tmpDir());
+      const md2 = renderStore(next);
+      assert.strictEqual(md2, md, `round-trip ${i + 1} changed the render`);
+      md = md2;
+    }
+  });
+
+  test("the auto-generated header is never captured as preamble", () => {
+    const store = newStore();
+    importFromMarkdown(store, preambleMd, tmpDir());
+    assert.strictEqual(store.preamble, undefined);
+    const rendered = renderStore(store);
+    assert.strictEqual(
+      (rendered.match(/# anatomy\.md/g) || []).length, 1,
+      "header must not duplicate"
+    );
+  });
+
+  test("empty/corrupt anatomy.md never wipes preserved content", () => {
+    const store = newStore();
+    importFromMarkdown(store, pureTopMd, tmpDir());
+    assert.ok(store.preamble && store.preamble.length === 2);
+    importFromMarkdown(store, "", tmpDir());
+    assert.ok(store.preamble && store.preamble.length === 2, "empty md must not clear preamble");
+  });
+
+  test("hand-written indented bullets survive; legacy symbol sub-bullets are dropped", () => {
+    const md = `# anatomy.md
+
+> Auto-maintained by OpenWolf. Last scanned: t
+> Files: 1 tracked | Anatomy hits: 0 | Misses: 0
+
+## src/
+
+- \`index.ts\` — Main entry (~100 tok)
+  - note: uses the legacy config loader, do not modernize
+  - fn \`main\` L1-40 (~120 tok)
+`;
+    const store = newStore();
+    importFromMarkdown(store, md, tmpDir());
+    const raws = store.rawLines?.["src/"] ?? [];
+    assert.ok(raws.includes("  - note: uses the legacy config loader, do not modernize"));
+    assert.ok(!raws.some((l) => l.includes("L1-40")), "legacy symbol sub-bullets are mechanical output, dropped");
+  });
+
+  test("GB-unit bullets, prose, and preamble coexist across passes", () => {
+    const md = `# anatomy.md
+
+> Auto-maintained by OpenWolf. Last scanned: t
+> Files: 1 tracked | Anatomy hits: 0 | Misses: 0
+
+Top-level curated note.
+
+## assets/models/ (downloaded checkpoints, not git-tracked)
+
+- \`base-model.safetensors\` (~16GB) — pretrained backbone
+- \`fine-tuned.safetensors\` (~4GB) — our own fine-tune, NOT reproducible
+
+## src/
+
+- \`index.ts\` — Main entry (~100 tok)
+`;
+    const store = newStore();
+    importFromMarkdown(store, md, tmpDir());
+    let rendered = renderStore(store);
+    const next = newStore();
+    importFromMarkdown(next, rendered, tmpDir());
+    rendered = renderStore(next);
+    assert.ok(rendered.includes("Top-level curated note."));
+    assert.ok(rendered.includes("(~16GB)"));
+    assert.ok(rendered.includes("NOT reproducible"));
+  });
+});
