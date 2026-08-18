@@ -6,13 +6,37 @@ import {
 } from "./shared.js";
 import { lookupEntry } from "./anatomy-store.js";
 
+interface FileRead {
+  count: number;
+  tokens: number;
+  first_read: string;
+  read_mtime?: number;
+  anatomy_hit?: boolean;
+  /** Duplicate denial already spent for this file (one-shot guarantee). */
+  denied_once?: boolean;
+  /** Set when compaction evicted file contents from context — deny would be wrong. */
+  compacted?: boolean;
+}
+
 interface SessionData {
   session_id: string;
-  files_read: Record<string, { count: number; tokens: number; first_read: string; read_mtime?: number; anatomy_hit?: boolean }>;
+  files_read: Record<string, FileRead>;
   anatomy_hits: number;
   anatomy_misses: number;
   repeated_reads_warned: number;
+  reads_denied?: number;
+  denied_tokens_saved?: number;
   [key: string]: unknown;
+}
+
+type DuplicateMode = "warn" | "deny" | "off";
+
+function duplicateMode(wolfDir: string): DuplicateMode {
+  const cfg = readJSON<{ openwolf?: { reads?: { duplicate_mode?: string } } }>(
+    path.join(wolfDir, "config.json"), {}
+  );
+  const mode = cfg.openwolf?.reads?.duplicate_mode;
+  return mode === "deny" || mode === "off" ? mode : "warn";
 }
 
 async function main(): Promise<void> {
@@ -22,7 +46,11 @@ async function main(): Promise<void> {
   const sessionFile = path.join(hooksDir, "_session.json");
 
   const raw = await readStdin();
-  let input: { tool_input?: { file_path?: string; path?: string } };
+  let input: {
+    tool_input?: { file_path?: string; path?: string; offset?: number; limit?: number };
+    agent_id?: string;
+    agent_type?: string;
+  };
   try {
     input = JSON.parse(raw);
   } catch {
@@ -33,6 +61,16 @@ async function main(): Promise<void> {
   const filePath = input.tool_input?.file_path ?? input.tool_input?.path ?? "";
   if (!filePath) { process.exit(0); return; }
 
+  // Ranged reads (offset/limit) are exactly what the symbol hints steer the
+  // model toward — never warn about, deny, or record them as full reads (a
+  // ranged first contact must not make a later legitimate full read look like
+  // a duplicate).
+  const isRangedRead = input.tool_input?.offset !== undefined || input.tool_input?.limit !== undefined;
+  // Subagents share this session file but not the main thread's context: a
+  // file the main thread read is unseen by a fresh subagent, so duplicate
+  // handling stays hands-off for them.
+  const isSubagent = typeof input.agent_id === "string" && input.agent_id.length > 0;
+
   const normalizedFile = normalizePath(filePath);
 
   // Skip tracking for .wolf/ internal files — they're infrastructure, not project files.
@@ -42,6 +80,11 @@ async function main(): Promise<void> {
     ? normalizedFile.slice(projectDir.length).replace(/^\//, "")
     : "";
   if (relToProject.startsWith(".wolf/") || relToProject.startsWith(".wolf\\")) {
+    process.exit(0);
+    return;
+  }
+
+  if (isRangedRead) {
     process.exit(0);
     return;
   }
@@ -63,13 +106,41 @@ async function main(): Promise<void> {
       modifiedSinceRead = prev.read_mtime === undefined || mtime > prev.read_mtime;
     } catch {}
     if (!modifiedSinceRead) {
-      notes.push(
-        `OpenWolf: ${path.basename(normalizedFile)} was already read this session (~${prev.tokens} tok), unchanged since. If you only need the gist, your earlier read may suffice; for exact text (edit anchors, line numbers), the re-read is fine.`
-      );
-      session.files_read[normalizedFile].count++;
+      const mode = duplicateMode(wolfDir);
       session.repeated_reads_warned++;
+
+      // Denial is the only path that actually saves the tokens, but it must
+      // never strand the model: full reads only (ranged reads exited above),
+      // main thread only, only when the earlier read verifiably delivered
+      // content (tokens > 0), never after a compaction evicted that content,
+      // and only ONCE per file per session — the next attempt passes through.
+      const denyEligible =
+        mode === "deny" && !isSubagent && prev.tokens > 0 &&
+        prev.denied_once !== true && prev.compacted !== true;
+
+      if (denyEligible) {
+        prev.denied_once = true;
+        session.reads_denied = (session.reads_denied ?? 0) + 1;
+        session.denied_tokens_saved = (session.denied_tokens_saved ?? 0) + prev.tokens;
+        writeJSON(sessionFile, session);
+        emitHookJSON("PreToolUse", {
+          permissionDecision: "deny",
+          permissionDecisionReason: `OpenWolf: ${path.basename(normalizedFile)} was already read this session (~${prev.tokens} tok) and is unchanged on disk. Reuse your earlier read, or use offset/limit for the exact lines you need. If you do need the full file again, a second attempt will pass through.`,
+        });
+        process.exit(0);
+        return;
+      }
+
+      prev.count++;
+      if (mode !== "off") {
+        notes.push(
+          `OpenWolf: ${path.basename(normalizedFile)} was already read this session (~${prev.tokens} tok), unchanged since. If you only need the gist, your earlier read may suffice; for exact text (edit anchors, line numbers), the re-read is fine.`
+        );
+      }
       writeJSON(sessionFile, session);
-      emitHookJSON("PreToolUse", { additionalContext: notes.join("\n") });
+      if (notes.length > 0) {
+        emitHookJSON("PreToolUse", { additionalContext: notes.join("\n") });
+      }
       process.exit(0);
       return;
     }

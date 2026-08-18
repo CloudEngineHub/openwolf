@@ -2,6 +2,9 @@
   "version": 1,
   "openwolf": {
     "enabled": true,
+    "reads": {
+      "duplicate_mode": "warn"
+    },
     "anatomy": {
       "auto_scan_on_init": true,
       "rescan_interval_hours": 6,

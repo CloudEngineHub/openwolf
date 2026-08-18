@@ -128,6 +128,21 @@ async function main(): Promise<void> {
   } catch {}
   const continuing = (source === "compact" || source === "resume") && fs.existsSync(sessionFile);
 
+  // Compaction evicts verbatim file contents from the model's context, so a
+  // post-compact re-read is legitimate: clear deny-eligibility on every
+  // recorded read (the warn path still fires; only denial is disarmed).
+  if (continuing && source === "compact") {
+    try {
+      const session = readJSON<{ files_read?: Record<string, { compacted?: boolean }> }>(sessionFile, {});
+      if (session.files_read) {
+        for (const entry of Object.values(session.files_read)) {
+          entry.compacted = true;
+        }
+        writeJSON(sessionFile, session);
+      }
+    } catch {}
+  }
+
   if (!continuing) {
     writeJSON(sessionFile, {
       session_id: sessionId,
