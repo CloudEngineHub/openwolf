@@ -51,6 +51,7 @@ export const HOOK_FILES = [
   "ledger.js",
   "ledger-math.js",
   "shared.js",
+  "bug-index.js",
   "anatomy-store.js",
   "anatomy-lock.js",
   "symbol-extractor.js",

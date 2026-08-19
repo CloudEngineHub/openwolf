@@ -1,6 +1,7 @@
 import * as fs from "node:fs";
 import * as path from "node:path";
 import { getWolfDir, ensureWolfDir, readJSON, readMarkdown, readStdin, emitHookJSON, recordInjectionToSessionFile } from "./shared.js";
+import { searchBugsFTS } from "./bug-index.js";
 
 interface BugEntry {
   id: string;
@@ -114,31 +115,43 @@ function checkBugLog(wolfDir: string, filePath: string, oldStr: string, newStr: 
   if (bugLog.bugs.length === 0) return [];
 
   const basename = path.basename(filePath);
-
-  // ONLY surface bugs that match the SAME file being edited.
-  // Cross-file matching is too noisy and risks misdirecting Claude.
-  const fileMatches = bugLog.bugs.filter(b => {
-    const bugBasename = path.basename(b.file);
-    return bugBasename === basename;
-  });
-
-  if (fileMatches.length === 0) return [];
-
-  // Further filter: require tag or error_message overlap with the edit content
   const editText = (oldStr + " " + newStr + " " + content).toLowerCase();
-  const editTokens = tokenize(editText);
 
-  const relevant = fileMatches.filter(bug => {
-    // Check if any bug tag appears in the edit content
-    const tagHit = bug.tags.some(t => editText.includes(t.toLowerCase()));
-    if (tagHit) return true;
+  // J4: signature-keyed FTS retrieval first — finds relevant fixes across
+  // files, ranked by relevance, not just same-basename matches. Falls back to
+  // the legacy basename + overlap filter when node:sqlite is unavailable.
+  let relevant: BugEntry[] | null = null;
+  const ftsHits = searchBugsFTS(wolfDir, `${basename} ${editText.slice(0, 600)}`, 4);
+  if (ftsHits !== null) {
+    // Precision gate on the recall-oriented OR-query: keep same-file hits, and
+    // cross-file hits only with a tag or 3-word overlap with the edit.
+    const editTokens = tokenize(editText);
+    relevant = (ftsHits as unknown as BugEntry[]).filter((bug) => {
+      if (path.basename(bug.file ?? "") === basename) return true;
+      const tagHit = (bug.tags ?? []).some((t) => editText.includes(t.toLowerCase()));
+      if (tagHit) return true;
+      const bugTokens = tokenize(bug.error_message + " " + bug.root_cause);
+      return [...editTokens].filter((t) => bugTokens.has(t)).length >= 3;
+    });
+  }
 
-    // Check meaningful word overlap (excluding stop words)
-    const bugTokens = tokenize(bug.error_message + " " + bug.root_cause);
-    const overlap = [...editTokens].filter(t => bugTokens.has(t));
-    // Require at least 3 meaningful overlapping words
-    return overlap.length >= 3;
-  });
+  if (relevant === null) {
+    // Legacy path: ONLY surface bugs recorded against the SAME file.
+    const fileMatches = bugLog.bugs.filter(b => {
+      const bugBasename = path.basename(b.file);
+      return bugBasename === basename;
+    });
+    if (fileMatches.length === 0) return [];
+
+    const editTokens = tokenize(editText);
+    relevant = fileMatches.filter(bug => {
+      const tagHit = bug.tags.some(t => editText.includes(t.toLowerCase()));
+      if (tagHit) return true;
+      const bugTokens = tokenize(bug.error_message + " " + bug.root_cause);
+      const overlap = [...editTokens].filter(t => bugTokens.has(t));
+      return overlap.length >= 3;
+    });
+  }
 
   if (relevant.length === 0) return [];
 
