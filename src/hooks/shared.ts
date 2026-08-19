@@ -605,6 +605,37 @@ export function emitHookJSON(hookEventName: string, fields: HookJSONFields): voi
   process.stdout.write(JSON.stringify({ hookSpecificOutput: out }));
 }
 
+// ─── Injection accounting (J1: cost-of-injection) ───────────────────────────
+// Every token OpenWolf injects into the model's context (digests, hints,
+// warnings, reminders) is a cost the savings claim must be weighed against.
+// Hooks record what they emit; the ledger folds it into the session totals.
+
+export interface InjectionTracking {
+  injected_tokens_estimated?: number;
+  injected_by_source?: Record<string, number>;
+  [key: string]: unknown;
+}
+
+/** Record an injected text against the in-memory session (caller persists). */
+export function recordInjection(session: InjectionTracking, source: string, text: string): void {
+  if (!text) return;
+  const tokens = estimateTokens(text, "prose");
+  session.injected_tokens_estimated = (session.injected_tokens_estimated ?? 0) + tokens;
+  const bySource = session.injected_by_source ?? {};
+  bySource[source] = (bySource[source] ?? 0) + tokens;
+  session.injected_by_source = bySource;
+}
+
+/** Same, for hooks that do not otherwise hold the session file open. */
+export function recordInjectionToSessionFile(sessionFile: string, source: string, text: string): void {
+  if (!text) return;
+  try {
+    const session = readJSON<InjectionTracking>(sessionFile, {});
+    recordInjection(session, source, text);
+    writeJSON(sessionFile, session);
+  } catch {}
+}
+
 /**
  * Count non-mechanical semantic entries written to memory.md this session.
  * Mechanical entries (auto-generated file ops, session-end lines) don't count.
@@ -640,12 +671,16 @@ export function countSemanticEntries(wolfDir: string): number {
 // harness's actual per-message API usage. Summing it gives *measured* session
 // tokens — the verifiable numbers the estimated ledger can be checked against.
 
-export interface RealUsage {
+export interface ModelUsageTotals {
   input_tokens: number;
   output_tokens: number;
   cache_read_input_tokens: number;
   cache_creation_input_tokens: number;
   api_calls: number;
+}
+
+export interface RealUsage extends ModelUsageTotals {
+  per_model?: Record<string, ModelUsageTotals>;
 }
 
 export function readTranscriptUsage(transcriptPath: string): RealUsage | null {
@@ -656,8 +691,9 @@ export function readTranscriptUsage(transcriptPath: string): RealUsage | null {
     return null;
   }
   // One usage block per API call; streaming can emit several transcript lines
-  // for one message id — keep the last usage seen per id.
-  const byId = new Map<string, { input_tokens?: number; output_tokens?: number; cache_read_input_tokens?: number; cache_creation_input_tokens?: number }>();
+  // for one message id, and a resumed session can replay a message under a new
+  // request — dedupe on message id + request id, keeping the last usage seen.
+  const byId = new Map<string, { model?: string; input_tokens?: number; output_tokens?: number; cache_read_input_tokens?: number; cache_creation_input_tokens?: number }>();
   let anon = 0;
   for (const line of raw.split("\n")) {
     if (!line.trim()) continue;
@@ -665,17 +701,27 @@ export function readTranscriptUsage(transcriptPath: string): RealUsage | null {
       const entry = JSON.parse(line);
       const usage = entry?.message?.usage;
       if (usage && typeof usage === "object" && typeof usage.output_tokens === "number") {
-        byId.set(entry.message.id ?? `anon-${anon++}`, usage);
+        const key = `${entry.message.id ?? `anon-${anon++}`}:${entry.requestId ?? ""}`;
+        byId.set(key, { ...usage, model: entry.message.model });
       }
     } catch {}
   }
   if (byId.size === 0) return null;
   const total: RealUsage = { input_tokens: 0, output_tokens: 0, cache_read_input_tokens: 0, cache_creation_input_tokens: 0, api_calls: byId.size };
+  const perModel: Record<string, ModelUsageTotals> = {};
   for (const u of byId.values()) {
     total.input_tokens += u.input_tokens ?? 0;
     total.output_tokens += u.output_tokens ?? 0;
     total.cache_read_input_tokens += u.cache_read_input_tokens ?? 0;
     total.cache_creation_input_tokens += u.cache_creation_input_tokens ?? 0;
+    const model = u.model ?? "unknown";
+    const m = perModel[model] ?? (perModel[model] = { input_tokens: 0, output_tokens: 0, cache_read_input_tokens: 0, cache_creation_input_tokens: 0, api_calls: 0 });
+    m.input_tokens += u.input_tokens ?? 0;
+    m.output_tokens += u.output_tokens ?? 0;
+    m.cache_read_input_tokens += u.cache_read_input_tokens ?? 0;
+    m.cache_creation_input_tokens += u.cache_creation_input_tokens ?? 0;
+    m.api_calls++;
   }
+  if (Object.keys(perModel).length > 0) total.per_model = perModel;
   return total;
 }

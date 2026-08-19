@@ -38,6 +38,7 @@ interface SessionEntry {
     anatomy_lookups: number
     anatomy_misses?: number
     savings_estimated?: number
+    injection_tokens_estimated?: number
   }
 }
 
@@ -51,6 +52,7 @@ interface LifetimeTotals {
   repeated_reads_blocked: number
   repeated_reads_warned: number
   estimated_savings_vs_bare_cli: number
+  injection_tokens_estimated: number
   [key: string]: number
 }
 
@@ -78,6 +80,7 @@ function emptyLedger(): LedgerData {
       repeated_reads_blocked: 0,
       repeated_reads_warned: 0,
       estimated_savings_vs_bare_cli: 0,
+      injection_tokens_estimated: 0,
     },
     sessions: [],
     daemon_usage: [],
@@ -121,6 +124,7 @@ function buildSessionEntry(session: SessionState): SessionEntry {
       anatomy_misses: session.anatomy_misses,
       // Honest savings: tokens of reads that were denied, nothing else.
       savings_estimated: session.denied_tokens_saved ?? 0,
+      injection_tokens_estimated: session.injected_tokens_estimated ?? 0,
     },
   }
 }
@@ -148,6 +152,7 @@ function foldEntry(acc: Record<string, number>, e: SessionEntry): void {
   addInto(acc, "repeated_reads_blocked", e.totals.repeated_reads_blocked)
   addInto(acc, "repeated_reads_warned", e.totals.repeated_reads_warned)
   addInto(acc, "estimated_savings_vs_bare_cli", e.totals.savings_estimated)
+  addInto(acc, "injection_tokens_estimated", e.totals.injection_tokens_estimated)
 }
 
 /**
@@ -168,6 +173,7 @@ function recomputeLifetime(ledger: LedgerData): void {
     repeated_reads_blocked: 0,
     repeated_reads_warned: 0,
     estimated_savings_vs_bare_cli: 0,
+    injection_tokens_estimated: 0,
     ...acc,
     total_sessions: totalSessions,
   } as LifetimeTotals

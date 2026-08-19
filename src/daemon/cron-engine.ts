@@ -5,6 +5,7 @@ import cron from "node-cron";
 import { readJSON, writeJSON, readText, writeText, appendText } from "../utils/fs-safe.js";
 import { scanProject } from "../scanner/anatomy-scanner.js";
 import { detectWaste } from "../tracker/waste-detector.js";
+import { scanProjectUsage } from "../tracker/transcript-usage.js";
 import { withFileLock } from "../hooks/anatomy-lock.js";
 import type { Logger } from "../utils/logger.js";
 
@@ -312,12 +313,20 @@ export class CronEngine {
 
   private generateTokenReport(): void {
     const flags = detectWaste(this.wolfDir);
+    // Ground truth (J1): scan every harness transcript for this project —
+    // including subagent sidechains and sessions the Stop hook never saw.
+    // Scanned OUTSIDE the lock; only the result assignment happens inside.
+    let measured: ReturnType<typeof scanProjectUsage> = null;
+    try {
+      measured = scanProjectUsage(this.projectRoot);
+    } catch {}
     const ledgerPath = path.join(this.wolfDir, "token-ledger.json");
     // Same lock the hooks' ledger writer uses: an unlocked rewrite here could
     // clobber a concurrent Stop-hook flush and lose whole sessions.
     withFileLock(ledgerPath + ".lock", 2000, () => {
       const ledger = readJSON<Record<string, unknown>>(ledgerPath, {});
       (ledger as { waste_flags: unknown[] }).waste_flags = flags;
+      if (measured) (ledger as { measured_project: unknown }).measured_project = measured;
       (ledger as { optimization_report: { last_generated: string; patterns: unknown[] } }).optimization_report = {
         last_generated: new Date().toISOString(),
         patterns: flags.map((f) => f.pattern),

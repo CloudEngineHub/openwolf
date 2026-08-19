@@ -2,7 +2,7 @@ import * as fs from "node:fs";
 import * as path from "node:path";
 import {
   getWolfDir, ensureWolfDir, readJSON, writeJSON,
-  estimateTokens, readStdin, normalizePath, getProjectDir, emitHookJSON
+  estimateTokens, readStdin, normalizePath, getProjectDir, emitHookJSON, recordInjection
 } from "./shared.js";
 import { lookupEntry } from "./anatomy-store.js";
 
@@ -122,10 +122,12 @@ async function main(): Promise<void> {
         prev.denied_once = true;
         session.reads_denied = (session.reads_denied ?? 0) + 1;
         session.denied_tokens_saved = (session.denied_tokens_saved ?? 0) + prev.tokens;
+        const reason = `OpenWolf: ${path.basename(normalizedFile)} was already read this session (~${prev.tokens} tok) and is unchanged on disk. Reuse your earlier read, or use offset/limit for the exact lines you need. If you do need the full file again, a second attempt will pass through.`;
+        recordInjection(session, "dup_deny", reason);
         writeJSON(sessionFile, session);
         emitHookJSON("PreToolUse", {
           permissionDecision: "deny",
-          permissionDecisionReason: `OpenWolf: ${path.basename(normalizedFile)} was already read this session (~${prev.tokens} tok) and is unchanged on disk. Reuse your earlier read, or use offset/limit for the exact lines you need. If you do need the full file again, a second attempt will pass through.`,
+          permissionDecisionReason: reason,
         });
         process.exit(0);
         return;
@@ -137,6 +139,7 @@ async function main(): Promise<void> {
           `OpenWolf: ${path.basename(normalizedFile)} was already read this session (~${prev.tokens} tok), unchanged since. If you only need the gist, your earlier read may suffice; for exact text (edit anchors, line numbers), the re-read is fine.`
         );
       }
+      if (notes.length > 0) recordInjection(session, "dup_warn", notes.join("\n"));
       writeJSON(sessionFile, session);
       if (notes.length > 0) {
         emitHookJSON("PreToolUse", { additionalContext: notes.join("\n") });
@@ -192,6 +195,7 @@ async function main(): Promise<void> {
     anatomy_hit: found,
   };
 
+  if (notes.length > 0) recordInjection(session, "anatomy_hint", notes.join("\n"));
   writeJSON(sessionFile, session);
   if (notes.length > 0) {
     emitHookJSON("PreToolUse", { additionalContext: notes.join("\n") });

@@ -32,6 +32,8 @@ export interface SessionData {
   stop_count: number;
   reminders_sent: Record<string, number>;
   pending_reminders?: string[];
+  injected_tokens_estimated?: number;
+  injected_by_source?: Record<string, number>;
   [key: string]: unknown;
 }
 
@@ -57,7 +59,10 @@ export interface SessionEntry {
     anatomy_lookups: number;
     anatomy_misses?: number;
     savings_estimated?: number;
+    /** Tokens OpenWolf itself injected into context (digests, hints, warnings). */
+    injection_tokens_estimated?: number;
   };
+  injected_by_source?: Record<string, number>;
   real_usage?: RealUsage;
 }
 
@@ -71,6 +76,7 @@ export interface LifetimeTotals {
   repeated_reads_blocked: number;
   repeated_reads_warned: number;
   estimated_savings_vs_bare_cli: number;
+  injection_tokens_estimated: number;
   [key: string]: number;
 }
 
@@ -98,6 +104,7 @@ export function emptyLedger(): LedgerData {
       repeated_reads_blocked: 0,
       repeated_reads_warned: 0,
       estimated_savings_vs_bare_cli: 0,
+      injection_tokens_estimated: 0,
     },
     sessions: [],
     daemon_usage: [],
@@ -125,6 +132,8 @@ export function buildSessionTotals(
     anatomy_misses: session.anatomy_misses,
     // Honest savings: tokens of reads that were denied, nothing else.
     savings_estimated: session.denied_tokens_saved ?? 0,
+    // The other side of the scale: what OpenWolf's own context injection cost.
+    injection_tokens_estimated: session.injected_tokens_estimated ?? 0,
   };
 }
 
@@ -151,6 +160,7 @@ export function foldEntry(acc: Record<string, number>, e: SessionEntry): void {
   addInto(acc, "repeated_reads_blocked", e.totals.repeated_reads_blocked);
   addInto(acc, "repeated_reads_warned", e.totals.repeated_reads_warned);
   addInto(acc, "estimated_savings_vs_bare_cli", e.totals.savings_estimated);
+  addInto(acc, "injection_tokens_estimated", e.totals.injection_tokens_estimated);
   if (e.real_usage) {
     addInto(acc, "real_input_tokens", e.real_usage.input_tokens);
     addInto(acc, "real_output_tokens", e.real_usage.output_tokens);
@@ -178,6 +188,7 @@ export function recomputeLifetime(ledger: LedgerData): void {
     repeated_reads_blocked: 0,
     repeated_reads_warned: 0,
     estimated_savings_vs_bare_cli: 0,
+    injection_tokens_estimated: 0,
     ...acc,
     total_sessions: totalSessions,
   } as LifetimeTotals;

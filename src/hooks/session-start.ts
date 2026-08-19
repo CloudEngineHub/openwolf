@@ -1,7 +1,7 @@
 import * as fs from "node:fs";
 import * as path from "node:path";
 import { execFileSync } from "node:child_process";
-import { getWolfDir, ensureWolfDir, writeJSON, appendMarkdown, readJSON, timestamp, timeShort, estimateTokens, readStdin, detectAgent } from "./shared.js";
+import { getWolfDir, ensureWolfDir, writeJSON, appendMarkdown, readJSON, timestamp, timeShort, estimateTokens, readStdin, detectAgent, recordInjectionToSessionFile } from "./shared.js";
 import { loadStore } from "./anatomy-store.js";
 
 // ─── Session digest (Workstream E/F: model-aware context budgeting) ─────────
@@ -231,6 +231,7 @@ async function main(): Promise<void> {
     }
 
     if (digest) {
+      recordInjectionToSessionFile(sessionFile, "digest", digest);
       process.stdout.write(JSON.stringify({
         hookSpecificOutput: { hookEventName: "SessionStart", additionalContext: digest },
       }));

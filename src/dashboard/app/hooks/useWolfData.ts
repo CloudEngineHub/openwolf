@@ -38,6 +38,7 @@ interface TokenLedger {
     repeated_reads_blocked: number;
     repeated_reads_warned?: number;
     estimated_savings_vs_bare_cli: number;
+    injection_tokens_estimated?: number;
     real_input_tokens?: number;
     real_output_tokens?: number;
     real_cache_read_tokens?: number;
@@ -46,6 +47,19 @@ interface TokenLedger {
   };
   sessions: LedgerSession[];
   waste_flags: any[];
+  /** Project-wide transcript scan written by the daemon (J1 ground truth). */
+  measured_project?: {
+    input_tokens: number;
+    output_tokens: number;
+    cache_read_input_tokens: number;
+    cache_creation_input_tokens: number;
+    api_calls: number;
+    transcripts: number;
+    by_model: Record<string, { input_tokens: number; output_tokens: number; cache_read_input_tokens: number; cache_creation_input_tokens: number; api_calls: number }>;
+    sidechain: { input_tokens: number; output_tokens: number; api_calls: number };
+    last_activity: string | null;
+    scanned_at: string;
+  };
 }
 
 export interface WolfConfig {

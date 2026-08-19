@@ -1,6 +1,6 @@
 import * as fs from "node:fs";
 import * as path from "node:path";
-import { getWolfDir, ensureWolfDir, readJSON, readMarkdown, readStdin, emitHookJSON } from "./shared.js";
+import { getWolfDir, ensureWolfDir, readJSON, readMarkdown, readStdin, emitHookJSON, recordInjectionToSessionFile } from "./shared.js";
 
 interface BugEntry {
   id: string;
@@ -52,6 +52,7 @@ async function main(): Promise<void> {
   }
 
   if (notes.length > 0) {
+    recordInjectionToSessionFile(path.join(wolfDir, "hooks", "_session.json"), "cerebrum_buglog", notes.join("\n"));
     emitHookJSON("PreToolUse", { additionalContext: notes.join("\n") });
   }
   process.exit(0);

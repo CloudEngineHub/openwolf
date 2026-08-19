@@ -55,9 +55,8 @@ export function TokenUsage({ data }: { data: WolfData }) {
 
   return (
     <div className="space-y-4">
-      {/* Headline tiles */}
+      {/* Headline tiles — measured numbers lead, estimates are demoted */}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-        <StatTile label="estimated · lifetime" value={formatTokens(lt.total_tokens_estimated)} sub="char-ratio heuristic" size="md" />
         <StatTile
           label="measured · lifetime"
           value={measured ? formatTokens((lt.real_input_tokens ?? 0) + (lt.real_output_tokens ?? 0)) : "—"}
@@ -68,6 +67,12 @@ export function TokenUsage({ data }: { data: WolfData }) {
           label="cache read · measured"
           value={measured ? formatTokens(lt.real_cache_read_tokens ?? 0) : "—"}
           sub={measured ? "prompt cache working for you" : undefined}
+          size="md"
+        />
+        <StatTile
+          label="openwolf overhead · est."
+          value={formatTokens(lt.injection_tokens_estimated ?? 0)}
+          sub="context injected by hooks"
           size="md"
         />
         {denyOn ? (
@@ -88,6 +93,42 @@ export function TokenUsage({ data }: { data: WolfData }) {
           />
         )}
       </div>
+
+      {/* Project-wide ground truth: every transcript, incl. subagents */}
+      {tokenLedger.measured_project && (
+        <div className="wd-card p-5">
+          <div className="flex items-center justify-between mb-3">
+            <span className="wd-label" style={{ color: "var(--text-muted)" }}>measured · all project transcripts</span>
+            <span className="wd-label" style={{ color: "var(--text-faint)" }}>
+              {tokenLedger.measured_project.transcripts} transcripts · scanned {tokenLedger.measured_project.scanned_at?.slice(0, 16).replace("T", " ")}
+            </span>
+          </div>
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-x-6 gap-y-2 font-mono text-sm" style={{ color: "var(--text-secondary)" }}>
+            <div className="flex justify-between"><span>in</span><span className="dot-display" style={{ color: "var(--text-primary)" }}>{formatTokens(tokenLedger.measured_project.input_tokens)}</span></div>
+            <div className="flex justify-between"><span>out</span><span className="dot-display" style={{ color: "var(--text-primary)" }}>{formatTokens(tokenLedger.measured_project.output_tokens)}</span></div>
+            <div className="flex justify-between"><span>cache read</span><span className="dot-display" style={{ color: "var(--text-primary)" }}>{formatTokens(tokenLedger.measured_project.cache_read_input_tokens)}</span></div>
+            <div className="flex justify-between"><span>cache write</span><span className="dot-display" style={{ color: "var(--text-primary)" }}>{formatTokens(tokenLedger.measured_project.cache_creation_input_tokens)}</span></div>
+          </div>
+          {Object.keys(tokenLedger.measured_project.by_model).length > 0 && (
+            <div className="mt-3 space-y-1 font-mono text-sm" style={{ color: "var(--text-secondary)" }}>
+              {Object.entries(tokenLedger.measured_project.by_model)
+                .sort((a, b) => b[1].output_tokens - a[1].output_tokens)
+                .map(([model, m]) => (
+                  <div key={model} className="flex justify-between">
+                    <span style={{ color: "var(--text-muted)" }}>{model}</span>
+                    <span>in {formatTokens(m.input_tokens)} · out {formatTokens(m.output_tokens)} · {fmt(m.api_calls)} calls</span>
+                  </div>
+                ))}
+              {tokenLedger.measured_project.sidechain.api_calls > 0 && (
+                <div className="flex justify-between">
+                  <span style={{ color: "var(--text-muted)" }}>subagent share</span>
+                  <span>in {formatTokens(tokenLedger.measured_project.sidechain.input_tokens)} · out {formatTokens(tokenLedger.measured_project.sidechain.output_tokens)} · {fmt(tokenLedger.measured_project.sidechain.api_calls)} calls</span>
+                </div>
+              )}
+            </div>
+          )}
+        </div>
+      )}
 
       {/* Usage over time */}
       <div className="wd-card p-5">

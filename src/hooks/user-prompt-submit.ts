@@ -1,5 +1,5 @@
 import * as path from "node:path";
-import { getWolfDir, ensureWolfDir, readJSON, writeJSON, emitHookJSON } from "./shared.js";
+import { getWolfDir, ensureWolfDir, readJSON, writeJSON, emitHookJSON, recordInjection } from "./shared.js";
 
 // UserPromptSubmit hook: drains reminders the Stop hook queued last turn.
 //
@@ -23,6 +23,7 @@ function main(): void {
     return;
   }
   session.pending_reminders = [];
+  recordInjection(session, "reminders", pending.join("\n\n"));
   writeJSON(sessionFile, session);
   emitHookJSON("UserPromptSubmit", { additionalContext: pending.join("\n\n") });
   process.exit(0);

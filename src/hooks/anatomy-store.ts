@@ -262,6 +262,11 @@ export function importFromMarkdown(
   // preserved hand-written content in the store.
   if (!mdContent.trim()) return;
 
+  // The imported md records when it was actually scanned; keep that instead
+  // of claiming "scanned now" (also makes import -> render a fixed point).
+  const scannedMatch = mdContent.match(/^> Auto-maintained by OpenWolf\. Last scanned: (\S+)$/m);
+  if (scannedMatch) store.meta.lastScanned = scannedMatch[1];
+
   const { sections, rawLines, preamble } = parseAnatomyWithRaw(mdContent);
   if (rawLines.size > 0) {
     store.rawLines = Object.fromEntries(rawLines);

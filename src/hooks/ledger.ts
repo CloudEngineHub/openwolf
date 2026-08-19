@@ -54,6 +54,10 @@ export function buildSessionEntry(session: SessionData, transcriptPath?: string)
     totals: buildSessionTotals(session, reads, writes),
   };
 
+  if (session.injected_by_source && Object.keys(session.injected_by_source).length > 0) {
+    entry.injected_by_source = { ...session.injected_by_source };
+  }
+
   if (transcriptPath) {
     // readTranscriptUsage dedupes by message id, so this is the cumulative
     // total for the whole session — correct to REPLACE, never to add.
