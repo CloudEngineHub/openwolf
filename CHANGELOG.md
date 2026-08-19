@@ -4,6 +4,71 @@ All notable changes to OpenWolf are documented here. The format follows
 [Keep a Changelog](https://keepachangelog.com/), and OpenWolf uses
 [Semantic Versioning](https://semver.org/).
 
+## [2.1.0] - 2026-08-20
+
+The measurement release. OpenWolf now proves its numbers instead of asserting
+them: ground-truth token usage from the harness's own transcripts, an honest
+ledger of what OpenWolf itself injects, an exact tree-sitter index, and
+relevance-ranked bug recall.
+
+### Added
+
+- Project-wide measured usage: `openwolf report` and the daemon scan every
+  transcript in the harness project directory (subagent sidechains and
+  headless runs included), deduplicated by message and request id, broken
+  down per model. The dashboard shows the project-wide card next to the
+  session numbers.
+- Injection accounting: every digest, anatomy hint, duplicate-read warning,
+  cerebrum/buglog note, edit warning, and reminder OpenWolf injects is
+  counted per source and reported as overhead next to the savings it claims,
+  in the ledger, `openwolf report`, and the dashboard.
+- A/B benchmark harness (`scripts/benchmark/run-ab.mjs`, repository only):
+  fixed task set, OpenWolf vs bare clones, headless runs, medians, cache
+  dimensions reported separately. Methodology in the README.
+- Tree-sitter symbol extraction: `openwolf scan` upgrades the index with
+  exact AST line ranges and nested methods for ts/tsx/js, python, go, rust,
+  java, ruby, and php, with signature skeletons for large files. Hooks keep
+  the dependency-free regex extractor as the incremental fast path; any
+  wasm failure falls back silently.
+- Import-graph importance: a PageRank score per file ranks hints and search
+  results; projects with no resolvable imports get no scores rather than
+  false ones.
+- `openwolf find <query>`: ranked symbol/file shortlist straight from the
+  index, capped near 1k output tokens, quality then importance ordering.
+- Buglog FTS: SQLite full-text index (node:sqlite, Node 22.5+) over the bug
+  log keyed by normalized error signature; powers `openwolf bug search`
+  (relevance ranked) and the pre-write hook's cross-file fix recall. Falls
+  back to the previous matcher on older Node.
+- Bash output filter (suggest mode, `openwolf.bash.filter_mode`): a
+  once-per-session note when a verbose test/build command is about to dump
+  its output into context, with a log-to-file + tail recipe. Rewrite mode is
+  configured but intentionally inert: OpenWolf will not auto-approve tool
+  calls to rewrite them.
+- Context-health audit: `GET /api/context-health` and an overview card
+  flagging oversized CLAUDE.md, always-on @-imports, missing config blocks,
+  and injection above the digest budget.
+- `/handoff` command: regenerates `.wolf/STATUS.md` from the session's real
+  state. The Stop hook's STATUS staleness nag is gone.
+
+### Changed
+
+- CLAUDE.md snippet is now a lean stub; the operating protocol ships as a
+  Claude Code skill (`.claude/skills/openwolf/SKILL.md`) loaded on demand.
+  `openwolf update` swaps legacy shipped snippets byte-identically and never
+  touches customized files. `.claude/rules/openwolf.md` slimmed to the
+  always-true lines.
+- cerebrum syncs into Claude Code auto-memory (preferences, learnings,
+  do-not-repeat) when the memory directory exists; the session-start digest
+  then stops re-injecting Do-Not-Repeat on Claude. cerebrum.md remains
+  canonical for Codex, OpenCode, Gemini, and Cursor.
+- The dashboard's char-ratio estimate headline is retired; measured tiles
+  lead everywhere.
+
+### Fixed
+
+- Importing an existing anatomy.md preserves its recorded scan timestamp
+  instead of claiming it was scanned now.
+
 ## [2.0.5] - 2026-08-20
 
 Dashboard honesty release. After 2.0.4 made savings accounting honest, two

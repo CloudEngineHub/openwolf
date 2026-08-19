@@ -190,34 +190,51 @@ Languages with symbol support today: TypeScript, JavaScript, Python, Go, Rust.
 
 ## Token Intelligence
 
-Estimates are useful; measurements are trustworthy. At session end OpenWolf
-reads the real usage from the harness transcript: input tokens, output
-tokens, cache reads, cache writes, and API calls, attributed to the agent
-that ran the session.
+Estimates are useful; measurements are trustworthy. OpenWolf reads real usage
+from the harness's own transcripts at two levels: the Stop hook sums the
+current session at each turn, and `openwolf report` (plus the daemon) scans
+every transcript in the harness project directory, including subagent
+sidechains and headless runs no hook ever saw, deduplicated by message and
+request id, broken down per model.
 
 ```bash
 openwolf report
 ```
 
 ```
-  Measured (from harness transcripts)
-    API calls:              29
-    Input tokens:           57,489
-    Cache reads:            309,141
+  Measured (all project transcripts, scanned now)
+    API calls:              814
+    Input tokens:           1,609
+    Output tokens:          737,952
+    Cache reads:            238,172,904
+    Cache writes:           3,323,678
 
-  Duplicate reads denied:   14
+  Duplicate reads warned:   193
+  Duplicate reads denied:   0
 
   Estimated (char-ratio heuristic; treat as rough)
-    Tokens tracked:         1,549,658
-    Saved by denied reads:  61,240
+    Saved by denied reads:  0
+    OpenWolf injected:      1,204 (digests, hints, warnings)
 ```
 
 A note on honesty: earlier releases reported large "estimated savings"
 figures produced by a heuristic that also counted tokens that were actually
-spent. 2.0.4 retires that math. Savings are now credited only for reads
-OpenWolf verifiably prevented, and the headline numbers come from the
-harness's own transcripts, measured, not modeled. If a context tool cannot
-show you measured numbers, doubt it, including this one.
+spent. That math is retired. Savings are credited only for reads OpenWolf
+verifiably prevented (deny mode, off by default), the headline numbers come
+from the harness's transcripts, and OpenWolf reports its own injection cost
+(every digest, hint, and warning it adds to your context) right next to the
+savings it claims. If a context tool cannot show you measured numbers
+including its own overhead, doubt it, including this one.
+
+### Benchmark methodology
+
+The repository ships an A/B harness (`scripts/benchmark/run-ab.mjs`, not in
+the npm package) that runs a fixed task set against two fresh clones of a
+fixture repo, one initialized with OpenWolf and one bare, via headless
+`claude -p`. Results report input, output, cache read, and cache write
+tokens separately (never collapsed into one number), as medians over
+repeats, read from the transcripts with the same scanner the dashboard
+uses. Published numbers will always link the raw results file.
 
 ## Security
 
@@ -232,8 +249,14 @@ show you measured numbers, doubt it, including this one.
 
 ## Bundled Skills
 
-`openwolf init` installs two slash commands into every configured agent
-(Claude Code, Codex, OpenCode):
+`openwolf init` installs slash commands into every configured agent
+(Claude Code, Codex, OpenCode), plus a proper Claude Code skill
+(`.claude/skills/openwolf/SKILL.md`) carrying the operating protocol so
+CLAUDE.md stays a lean stub:
+
+- **`/handoff`**: regenerate `.wolf/STATUS.md` from the session's actual
+  state (git, memory log, open items) so the next session resumes in one
+  cheap read.
 
 - **`/security-audit [scope]`**: layered audit covering dependencies,
   secrets, injection surfaces, and authorization, ending in a
@@ -265,7 +288,8 @@ openwolf init              Initialize .wolf/ and wire detected agents
 openwolf status            Health, stats, file integrity
 openwolf scan              Rebuild the project index
 openwolf scan --check      Verify the index matches the filesystem (CI-friendly)
-openwolf report            Token report: estimated vs measured
+openwolf report            Token report: measured (all transcripts) + estimates
+openwolf find <query>      Locate a symbol or file via the index (ranked, ~1k tok cap)
 openwolf dashboard         Open the web dashboard
 openwolf daemon start      Start the background daemon
 openwolf daemon stop       Stop the daemon
