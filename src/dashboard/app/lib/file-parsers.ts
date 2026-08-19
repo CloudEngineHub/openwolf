@@ -12,6 +12,8 @@ export interface AnatomyEntry {
   description: string;
   tokens: number;
   section: string;
+  /** PageRank import-graph importance, 0..1 (index-derived entries only). */
+  importance?: number;
 }
 
 export interface MemorySession {

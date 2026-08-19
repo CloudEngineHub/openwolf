@@ -39,6 +39,12 @@ export interface StoreFileEntry {
   updatedAt: string;
   source: "hook" | "scan" | "md-import";
   symbols?: SymbolEntry[];
+  /** How symbols were derived: exact AST ("ts") or heuristic line regexes. */
+  symbolSource?: "ts" | "regex";
+  /** Signature-only outline for large files (J2), capped ~400 tokens. */
+  skeleton?: string;
+  /** PageRank import-graph importance, 0..1 normalized (J2). */
+  importance?: number;
 }
 
 export interface AnatomyStoreData {
@@ -319,7 +325,7 @@ export function lookupEntry(
   wolfDir: string,
   projectDir: string,
   normalizedFile: string
-): { file: string; description: string; tokens: number; symbols?: SymbolEntry[]; size?: number; mtimeMs?: number } | null {
+): { file: string; description: string; tokens: number; symbols?: SymbolEntry[]; skeleton?: string; size?: number; mtimeMs?: number } | null {
   const rel = normalizedFile.startsWith(projectDir + "/")
     ? normalizedFile.slice(projectDir.length + 1)
     : normalizedFile.startsWith("/") ? null : normalizedFile;
@@ -331,6 +337,7 @@ export function lookupEntry(
       description: e.description,
       tokens: e.tokens,
       symbols: e.symbols,
+      skeleton: e.skeleton,
       size: e.size,
       mtimeMs: e.mtimeMs,
     });

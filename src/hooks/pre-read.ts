@@ -39,6 +39,13 @@ function duplicateMode(wolfDir: string): DuplicateMode {
   return mode === "deny" || mode === "off" ? mode : "warn";
 }
 
+function skeletonHintsEnabled(wolfDir: string): boolean {
+  const cfg = readJSON<{ openwolf?: { reads?: { skeleton_hints?: boolean } } }>(
+    path.join(wolfDir, "config.json"), {}
+  );
+  return cfg.openwolf?.reads?.skeleton_hints !== false;
+}
+
 async function main(): Promise<void> {
   ensureWolfDir();
   const wolfDir = getWolfDir();
@@ -169,9 +176,18 @@ async function main(): Promise<void> {
                 (entry.mtimeMs === undefined || Math.abs(st.mtimeMs - entry.mtimeMs) < 1);
       } catch {}
       if (fresh) {
-        const top = [...entry.symbols].sort((a, b) => b.tokens - a.tokens).slice(0, 5);
-        const list = top.map((s) => `${s.kind} ${s.name} L${s.startLine}-${s.endLine} ~${s.tokens} tok`).join("; ");
-        notes.push(`Largest sections: ${list}. Read with offset/limit to fetch just the part you need.`);
+        // J2 skeleton hint: for big files with an indexed signature outline,
+        // the outline replaces the "largest sections" line — often enough to
+        // skip the full read entirely. Config-gated (reads.skeleton_hints).
+        if (entry.skeleton && entry.tokens > 2000 && skeletonHintsEnabled(wolfDir)) {
+          notes.push(
+            `Signature outline of ${entry.file} (~${entry.tokens} tok full; symbols with line ranges follow):\n${entry.skeleton}\nRead with offset/limit to fetch just the part you need.`
+          );
+        } else {
+          const top = [...entry.symbols].sort((a, b) => b.tokens - a.tokens).slice(0, 5);
+          const list = top.map((s) => `${s.kind} ${s.name} L${s.startLine}-${s.endLine} ~${s.tokens} tok`).join("; ");
+          notes.push(`Largest sections: ${list}. Read with offset/limit to fetch just the part you need.`);
+        }
       }
     }
   }

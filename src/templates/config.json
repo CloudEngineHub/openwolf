@@ -3,7 +3,8 @@
   "openwolf": {
     "enabled": true,
     "reads": {
-      "duplicate_mode": "warn"
+      "duplicate_mode": "warn",
+      "skeleton_hints": true
     },
     "bash": {
       "filter_mode": "suggest"

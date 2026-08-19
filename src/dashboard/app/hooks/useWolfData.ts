@@ -164,6 +164,7 @@ export function useWolfData(): WolfData {
             tokens: e.tokens ?? 0,
             section: slash === -1 ? "./" : relPath.slice(0, slash + 1),
             symbols: e.symbols,
+            importance: e.importance,
           };
         });
         setAnatomy({

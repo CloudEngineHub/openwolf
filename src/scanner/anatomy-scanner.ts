@@ -8,6 +8,8 @@ import {
 } from "../hooks/anatomy-store.js";
 import { withAnatomyLock, CLI_LOCK_BUDGET_MS } from "../hooks/anatomy-lock.js";
 import { extractSymbols, symbolsSupported, SYMBOL_MIN_TOKENS } from "../hooks/symbol-extractor.js";
+import { analyzeFileTS, tsSymbolsSupported } from "../anatomy/ts-symbol-extractor.js";
+import { computeImportance } from "../anatomy/importance.js";
 import { readJSON, writeJSON, writeText } from "../utils/fs-safe.js";
 import { normalizePath } from "../utils/paths.js";
 
@@ -100,7 +102,8 @@ function walkDir(
   rootDir: string,
   excludePatterns: string[],
   maxFiles: number,
-  files: Record<string, StoreFileEntry>
+  files: Record<string, StoreFileEntry>,
+  contents?: Record<string, string>
 ): void {
   let totalFiles = Object.keys(files).length;
   if (totalFiles >= maxFiles) return;
@@ -121,7 +124,7 @@ function walkDir(
     if (shouldExclude(relPath, excludePatterns)) continue;
 
     if (item.isDirectory()) {
-      walkDir(fullPath, rootDir, excludePatterns, maxFiles, files);
+      walkDir(fullPath, rootDir, excludePatterns, maxFiles, files, contents);
     } else if (item.isFile()) {
       const ext = path.extname(item.name).toLowerCase();
       if (BINARY_EXTENSIONS.has(ext)) continue;
@@ -159,7 +162,9 @@ function walkDir(
         updatedAt: new Date().toISOString(),
         source: "scan",
         symbols: symbols && symbols.length > 0 ? symbols : undefined,
+        symbolSource: symbols && symbols.length > 0 ? "regex" : undefined,
       };
+      if (contents) contents[relPath] = content;
 
       totalFiles++;
       if (totalFiles >= maxFiles) return;
@@ -171,7 +176,7 @@ function walkDir(
 /**
  * Scan the project and return the anatomy content and file count WITHOUT writing to disk.
  */
-export function buildAnatomy(wolfDir: string, projectRoot: string): { content: string; fileCount: number; store: AnatomyStoreData } {
+export async function buildAnatomy(wolfDir: string, projectRoot: string): Promise<{ content: string; fileCount: number; store: AnatomyStoreData }> {
   const configPath = path.join(wolfDir, "config.json");
   const config = readJSON<WolfConfig>(configPath, {
     version: 1,
@@ -186,13 +191,39 @@ export function buildAnatomy(wolfDir: string, projectRoot: string): { content: s
   });
 
   const store = newStore();
+  const contents: Record<string, string> = {};
   walkDir(
     projectRoot,
     projectRoot,
     config.openwolf.anatomy.exclude_patterns,
     config.openwolf.anatomy.max_files,
-    store.files
+    store.files,
+    contents
   );
+
+  // J2: upgrade regex symbols to exact tree-sitter results where a grammar is
+  // available, and emit a signature skeleton for large files. Failure of the
+  // wasm runtime leaves the regex symbols in place — never a hard error.
+  for (const [relPath, entry] of Object.entries(store.files)) {
+    const ext = path.extname(relPath).toLowerCase();
+    if (entry.tokens < SYMBOL_MIN_TOKENS || !tsSymbolsSupported(ext)) continue;
+    try {
+      const analysis = await analyzeFileTS(contents[relPath] ?? "", ext);
+      if (analysis && analysis.symbols.length > 0) {
+        entry.symbols = analysis.symbols;
+        entry.symbolSource = "ts";
+        if (entry.tokens >= 2000 && analysis.skeleton) entry.skeleton = analysis.skeleton;
+      }
+    } catch {}
+  }
+
+  // J2: PageRank importance over the import graph (0..1, max = 1).
+  try {
+    const importance = computeImportance(contents);
+    for (const [relPath, score] of Object.entries(importance)) {
+      if (store.files[relPath]) store.files[relPath].importance = score;
+    }
+  } catch {}
 
   return { content: renderStore(store), fileCount: Object.keys(store.files).length, store };
 }
@@ -215,15 +246,22 @@ export function buildMergedStore(
     if (prev && ((prev.hash && prev.hash === entry.hash) || prev.source === "md-import")) {
       // Content unchanged or human-edited: keep the curated description.
       if (prev.description) entry.description = prev.description;
-      if (prev.hash === entry.hash && prev.symbols) entry.symbols = prev.symbols;
+      // Symbols: never downgrade quality. A fresh tree-sitter result wins;
+      // otherwise keep whatever the store already has for unchanged content
+      // (which may itself be tree-sitter from an earlier scan).
+      if (prev.hash === entry.hash && prev.symbols && entry.symbolSource !== "ts") {
+        entry.symbols = prev.symbols;
+        entry.symbolSource = prev.symbolSource;
+        if (prev.skeleton && !entry.skeleton) entry.skeleton = prev.skeleton;
+      }
     }
   }
   existing.files = fresh.files;
   return existing;
 }
 
-export function scanProject(wolfDir: string, projectRoot: string): number {
-  const { fileCount, store: fresh } = buildAnatomy(wolfDir, projectRoot);
+export async function scanProject(wolfDir: string, projectRoot: string): Promise<number> {
+  const { fileCount, store: fresh } = await buildAnatomy(wolfDir, projectRoot);
 
   const result = withAnatomyLock(wolfDir, CLI_LOCK_BUDGET_MS, () => {
     const existing = buildMergedStore(wolfDir, projectRoot, fresh);

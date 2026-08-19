@@ -232,7 +232,7 @@ export class CronEngine {
   private async runAction(action: CronAction): Promise<void> {
     switch (action.type) {
       case "scan_project":
-        scanProject(this.wolfDir, this.projectRoot);
+        await scanProject(this.wolfDir, this.projectRoot);
         break;
 
       case "consolidate_memory":

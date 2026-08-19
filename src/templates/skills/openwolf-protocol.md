@@ -15,7 +15,8 @@ You are working in an OpenWolf-managed project. The hooks handle bookkeeping aut
 
 1. Before reading an unfamiliar file, grep `.wolf/anatomy.md` for its path to get a one-line description and token estimate. Never read anatomy.md whole; it is an index.
 2. If the description answers your question, skip the full read. For large files, prefer Read with offset/limit; the pre-read hook surfaces the largest sections with line ranges.
-3. If a file is not in anatomy.md, search with Grep/Glob. Regenerate the index with `openwolf scan`.
+3. To locate a symbol or file by name, run `openwolf find <query>` first: it answers from the index in one ranked shortlist (~1k tokens max), cheaper than grepping the world.
+4. If a file is not in anatomy.md, search with Grep/Glob. Regenerate the index with `openwolf scan`.
 
 ## Code generation and learning
 

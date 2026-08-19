@@ -267,7 +267,7 @@ export async function initCommand(options?: { agent?: string[] }): Promise<void>
   let fileCount = 0;
   if (!isUpgrade) {
     try {
-      fileCount = scanProject(wolfDir, projectRoot);
+      fileCount = await scanProject(wolfDir, projectRoot);
     } catch {
       console.log("  Anatomy scan deferred — will run on first session.");
     }

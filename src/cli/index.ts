@@ -7,6 +7,7 @@ import { statusCommand } from "./status.js";
 import { scanCommand } from "./scan.js";
 import { dashboardCommand } from "./dashboard.js";
 import { reportCommand } from "./report.js";
+import { findCommand } from "./find.js";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -58,6 +59,11 @@ export function createProgram(): Command {
     .command("report")
     .description("Token report: estimated vs measured (from harness transcripts)")
     .action(reportCommand);
+
+  program
+    .command("find <query>")
+    .description("Locate a symbol or file via the anatomy index (ranked, ~1k token cap)")
+    .action(findCommand);
 
   const daemon = program
     .command("daemon")
