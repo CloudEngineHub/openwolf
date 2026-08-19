@@ -4,6 +4,32 @@ All notable changes to OpenWolf are documented here. The format follows
 [Keep a Changelog](https://keepachangelog.com/), and OpenWolf uses
 [Semantic Versioning](https://semver.org/).
 
+## [2.0.5] - 2026-08-20
+
+Dashboard honesty release. After 2.0.4 made savings accounting honest, two
+leftovers made the dashboard contradict itself: a "re-reads blocked" count
+carried over from the old warning semantics next to a savings figure of 0,
+and the config key that enables deny mode was undiscoverable on upgraded
+projects. Both are fixed.
+
+### Fixed
+
+- `openwolf update` and `openwolf init` now deep-merge new config defaults
+  into an existing `.wolf/config.json`, adding missing keys only and never
+  touching customized values (ports, budgets, exclude patterns). Upgraded
+  projects finally see `openwolf.reads.duplicate_mode`, which previously
+  existed only in fresh installs. The default stays `warn`.
+- Duplicate-read warnings and denials are now tracked as separate ledger
+  fields (`repeated_reads_warned` vs `repeated_reads_blocked`). Sessions
+  written before 2.0.5 stored warning counts in the blocked field;
+  `openwolf update` migrates them, so "193 blocked, 0 saved" can no longer
+  appear. `openwolf report` lists both lines.
+- The dashboard no longer renders misleading zeros. In warn mode the savings
+  tile shows "n/a" with a note that denial savings are not tracked and how to
+  enable deny mode; the stat row shows "re-read warnings". In deny mode the
+  tiles show denied re-reads and the tokens they saved. The context health
+  card now shows the active duplicate read mode.
+
 ## [2.0.4] - 2026-08-18
 
 The repair release. A full audit against the Claude Code hooks reference

@@ -46,6 +46,7 @@ export const HOOK_FILES = [
   "stop.js",
   "session-end.js",
   "ledger.js",
+  "ledger-math.js",
   "shared.js",
   "anatomy-store.js",
   "anatomy-lock.js",

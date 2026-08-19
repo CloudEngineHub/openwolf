@@ -18,7 +18,8 @@ import { resolveAgents, availableAgents } from "../agents/index.js";
 import { newStore, importFromMarkdown, saveStore, STORE_FILE, sha256 as storeSha256 } from "../hooks/anatomy-store.js";
 import { installSkills } from "../agents/skills.js";
 import { HOOK_SETTINGS, HOOK_FILES } from "./hook-manifest.js";
-import { emptyLedger, recomputeLifetime, type LedgerData } from "../hooks/ledger.js";
+import { emptyLedger, recomputeLifetime, migrateLegacyBlockedCounts, type LedgerData } from "../hooks/ledger.js";
+import { mergeConfigDefaults } from "./config-merge.js";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -177,6 +178,14 @@ async function updateProject(
     }
     console.log(`    ✓ Templates updated (${ALWAYS_OVERWRITE.join(", ")})`);
 
+    // 2b. Merge new config defaults (add missing keys only, never overwrite):
+    // upgraded projects must be able to discover new tunables such as
+    // openwolf.reads.duplicate_mode. Runs before the port-collision pass so a
+    // merged-in default port can still be reassigned.
+    if (mergeConfigDefaults(path.join(wolfDir, "config.json"), templatesDir)) {
+      console.log(`    ✓ Config defaults merged (new keys added, existing values preserved)`);
+    }
+
     // 3. Update hook scripts
     copyHookScripts(wolfDir);
     console.log(`    ✓ Hook scripts updated`);
@@ -225,6 +234,7 @@ async function updateProject(
       const ledgerPath = path.join(wolfDir, "token-ledger.json");
       if (fs.existsSync(ledgerPath)) {
         const ledger = readJSON<LedgerData>(ledgerPath, emptyLedger());
+        let ledgerChanged = false;
         if (Array.isArray(ledger.sessions) && ledger.sessions.length > 0) {
           const before = ledger.sessions.length;
           const byId = new Map<string, (typeof ledger.sessions)[number]>();
@@ -238,10 +248,21 @@ async function updateProject(
             // never tied to real entries): reset it to the sessions we can
             // actually account for.
             ledger.lifetime.total_sessions = byId.size;
-            recomputeLifetime(ledger);
-            writeJSON(ledgerPath, ledger);
+            ledgerChanged = true;
             console.log(`    ✓ Token ledger repaired (${before} entries -> ${byId.size} sessions, lifetime recomputed)`);
           }
+        }
+        // 5a2c. Pre-2.0.5 sessions stored duplicate-read WARNING counts in
+        // repeated_reads_blocked; relabel them so blocked only ever means
+        // actual denials (see migrateLegacyBlockedCounts).
+        const migrated = migrateLegacyBlockedCounts(ledger);
+        if (migrated > 0) {
+          ledgerChanged = true;
+          console.log(`    ✓ Token ledger migrated (${migrated} legacy blocked-counts relabeled as warnings)`);
+        }
+        if (ledgerChanged) {
+          recomputeLifetime(ledger);
+          writeJSON(ledgerPath, ledger);
         }
       }
     } catch {}

@@ -50,6 +50,8 @@ export function ProjectOverview({ data }: { data: WolfData }) {
   const lt = tokenLedger.lifetime;
   const projectName = project.name || identity.name;
   const measured = (lt.real_api_calls ?? 0) > 0;
+  const dupMode = config.reads?.duplicate_mode ?? "warn";
+  const denyOn = dupMode === "deny";
   const savingsPct = lt.total_tokens_estimated > 0
     ? Math.round((lt.estimated_savings_vs_bare_cli / (lt.total_tokens_estimated + lt.estimated_savings_vs_bare_cli)) * 100)
     : 0;
@@ -84,13 +86,23 @@ export function ProjectOverview({ data }: { data: WolfData }) {
       <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-4">
         {/* Hero — the inverted tile */}
         <div className="xl:col-span-2">
-          <StatTile
-            label="tokens saved · estimated"
-            value={lt.estimated_savings_vs_bare_cli > 0 ? formatTokens(lt.estimated_savings_vs_bare_cli) : "0"}
-            sub={savingsPct > 0 ? `${savingsPct}% vs bare agent` : "accumulates as sessions run"}
-            variant="inverted"
-            size="xl"
-          />
+          {denyOn ? (
+            <StatTile
+              label="tokens saved · denied re-reads"
+              value={lt.estimated_savings_vs_bare_cli > 0 ? formatTokens(lt.estimated_savings_vs_bare_cli) : "0"}
+              sub={savingsPct > 0 ? `${savingsPct}% vs bare agent` : "accumulates as sessions run"}
+              variant="inverted"
+              size="xl"
+            />
+          ) : (
+            <StatTile
+              label="tokens saved · denied re-reads"
+              value="n/a"
+              sub={`${dupMode} mode active · denial savings not tracked · set reads.duplicate_mode to deny in .wolf/config.json to track`}
+              variant="inverted"
+              size="xl"
+            />
+          )}
         </div>
 
         {/* Measured usage */}
@@ -135,7 +147,11 @@ export function ProjectOverview({ data }: { data: WolfData }) {
         <StatTile label="sessions" value={fmt(lt.total_sessions)} size="md" />
         <StatTile label="files tracked" value={fmt(anatomy.metadata.files)} size="md" />
         <StatTile label="reads / writes" value={`${fmt(lt.total_reads)}·${fmt(lt.total_writes)}`} size="md" />
-        <StatTile label="re-reads blocked" value={fmt(lt.repeated_reads_blocked)} size="md" />
+        {denyOn ? (
+          <StatTile label="re-reads denied" value={fmt(lt.repeated_reads_blocked)} size="md" />
+        ) : (
+          <StatTile label="re-read warnings" value={fmt(lt.repeated_reads_warned)} size="md" />
+        )}
         <StatTile label="anatomy hit rate" value={hitRate !== null ? `${hitRate}%` : "—"} size="md" />
         <StatTile
           label="bugs on file"
@@ -152,7 +168,7 @@ export function ProjectOverview({ data }: { data: WolfData }) {
           <div className="flex items-center justify-between mb-3">
             <span className="wd-label" style={{ color: "var(--text-muted)" }}>context health</span>
             {scanAgeH !== null && scanAgeH > 6 && (
-              <span className="wd-label" style={{ color: "var(--accent)" }}>stale — run openwolf scan</span>
+              <span className="wd-label" style={{ color: "var(--accent)" }}>stale · run openwolf scan</span>
             )}
           </div>
           <div className="space-y-2 font-mono text-sm" style={{ color: "var(--text-secondary)" }}>
@@ -167,6 +183,10 @@ export function ProjectOverview({ data }: { data: WolfData }) {
             <div className="flex justify-between">
               <span>session digest budget</span>
               <span>{config.context?.session_digest_budget_tokens ?? 1500} tok</span>
+            </div>
+            <div className="flex justify-between">
+              <span>duplicate read mode</span>
+              <span>{dupMode}</span>
             </div>
           </div>
         </div>

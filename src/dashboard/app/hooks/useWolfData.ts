@@ -36,6 +36,7 @@ interface TokenLedger {
     anatomy_hits: number;
     anatomy_misses: number;
     repeated_reads_blocked: number;
+    repeated_reads_warned?: number;
     estimated_savings_vs_bare_cli: number;
     real_input_tokens?: number;
     real_output_tokens?: number;
@@ -50,6 +51,7 @@ interface TokenLedger {
 export interface WolfConfig {
   agents: string[];
   context?: { session_digest_budget_tokens?: number; budgets?: Record<string, number> };
+  reads?: { duplicate_mode?: string };
 }
 
 export interface ScanState {
@@ -171,7 +173,7 @@ export function useWolfData(): WolfData {
     if (files["config.json"]) {
       try {
         const cfg = JSON.parse(files["config.json"]);
-        setConfig({ agents: cfg?.openwolf?.agents ?? ["claude"], context: cfg?.openwolf?.context });
+        setConfig({ agents: cfg?.openwolf?.agents ?? ["claude"], context: cfg?.openwolf?.context, reads: cfg?.openwolf?.reads });
       } catch {}
     }
     if (files["STATUS.md"] !== undefined && files["STATUS.md"] !== "") setStatusDoc(files["STATUS.md"]);

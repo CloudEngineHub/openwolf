@@ -54,6 +54,7 @@ export function reportCommand(): void {
   console.log(`  Sessions:                 ${fmt(lt.total_sessions)}`);
   console.log(`  Reads / writes:           ${fmt(lt.total_reads)} / ${fmt(lt.total_writes)}`);
   console.log(`  Anatomy hits / misses:    ${fmt(lt.anatomy_hits)} / ${fmt(lt.anatomy_misses)}`);
+  console.log(`  Duplicate reads warned:   ${fmt(lt.repeated_reads_warned)}`);
   console.log(`  Duplicate reads denied:   ${fmt(lt.repeated_reads_blocked)}`);
   console.log("");
   console.log("  Estimated (char-ratio heuristic; treat as rough)");

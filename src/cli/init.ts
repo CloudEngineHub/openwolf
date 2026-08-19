@@ -12,6 +12,7 @@ import { resolveAgents, detectInstalledAgents } from "../agents/index.js";
 import { installSkills } from "../agents/skills.js";
 import { newStore, importFromMarkdown, saveStore, loadStore, STORE_FILE, sha256 as storeSha256 } from "../hooks/anatomy-store.js";
 import { HOOK_SETTINGS, HOOK_FILES } from "./hook-manifest.js";
+import { mergeConfigDefaults } from "./config-merge.js";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -351,7 +352,11 @@ function collectUsedPorts(excludeRoot: string): Set<number> {
 function reconcileConfig(templatesDir: string, wolfDir: string, projectRoot: string): boolean {
   const cfgPath = path.join(wolfDir, "config.json");
   if (fs.existsSync(cfgPath)) {
-    return false; // preserve existing ports + user tunables
+    // Preserve existing ports + user tunables, but add any keys the shipped
+    // template has grown since this project was initialized (e.g.
+    // openwolf.reads.duplicate_mode) so new features stay discoverable.
+    mergeConfigDefaults(cfgPath, templatesDir);
+    return false;
   }
   writeTemplateFile(templatesDir, wolfDir, "config.json");
   const cfg = readJSON<any>(cfgPath, null as any);

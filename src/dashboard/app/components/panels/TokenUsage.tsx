@@ -35,9 +35,11 @@ function byAgent(sessions: LedgerSession[]): AgentRow[] {
 }
 
 export function TokenUsage({ data }: { data: WolfData }) {
-  const { tokenLedger } = data;
+  const { tokenLedger, config } = data;
   const lt = tokenLedger.lifetime;
   const measured = (lt.real_api_calls ?? 0) > 0;
+  const dupMode = config.reads?.duplicate_mode ?? "warn";
+  const denyOn = dupMode === "deny";
 
   const chartData = tokenLedger.sessions.map((s) => ({
     date: s.started?.slice(5, 10) || "",
@@ -68,13 +70,23 @@ export function TokenUsage({ data }: { data: WolfData }) {
           sub={measured ? "prompt cache working for you" : undefined}
           size="md"
         />
-        <StatTile
-          label="est. saved vs bare"
-          value={lt.estimated_savings_vs_bare_cli > 0 ? formatTokens(lt.estimated_savings_vs_bare_cli) : "0"}
-          sub={savingsPct > 0 ? `${savingsPct}% of would-be usage` : "approximate by design"}
-          variant="inverted"
-          size="md"
-        />
+        {denyOn ? (
+          <StatTile
+            label="saved · denied re-reads"
+            value={lt.estimated_savings_vs_bare_cli > 0 ? formatTokens(lt.estimated_savings_vs_bare_cli) : "0"}
+            sub={savingsPct > 0 ? `${savingsPct}% of would-be usage` : "approximate by design"}
+            variant="inverted"
+            size="md"
+          />
+        ) : (
+          <StatTile
+            label="saved · denied re-reads"
+            value="n/a"
+            sub={`${dupMode} mode active · denial savings not tracked`}
+            variant="inverted"
+            size="md"
+          />
+        )}
       </div>
 
       {/* Usage over time */}

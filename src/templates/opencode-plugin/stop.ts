@@ -34,6 +34,7 @@ interface SessionEntry {
     reads_count: number
     writes_count: number
     repeated_reads_blocked: number
+    repeated_reads_warned?: number
     anatomy_lookups: number
     anatomy_misses?: number
     savings_estimated?: number
@@ -48,6 +49,7 @@ interface LifetimeTotals {
   anatomy_hits: number
   anatomy_misses: number
   repeated_reads_blocked: number
+  repeated_reads_warned: number
   estimated_savings_vs_bare_cli: number
   [key: string]: number
 }
@@ -74,6 +76,7 @@ function emptyLedger(): LedgerData {
       anatomy_hits: 0,
       anatomy_misses: 0,
       repeated_reads_blocked: 0,
+      repeated_reads_warned: 0,
       estimated_savings_vs_bare_cli: 0,
     },
     sessions: [],
@@ -113,6 +116,7 @@ function buildSessionEntry(session: SessionState): SessionEntry {
       // Honest accounting: only reads the hook actually denied count as
       // blocked (warnings do not prevent the read from happening).
       repeated_reads_blocked: session.reads_denied ?? 0,
+      repeated_reads_warned: session.repeated_reads_warned ?? 0,
       anatomy_lookups: session.anatomy_hits,
       anatomy_misses: session.anatomy_misses,
       // Honest savings: tokens of reads that were denied, nothing else.
@@ -142,6 +146,7 @@ function foldEntry(acc: Record<string, number>, e: SessionEntry): void {
   addInto(acc, "anatomy_hits", e.totals.anatomy_lookups)
   addInto(acc, "anatomy_misses", e.totals.anatomy_misses)
   addInto(acc, "repeated_reads_blocked", e.totals.repeated_reads_blocked)
+  addInto(acc, "repeated_reads_warned", e.totals.repeated_reads_warned)
   addInto(acc, "estimated_savings_vs_bare_cli", e.totals.savings_estimated)
 }
 
@@ -161,6 +166,7 @@ function recomputeLifetime(ledger: LedgerData): void {
     anatomy_hits: 0,
     anatomy_misses: 0,
     repeated_reads_blocked: 0,
+    repeated_reads_warned: 0,
     estimated_savings_vs_bare_cli: 0,
     ...acc,
     total_sessions: totalSessions,
