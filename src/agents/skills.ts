@@ -9,7 +9,13 @@ import { safeCopyFile } from "../utils/fs-safe.js";
 //   Codex       → .codex/prompts/<name>.md     (custom prompt)
 // Gemini CLI and Cursor have no project-level command surface we target yet.
 
-const SKILLS = ["security-audit", "reframe", "designqc"];
+const SKILLS = ["security-audit", "reframe", "designqc", "handoff"];
+
+// Claude Code skills proper (auto-loaded on demand by description match, unlike
+// slash commands): installed as .claude/skills/<name>/SKILL.md.
+const CLAUDE_SKILLS: Array<{ name: string; template: string }> = [
+  { name: "openwolf", template: "openwolf-protocol.md" },
+];
 
 export function installSkills(projectRoot: string, templatesDir: string, agents: string[]): string[] {
   const skillsDir = path.join(templatesDir, "skills");
@@ -55,5 +61,29 @@ export function installSkills(projectRoot: string, templatesDir: string, agents:
       actions.push(`Skills left untouched for ${agent} (customized): ${skipped.join(", ")} (delete the file to get the updated template)`);
     }
   }
+
+  // Claude Code skills: same never-clobber-customized contract.
+  const installedSkills: string[] = [];
+  for (const { name, template } of CLAUDE_SKILLS) {
+    const src = path.join(skillsDir, template);
+    if (!fs.existsSync(src)) continue;
+    const destDir = path.join(projectRoot, ".claude", "skills", name);
+    const dest = path.join(destDir, "SKILL.md");
+    if (fs.existsSync(dest)) {
+      const existing = fs.readFileSync(dest, "utf-8");
+      const templateContent = fs.readFileSync(src, "utf-8");
+      if (existing !== templateContent) {
+        actions.push(`Skill left untouched (customized): ${name} (delete .claude/skills/${name}/SKILL.md to get the updated template)`);
+        continue;
+      }
+    }
+    fs.mkdirSync(destDir, { recursive: true });
+    safeCopyFile(src, dest);
+    installedSkills.push(name);
+  }
+  if (installedSkills.length > 0) {
+    actions.push(`Claude skills installed: ${installedSkills.join(", ")} (.claude/skills/)`);
+  }
+
   return actions;
 }

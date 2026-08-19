@@ -7,6 +7,7 @@ import { WebSocketServer, WebSocket } from "ws";
 import { findProjectRoot } from "../scanner/project-root.js";
 import { readJSON, writeJSON, readText } from "../utils/fs-safe.js";
 import { getHealth } from "./health.js";
+import { auditContextHealth } from "./context-audit.js";
 import { withFileLock } from "../hooks/anatomy-lock.js";
 import { Logger } from "../utils/logger.js";
 import { getDashboardToken, validateDashboardToken } from "../utils/dashboard-auth.js";
@@ -176,6 +177,15 @@ app.get("/api/files", (_req, res) => {
     files["suggestions.json"] = "";
   }
   res.json(files);
+});
+
+// Context-health audit (J3): read-only checks on always-on context cost.
+app.get("/api/context-health", (_req, res) => {
+  try {
+    res.json(auditContextHealth(projectRoot, wolfDir));
+  } catch (err) {
+    res.status(500).json({ error: err instanceof Error ? err.message : String(err) });
+  }
 });
 
 // Trigger a cron task by ID

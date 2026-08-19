@@ -68,6 +68,12 @@ export interface WolfConfig {
   reads?: { duplicate_mode?: string };
 }
 
+export interface ContextHealth {
+  findings: Array<{ id: string; severity: "info" | "warn"; message: string }>;
+  always_on_estimate_tokens: number;
+  generated_at: string;
+}
+
 export interface ScanState {
   last_scanned?: string;
   git_head?: string | null;
@@ -113,6 +119,7 @@ export interface WolfData {
   identity: { name: string; role: string };
   project: ProjectMeta;
   config: WolfConfig;
+  contextHealth: ContextHealth | null;
   statusDoc: string;
   scanState: ScanState;
   loading: boolean;
@@ -134,6 +141,7 @@ export function useWolfData(): WolfData {
   const [identity, setIdentity] = useState({ name: "Wolf", role: "AI development assistant" });
   const [project, setProject] = useState<ProjectMeta>({ name: "", description: "", root: "" });
   const [config, setConfig] = useState<WolfConfig>({ agents: ["claude"] });
+  const [contextHealth, setContextHealth] = useState<ContextHealth | null>(null);
   const [statusDoc, setStatusDoc] = useState("");
   const [scanState, setScanState] = useState<ScanState>({});
   const [client, setClient] = useState<WolfClient | null>(null);
@@ -231,6 +239,11 @@ export function useWolfData(): WolfData {
       .then(p => { if (p && typeof p.name === "string") setProject(p); })
       .catch(() => {});
 
+    dashboardFetch("/api/context-health")
+      .then(r => (r.ok ? r.json() : null))
+      .then(c => { if (c && Array.isArray(c.findings)) setContextHealth(c); })
+      .catch(() => {});
+
     // WebSocket
     const wsClient = new WolfClient();
     wsClient.connect();
@@ -251,5 +264,5 @@ export function useWolfData(): WolfData {
     return () => wsClient.disconnect();
   }, [processFiles]);
 
-  return { anatomy, cerebrum, memory, tokenLedger, cronState, cronManifest, buglog, suggestions, health, identity, project, config, statusDoc, scanState, loading, authError, client };
+  return { anatomy, cerebrum, memory, tokenLedger, cronState, cronManifest, buglog, suggestions, health, identity, project, config, contextHealth, statusDoc, scanState, loading, authError, client };
 }

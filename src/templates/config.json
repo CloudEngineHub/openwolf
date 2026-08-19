@@ -5,6 +5,9 @@
     "reads": {
       "duplicate_mode": "warn"
     },
+    "bash": {
+      "filter_mode": "suggest"
+    },
     "anatomy": {
       "auto_scan_on_init": true,
       "rescan_interval_hours": 6,

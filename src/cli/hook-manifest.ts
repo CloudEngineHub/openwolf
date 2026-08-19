@@ -21,6 +21,7 @@ export const HOOK_SETTINGS = {
     PreToolUse: [
       { matcher: "Read", hooks: [cmd("pre-read.js", 5)] },
       { matcher: "Write|Edit|MultiEdit", hooks: [cmd("pre-write.js", 5)] },
+      { matcher: "Bash", hooks: [cmd("pre-bash.js", 5)] },
     ],
     PostToolUse: [
       { matcher: "Read", hooks: [cmd("post-read.js", 5)] },
@@ -40,6 +41,8 @@ export const HOOK_FILES = [
   "user-prompt-submit.js",
   "pre-read.js",
   "pre-write.js",
+  "pre-bash.js",
+  "bash-filter.js",
   "post-read.js",
   "post-write.js",
   "precompact.js",

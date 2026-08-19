@@ -20,6 +20,7 @@ import { installSkills } from "../agents/skills.js";
 import { HOOK_SETTINGS, HOOK_FILES } from "./hook-manifest.js";
 import { emptyLedger, recomputeLifetime, migrateLegacyBlockedCounts, type LedgerData } from "../hooks/ledger.js";
 import { mergeConfigDefaults } from "./config-merge.js";
+import { syncCerebrumToClaudeMemory } from "./memory-migrate.js";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -310,7 +311,19 @@ async function updateProject(
       console.log(`    ✓ ${line}`);
     }
 
-    // 6. Update CLAUDE.md snippet if it references OpenWolf
+    // 5e. Mirror cerebrum into Claude Code auto-memory (kills the digest's
+    // double injection of Do-Not-Repeat on Claude; other agents keep it).
+    try {
+      const sync = syncCerebrumToClaudeMemory(root, wolfDir);
+      if (sync.synced.length > 0) {
+        console.log(`    ✓ cerebrum synced to Claude auto-memory (${sync.synced.join(", ")})`);
+      }
+    } catch {}
+
+    // 6. Update the CLAUDE.md snippet. A legacy shipped snippet (matched
+    // byte-identically, so user customizations are never touched) is replaced
+    // with the current stub; the old snippet @-inlined the whole protocol
+    // into every session, which the stub + skill now cover on demand.
     const claudeMdPath = path.join(root, "CLAUDE.md");
     const snippetContent = readTemplateContent("claude-md-snippet.md", templatesDir);
     if (fs.existsSync(claudeMdPath)) {
@@ -318,6 +331,14 @@ async function updateProject(
       if (!existing.includes("OpenWolf")) {
         writeText(claudeMdPath, snippetContent + "\n\n" + existing);
         console.log(`    ✓ CLAUDE.md updated`);
+      } else {
+        const migrated = replaceLegacySnippet(existing, snippetContent);
+        if (migrated !== null) {
+          writeText(claudeMdPath, migrated);
+          console.log(`    ✓ CLAUDE.md snippet replaced with the lean stub (protocol moved to the openwolf skill)`);
+        } else if (existing.includes("@.wolf/OPENWOLF.md")) {
+          console.log(`    ⚠ CLAUDE.md still @-imports .wolf/OPENWOLF.md but was customized; consider trimming it yourself (the openwolf skill now carries the protocol)`);
+        }
       }
     }
 
@@ -444,6 +465,30 @@ function createBackup(wolfDir: string): string {
   return backupDir;
 }
 
+// Every CLAUDE.md snippet OpenWolf has ever shipped, verbatim (trimmed).
+// Replacement happens only on a byte-identical match of one of these blocks,
+// so anything the user edited is theirs and stays untouched.
+const LEGACY_CLAUDE_SNIPPETS = [
+  "# OpenWolf\n\n@.wolf/OPENWOLF.md\n\nThis project uses OpenWolf for context management. The imported protocol above applies every session.",
+  "# OpenWolf\n\n@.wolf/OPENWOLF.md\n\nThis project uses OpenWolf for context management. Read and follow .wolf/OPENWOLF.md every session. Check .wolf/cerebrum.md before generating code. Check .wolf/anatomy.md before reading files.",
+];
+
+/**
+ * Replace a legacy shipped snippet inside CLAUDE.md with the current stub.
+ * Returns the new content, or null when no shipped snippet matches verbatim.
+ */
+export function replaceLegacySnippet(existing: string, stub: string): string | null {
+  const stubTrimmed = stub.trim();
+  for (const legacy of LEGACY_CLAUDE_SNIPPETS) {
+    if (legacy === stubTrimmed) continue;
+    const idx = existing.indexOf(legacy);
+    if (idx !== -1) {
+      return existing.slice(0, idx) + stubTrimmed + existing.slice(idx + legacy.length);
+    }
+  }
+  return null;
+}
+
 // ─── Shared helpers (extracted from init.ts patterns) ─────────────
 
 function findTemplatesDir(): string {
@@ -465,8 +510,8 @@ function readTemplateContent(filename: string, templatesDir: string): string {
     return fs.readFileSync(filePath, "utf-8");
   }
   const templates: Record<string, string> = {
-    "claude-md-snippet.md": `# OpenWolf\n\n@.wolf/OPENWOLF.md\n\nThis project uses OpenWolf for context management. Read and follow .wolf/OPENWOLF.md every session. Check .wolf/cerebrum.md before generating code. Check .wolf/anatomy.md before reading files.`,
-    "claude-rules-openwolf.md": `---\ndescription: OpenWolf protocol enforcement — active on all files\nglobs: **/*\n---\n\n- Check .wolf/anatomy.md before reading any project file\n- Check .wolf/cerebrum.md Do-Not-Repeat list before generating code\n- After writing or editing files, update .wolf/anatomy.md and append to .wolf/memory.md\n- After receiving a user correction, update .wolf/cerebrum.md immediately (Preferences, Learnings, or Do-Not-Repeat)\n- LEARN from every interaction: if you discover a convention, user preference, or project pattern, add it to .wolf/cerebrum.md. Low threshold — when in doubt, log it.\n- BEFORE fixing any bug or error: read .wolf/buglog.json for known fixes\n- AFTER fixing any bug, error, failed test, failed build, or user-reported problem: ALWAYS log to .wolf/buglog.json with error_message, root_cause, fix, and tags\n- If you edit a file more than twice in a session, that likely indicates a bug — log it to .wolf/buglog.json\n- When the user asks to change/pick/migrate UI framework: read .wolf/reframe-frameworks.md, ask decision questions, recommend a framework, then execute with the framework's prompt`,
+    "claude-md-snippet.md": `# OpenWolf\n\nThis project uses OpenWolf for context management. The always-on rules live in \`.claude/rules/openwolf.md\`; the hooks handle bookkeeping (anatomy index, memory log, read tracking) automatically.\n\nFor the full operating protocol (session handoff, memory discipline, bug logging), load the \`openwolf\` skill, or read \`.wolf/OPENWOLF.md\`. Regenerate the session handoff with \`/handoff\`.`,
+    "claude-rules-openwolf.md": `---\ndescription: OpenWolf protocol enforcement, active on all files\nglobs: **/*\n---\n\n- Before reading an unfamiliar project file, grep .wolf/anatomy.md for its path (one-line description + token estimate). Never read anatomy.md whole; it is an index.\n- Check .wolf/cerebrum.md Do-Not-Repeat list before generating code; after a user correction, update cerebrum.md immediately.\n- Do NOT manually update .wolf/anatomy.md or .wolf/memory.md; the OpenWolf hooks maintain them.\n- BEFORE fixing any bug: grep .wolf/buglog.json for the error message or filename. AFTER fixing one: log it there (error_message, root_cause, fix, tags).\n- When resuming a session, read .wolf/STATUS.md first; regenerate it with /handoff when a quest finishes.`,
   };
   return templates[filename] ?? "";
 }

@@ -46,7 +46,7 @@ function nextPhase(statusDoc: string): string[] {
 }
 
 export function ProjectOverview({ data }: { data: WolfData }) {
-  const { health, tokenLedger, anatomy, buglog, cronState, config, statusDoc, scanState, project, identity } = data;
+  const { health, tokenLedger, anatomy, buglog, cronState, config, contextHealth, statusDoc, scanState, project, identity } = data;
   const lt = tokenLedger.lifetime;
   const projectName = project.name || identity.name;
   const measured = (lt.real_api_calls ?? 0) > 0;
@@ -188,7 +188,22 @@ export function ProjectOverview({ data }: { data: WolfData }) {
               <span>duplicate read mode</span>
               <span>{dupMode}</span>
             </div>
+            {contextHealth && (
+              <div className="flex justify-between">
+                <span>always-on context (est.)</span>
+                <span>{contextHealth.always_on_estimate_tokens.toLocaleString("en-US")} tok</span>
+              </div>
+            )}
           </div>
+          {contextHealth && contextHealth.findings.length > 0 && (
+            <div className="mt-3 space-y-1.5">
+              {contextHealth.findings.map((f) => (
+                <p key={f.id} className="text-sm" style={{ color: f.severity === "warn" ? "var(--accent)" : "var(--text-muted)" }}>
+                  {f.message}
+                </p>
+              ))}
+            </div>
+          )}
         </div>
 
         <div className="wd-card p-5">

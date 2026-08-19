@@ -51,7 +51,6 @@ async function main(): Promise<void> {
     ["buglog", checkForMissingBugLogs(wolfDir, session)],
     ["cerebrum", checkCerebrumFreshness(wolfDir, session)],
     ["semantic", checkSemanticSummaries(wolfDir, session)],
-    ["status", checkStatusFreshness(wolfDir, session)],
   ];
   const reminders: string[] = [];
   for (const [key, message] of reminderChecks) {
@@ -109,27 +108,8 @@ function checkForMissingBugLogs(wolfDir: string, session: SessionData): string |
  * code activity (3+ writes outside .wolf/). If so, nudge Claude to update
  * STATUS.md so the next /clear has fresh handoff context.
  */
-function checkStatusFreshness(wolfDir: string, session: SessionData): string | null {
-  const statusPath = path.join(wolfDir, "STATUS.md");
-  const codeWrites = session.files_written.filter(
-    (w) => !w.file.includes("/.wolf/") && !w.file.endsWith(".tmp")
-  );
-  if (codeWrites.length < 3) return null;
-
-  try {
-    const stat = fs.statSync(statusPath);
-    const sessionStartMs = session.started ? Date.parse(session.started) : 0;
-    if (!sessionStartMs) return null;
-
-    if (stat.mtimeMs < sessionStartMs) {
-      return `STATUS.md not updated this session despite ${codeWrites.length} code writes. Update .wolf/STATUS.md (done / next quest) so the next session resumes in one read.`;
-    }
-    return null;
-  } catch {
-    // STATUS.md doesn't exist yet.
-    return `.wolf/STATUS.md missing. Create it with the current quest summary and next steps so /clear stays cheap.`;
-  }
-}
+// (The STATUS.md staleness nag was removed in 2.1: STATUS.md is regenerated
+// on demand by the /handoff skill instead of being nagged about every turn.)
 
 /**
  * Check if cerebrum.md was updated recently. If it hasn't been updated in

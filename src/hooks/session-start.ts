@@ -1,7 +1,7 @@
 import * as fs from "node:fs";
 import * as path from "node:path";
 import { execFileSync } from "node:child_process";
-import { getWolfDir, ensureWolfDir, writeJSON, appendMarkdown, readJSON, timestamp, timeShort, estimateTokens, readStdin, detectAgent, recordInjectionToSessionFile } from "./shared.js";
+import { getWolfDir, ensureWolfDir, writeJSON, appendMarkdown, readJSON, timestamp, timeShort, estimateTokens, readStdin, detectAgent, recordInjectionToSessionFile, getProjectDir } from "./shared.js";
 import { loadStore } from "./anatomy-store.js";
 
 // ─── Session digest (Workstream E/F: model-aware context budgeting) ─────────
@@ -38,6 +38,24 @@ function extractSection(markdown: string, headingPattern: RegExp): string {
   return out.join("\n").trim();
 }
 
+/**
+ * True when this project's cerebrum was synced into Claude Code auto-memory
+ * (openwolf update leaves a marker in the memory index). Claude then recalls
+ * Do-Not-Repeat natively, so the digest must not inject it a second time.
+ */
+function claudeMemoryHasSync(): boolean {
+  if (detectAgent() !== "claude") return false;
+  try {
+    const home = process.env.HOME ?? process.env.USERPROFILE ?? "";
+    if (!home) return false;
+    const slug = path.resolve(getProjectDir()).replace(/[^a-zA-Z0-9]/g, "-");
+    const index = fs.readFileSync(path.join(home, ".claude", "projects", slug, "memory", "MEMORY.md"), "utf-8");
+    return index.includes("<!-- openwolf:begin -->");
+  } catch {
+    return false;
+  }
+}
+
 function buildSessionDigest(wolfDir: string, budget: number): string {
   const parts: string[] = [];
   let used = 0;
@@ -56,17 +74,21 @@ function buildSessionDigest(wolfDir: string, budget: number): string {
     tryAdd(extractSection(status, /^## 🚀/));
   } catch {}
 
-  // 2. Do-Not-Repeat list from cerebrum (most recent 10 entries).
-  try {
-    const cerebrum = fs.readFileSync(path.join(wolfDir, "cerebrum.md"), "utf-8");
-    const dnr = extractSection(cerebrum, /^## Do-Not-Repeat/);
-    if (dnr) {
-      const entries = dnr.split("\n").filter((l) => l.startsWith("- "));
-      if (entries.length > 0) {
-        tryAdd("## Do-Not-Repeat (from .wolf/cerebrum.md)\n" + entries.slice(-10).join("\n"));
+  // 2. Do-Not-Repeat list from cerebrum (most recent 10 entries) — skipped
+  // when the cerebrum was synced into Claude Code auto-memory, which already
+  // recalls it natively (double injection would pay for the list twice).
+  if (!claudeMemoryHasSync()) {
+    try {
+      const cerebrum = fs.readFileSync(path.join(wolfDir, "cerebrum.md"), "utf-8");
+      const dnr = extractSection(cerebrum, /^## Do-Not-Repeat/);
+      if (dnr) {
+        const entries = dnr.split("\n").filter((l) => l.startsWith("- "));
+        if (entries.length > 0) {
+          tryAdd("## Do-Not-Repeat (from .wolf/cerebrum.md)\n" + entries.slice(-10).join("\n"));
+        }
       }
-    }
-  } catch {}
+    } catch {}
+  }
 
   // 3. Recent known bugs — prevents re-deriving fixes (issue #45).
   try {
