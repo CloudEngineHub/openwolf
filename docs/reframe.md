@@ -31,7 +31,7 @@ Reframe includes profiles and prompts for 13 frameworks:
 | **Magic UI** | Polished SaaS aesthetic. Linear/Vercel-inspired design language. |
 | **DaisyUI** | Tailwind plugin. Fastest setup, works with any JavaScript framework. |
 | **HeroUI** | React Aria foundation. Polished components with strong accessibility. |
-| **Chakra UI** | CSS-in-JS. Robust theming system, excellent developer experience. |
+| **Chakra UI** | CSS-in-JS. Deep theming system, excellent developer experience. |
 | **Flowbite** | Tailwind plugin. Business and enterprise look out of the box. |
 | **Preline UI** | Tailwind plugin. Speed-focused with pre-built page sections. |
 | **Park UI** | Ark UI headless + Tailwind. Works across React, Vue, and Solid. |
