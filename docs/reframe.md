@@ -1,19 +1,17 @@
 # Reframe
 
-Curated knowledge base of 13 modern UI frameworks with battle-tested prompts. Reframe ships as a `/reframe` slash command and a reference file your agent reads to guide framework selection and migration. Every prompt enforces an anti-generic design mandate so the result does not look AI-generated.
+Curated knowledge base of 13 modern UI frameworks with battle-tested prompts. Reframe ships as the `/reframe` skill, installed for every wired agent during `openwolf init`. Every prompt enforces an anti-generic design mandate so the result does not look AI-generated.
 
 ## Overview
 
-When you run `/reframe` or ask your agent to change, pick, or migrate your UI framework, it reads `.wolf/reframe-frameworks.md` (installed during `openwolf init`). The file contains decision criteria, framework profiles, and framework-specific prompts that your agent adapts to your project using the anatomy index.
-
-Run `/reframe migrate`, `/reframe audit`, or `/reframe fix`, or simply talk to your agent about your UI framework and Reframe activates automatically.
+Run `/reframe migrate`, `/reframe audit`, or `/reframe fix`, or simply ask your agent to change, pick, or migrate your UI framework. The skill carries the decision criteria, framework profiles, and framework-specific prompts, which your agent adapts to your project using the anatomy index.
 
 ---
 
 ## How It Works
 
-1. `.wolf/reframe-frameworks.md` is created during `openwolf init`
-2. When you run `/reframe` or mention changing a UI framework, your agent reads the file
+1. The `/reframe` skill is installed during `openwolf init` for Claude Code, Codex, and OpenCode
+2. When you invoke it or mention changing a UI framework, your agent loads the knowledge base
 3. Your agent asks **5 decision questions** to understand your priorities and constraints
 4. Your agent recommends a framework based on your answers
 5. Your agent uses the framework-specific prompt, adapted to your project via the anatomy index, to execute the installation and migration

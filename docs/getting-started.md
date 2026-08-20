@@ -2,143 +2,120 @@
 
 ## Prerequisites
 
-- **Node.js 20+** ([download](https://nodejs.org)). OpenWolf's hooks run as Node.js scripts, so Node is required regardless of how your agent was installed.
-- **At least one supported coding agent.** OpenWolf works with Codex, OpenCode, and Claude Code (full lifecycle hooks), plus Cursor and Antigravity (beta, context-level). `openwolf init` auto-detects which ones you have installed and wires each of them.
+- **Node.js 20+** ([download](https://nodejs.org)). OpenWolf's hooks run as
+  Node.js scripts. Bug-log full-text search uses Node's built-in SQLite on
+  22.5+ and falls back to a simpler matcher below that.
+- **At least one supported coding agent.** Claude Code, Codex, and OpenCode
+  get full lifecycle hooks; Cursor, Gemini CLI, and Antigravity get
+  context-level integration. `openwolf init` auto-detects what you have.
 
-## Install OpenWolf
+## Install
 
 ```bash
 npm install -g openwolf
-```
-
-Verify the installation:
-
-```bash
 openwolf --version
 ```
 
 ## Initialize a project
-
-Navigate to any project and run:
 
 ```bash
 cd your-project
 openwolf init
 ```
 
-You'll see:
-
 ```
-  ✓ Agents detected on this machine: codex, cursor (auto-wiring)
+  ✓ Agents detected on this machine: codex, gemini (auto-wiring)
   ✓ Codex hooks registered (.codex/hooks.json)
-  ✓ Skills installed: /security-audit, /reframe
-  ✓ OpenWolf v2 initialized
-  ✓ Claude Code hooks registered (7 hooks)
+  ✓ Skills installed for claude: /security-audit, /reframe, /designqc, /handoff
+  ✓ Claude skills installed: openwolf (.claude/skills/)
+  ✓ OpenWolf v2.4 initialized
+  ✓ Claude Code hooks registered (10 hooks)
   ✓ Anatomy scan: 47 files indexed
 
   You're ready. Use your agents as normal. OpenWolf is watching.
 ```
 
-That's it. No configuration needed. Use your agents as you normally would. To wire specific agents instead of auto-detecting, pass `--agent codex opencode`, `--agent all`, or `--agent claude` to opt out.
+No configuration needed. To wire specific agents instead of auto-detecting,
+pass `--agent codex opencode`, `--agent all`, or `--agent claude`.
 
-## Verify it's working
+## Verify it works
 
 ```bash
 openwolf status
 ```
 
-```
-OpenWolf Status
-===============
+Confirms the core files, the 10 hook scripts, and the agent registrations.
+After your first session, `openwolf report` shows measured usage from the
+transcripts.
 
-  ✓ All core files present
-  ✓ All 7 hook scripts present
-  ✓ Agent hooks registered
+## What happens during a session
 
-Token Stats:
-  Sessions: 0
-  Total reads: 0
-  Total writes: 0
-  Tokens tracked: ~0
-  Estimated savings: ~0 tokens
+1. **Session start**: OpenWolf self-tests its own install, then injects a
+   ~400-token index of your project state: what each `.wolf` file holds, the
+   top Do-Not-Repeat rules, and the current handoff.
+2. **Before reads**: duplicate reads get a factual note; large files get
+   their symbol map so the agent reads a slice instead of the whole file.
+3. **Before writes**: the edit is checked against your Do-Not-Repeat list,
+   and relevant past bug fixes are surfaced from the bug log.
+4. **After Bash**: oversized output (grep floods, git show, file re-prints)
+   is condensed before it enters context. The full output stays at
+   `.wolf/cache/bash/` with a pointer. Test failures are never touched.
+5. **Every 25 tool batches**: the top rules are re-surfaced in one short
+   note, countering within-session instruction decay.
+6. **On compaction**: in-flight state, your rules, and the path-scoped
+   instructions the platform drops are re-injected.
+7. **On stop**: the ledger records measured usage per model and verifies
+   from the transcript which hooks fired and which context was delivered.
 
-Anatomy: 47 files tracked
+You interact with none of this.
 
-Daemon: initialized
-```
-
-## What happens next?
-
-Every time you run a supported agent in this project:
-
-1. **Session starts** - OpenWolf injects a budgeted digest of your project's key state, then logs the start to `memory.md`
-2. **Before file reads** - the hook checks for repeated reads and shows the anatomy description plus symbol line ranges for large files
-3. **Before writes** - the hook scans your `cerebrum.md` Do-Not-Repeat list and warns if you're about to repeat a known mistake
-4. **After reads** - token usage is estimated and tracked
-5. **After writes** - the anatomy index is updated under a lock, `memory.md` gets a log entry
-6. **Before compaction** - session state is snapshotted and restored, so no finished work is redone
-7. **On stop** - measured token usage is read from the transcript into the ledger
-
-You don't interact with any of this. It's invisible.
-
-## View the dashboard
-
-The simplest way to get going. This auto-starts the daemon and opens the dashboard:
+## The dashboard
 
 ```bash
 openwolf dashboard
 ```
 
-Opens the token-authenticated dashboard with measured vs estimated token usage, per-agent breakdown, project anatomy, context health, cron status, and more. Each project gets its own port automatically.
+Starts the daemon if needed and opens a token-authenticated local dashboard.
+The hero number is tokens verifiably kept out of context, measured at the
+rewrite point. Around it: measured vs estimated usage, cache-rebuild
+attribution, hook health, per-agent breakdown, the anatomy browser, and cron
+control. Each project gets its own port automatically.
 
-## Optional: Persistent daemon with PM2
+For a daemon that survives terminal closures, install
+[PM2](https://pm2.keymetrics.io/) and run `openwolf daemon start`. PM2 is
+optional; `openwolf dashboard` works without it.
 
-For production use, you can run the daemon via [PM2](https://pm2.keymetrics.io/) for auto-restart and boot persistence:
+## Navigating large repos
+
+Two commands answer questions the agent would otherwise grep for:
 
 ```bash
-npm install -g pm2
+openwolf find validateToken        # ranked shortlist, under 1k tokens
+openwolf find --file src/auth.ts   # one file: description, size, symbols
+openwolf map --focus auth          # budgeted overview of the important files
 ```
 
-```bash
-openwolf daemon start
-```
+`map` ranks files by personalized PageRank over the import graph, seeded by
+what your sessions have touched and your focus terms.
 
-::: tip Windows
-Run `pm2-windows-startup` for boot persistence after installing PM2.
-:::
+## Optional AI maintenance tasks
 
-::: info PM2 is optional
-`openwolf dashboard` starts the daemon automatically without PM2. PM2 is only needed if you want the daemon to survive terminal closures and auto-start on boot.
-:::
-
-## AI-powered tasks
-
-OpenWolf includes two optional weekly AI tasks. They use the Claude CLI with your **Claude subscription** (not API credits), and are the one Claude-specific maintenance feature; everything else works with any supported agent:
-
-- **Cerebrum reflection**, reviews and cleans up `cerebrum.md` (Sundays 3am)
-- **AI suggestions**, analyzes your project and generates improvement suggestions (Mondays 4am)
-
-These run automatically via the daemon's cron scheduler. You can also trigger them manually:
+Two weekly tasks use the Claude CLI with your subscription (not API
+credits): cerebrum reflection (reviews and prunes `cerebrum.md`) and project
+suggestions. They run on the daemon's schedule or manually:
 
 ```bash
 openwolf cron run cerebrum-reflection
 openwolf cron run project-suggestions
 ```
 
-::: warning ANTHROPIC_API_KEY conflict
-If you have `ANTHROPIC_API_KEY` set in your environment, OpenWolf automatically strips it when running AI tasks so that `claude -p` uses your subscription credentials from `~/.claude/.credentials.json` instead. This prevents "Credit balance is too low" errors when your API key has no credits but your subscription is active.
-:::
+If `ANTHROPIC_API_KEY` is set, OpenWolf strips it when spawning `claude -p`
+so your subscription credentials are used.
 
-## Reframe
+## Team usage
 
-Need help choosing a UI component framework? Run the `/reframe` skill or just ask your agent:
-
-> Help me pick a UI framework for this project.
-
-OpenWolf installs a `/reframe` slash command and ships a knowledge file (`.wolf/reframe-frameworks.md`) that your agent reads automatically. It covers 13 frameworks (shadcn/ui, Aceternity UI, Magic UI, DaisyUI, HeroUI, Chakra UI, Flowbite, Preline UI, Park UI, Origin UI, Headless UI, Cult UI, and Astryx) with a decision tree, comparison matrix, an anti-generic design mandate, and ready-made migration prompts.
-
-It works as the `/reframe` skill (installed for Claude Code, Codex, and OpenCode) or through your agent's normal conversation flow.
-
-::: tip Windows path separators
-If you see path errors on Windows, ensure you're using a recent Node.js 20+ release. OpenWolf normalizes paths internally, but some edge cases require Node 20.10+.
-:::
+`.wolf/` ships with a `.gitignore` that commits the state worth sharing
+(cerebrum, STATUS, bug log, the index) and ignores machine-local runtime
+(ledgers, caches, hook state). Commit `.wolf/` and your conventions, known
+fixes, and project map reach every teammate and every agent through normal
+code review.

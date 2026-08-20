@@ -4,7 +4,7 @@ import tailwindcss from "@tailwindcss/vite";
 export default defineConfig({
   title: "OpenWolf",
   description:
-    "A second brain for AI coding agents. Context management, architecture scaffolding, and smarter token utilization through invisible hooks. Works with Codex, OpenCode, Claude Code, and more.",
+    "The second brain for AI coding agents. Verbose output governed before it enters context, a durable project index, memory that survives compaction, and every saving measured from your agent's own transcripts. Works with Claude Code, Codex, OpenCode, and more.",
   head: [
     ["link", { rel: "icon", type: "image/svg+xml", href: "/wolf.svg" }],
     ["link", { rel: "canonical", href: "https://openwolf.com" }],
@@ -46,7 +46,7 @@ export default defineConfig({
       {
         property: "og:description",
         content:
-          "Open-source hooks that give AI coding agents project intelligence, verifiable token measurement, and mistake prevention. Works with Codex, OpenCode, Claude Code, and more.",
+          "Open-source hooks that govern token waste at the source, give agents a durable project index and persistent memory, and measure every claim from the harness's own transcripts. Works with Claude Code, Codex, OpenCode, and more.",
       },
     ],
     // Twitter Card
@@ -63,7 +63,7 @@ export default defineConfig({
       {
         name: "twitter:description",
         content:
-          "Open-source hooks that give AI coding agents project intelligence, verifiable token measurement, and mistake prevention. Works with Codex, OpenCode, Claude Code, and more.",
+          "Open-source hooks that govern token waste at the source, give agents a durable project index and persistent memory, and measure every claim from the harness's own transcripts. Works with Claude Code, Codex, OpenCode, and more.",
       },
     ],
     // Additional SEO

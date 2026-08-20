@@ -36,60 +36,63 @@ onUnmounted(() => observer?.disconnect());
 
 const features = [
   {
-    icon: "grid",
-    title: "Every Agent, One Brain",
-    desc: "Codex, OpenCode, and Claude Code share one project memory, with Cursor and Antigravity in beta. init auto-detects what you have installed and wires it. Learn once, apply everywhere.",
+    icon: "bolt",
+    title: "The Bash Output Governor",
+    desc: "grep floods, git show dumps, and file re-prints are condensed structurally before they enter context. The full output stays on disk with a pointer. Test failures are never touched. The saving is measured per call, at the rewrite point.",
     accent: "var(--ow-accent)",
   },
   {
     icon: "chart",
-    title: "Measured Tokens",
-    desc: "Real usage is read from harness transcripts at session end: input, output, cache, per agent. openwolf report shows measured numbers next to the estimates. Verify, don't trust.",
+    title: "Measured, Verified, Attributed",
+    desc: "Real usage from every transcript, per model. Hook delivery verified against the harness's own records. Cache rebuilds attributed to their trigger and cost. If OpenWolf claims it, it can prove it.",
     accent: "#818cf8",
   },
   {
     icon: "loop",
     title: "Context That Survives",
-    desc: "A token-budgeted digest of your project's state is injected at every session start. Compaction is snapshotted and restored. Sessions stop starting from zero.",
+    desc: "A ~400-token index of your project state at session start. Rules re-surfaced on a cadence to counter within-session decay. Compaction restores the path-scoped rules the platform documents as lost.",
     accent: "#f472b6",
   },
   {
-    icon: "bolt",
-    title: "Symbol-Level Reads",
-    desc: "Big files index their functions and classes with line ranges. Agents fetch one function with offset/limit instead of the whole file. Stale ranges are suppressed automatically.",
+    icon: "grid",
+    title: "Large Repos, Navigated",
+    desc: "openwolf find answers location queries in under 1k tokens. openwolf map ranks the important files by personalized PageRank over the import graph. Tree-sitter symbols give exact line ranges for slice reads.",
     accent: "#fbbf24",
   },
   {
     icon: "lightbulb",
-    title: "Self-Learning",
-    desc: "Every correction gets logged. Every bug fix gets remembered. Every preference gets enforced. Your agents get smarter with every session, without you repeating yourself.",
+    title: "A Committed Team Brain",
+    desc: "Conventions, corrections, and bug fixes live in files that travel through git and code review, readable by every agent and every teammate. On Claude Code, they sync both ways with native auto-memory.",
     accent: "#fb923c",
   },
   {
     icon: "eye",
-    title: "Secure by Default",
-    desc: "Loopback-only dashboard with token auth, zero shell interpolation, path traversal guards, and secret files excluded from every index. Plus bundled /security-audit and /reframe skills.",
+    title: "Provably Alive",
+    desc: "Heartbeats on every hook, a session-start self-test, and install verification on every update. A hook cannot die silently. Plus loopback-only token-auth dashboard, zero shell interpolation, and secrets excluded from every index.",
     accent: "#38bdf8",
   },
 ];
 
 const hooks = [
-  { event: "SessionStart", script: "session-start.js", desc: "Injects the budgeted context digest, detects stale anatomy" },
-  { event: "PreToolUse", script: "pre-read.js", desc: "Warns on repeated reads, shows anatomy and symbol hints" },
-  { event: "PreToolUse", script: "pre-write.js", desc: "Checks cerebrum Do-Not-Repeat patterns" },
-  { event: "PostToolUse", script: "post-read.js", desc: "Estimates and records token usage" },
-  { event: "PostToolUse", script: "post-write.js", desc: "Updates the anatomy store under a cross-process lock" },
+  { event: "SessionStart", script: "session-start.js", desc: "Self-tests the install, injects the state index, restores post-compaction context" },
+  { event: "PreToolUse", script: "pre-read.js", desc: "Duplicate-read advisories, anatomy descriptions, symbol and outline hints" },
+  { event: "PreToolUse", script: "pre-write.js", desc: "Do-Not-Repeat checks and relevant past bug fixes, before the edit happens" },
+  { event: "PreToolUse", script: "pre-bash.js", desc: "Suggests output caps for commands about to flood the context" },
+  { event: "PostToolUse", script: "post-bash.js", desc: "The governor: condenses oversized output, preserves the original, measures the delta" },
+  { event: "PostToolUse", script: "post-read.js", desc: "Records real read sizes into session tracking" },
+  { event: "PostToolUse", script: "post-write.js", desc: "Updates the index under a lock, logs the action, enforces state budgets" },
+  { event: "PostToolBatch", script: "post-batch.js", desc: "Re-surfaces the top rules every N batches, countering instruction decay" },
   { event: "PreCompact", script: "precompact.js", desc: "Snapshots session state before context compaction" },
-  { event: "Stop", script: "stop.js", desc: "Reads measured usage from the transcript; surfaces end-of-turn reminders" },
+  { event: "Stop", script: "stop.js", desc: "Flushes the ledger with measured usage and transcript-verified hook delivery" },
 ];
 
 const archFiles = [
-  { name: "anatomy-index.json", desc: "Durable project index: descriptions, token estimates, content hashes, and per-file symbols. Rendered to anatomy.md.", icon: "file" },
-  { name: "cerebrum.md", desc: "Learned preferences, conventions, Do-Not-Repeat mistakes. Gets smarter every session.", icon: "brain" },
-  { name: "STATUS.md", desc: "Session handoff. The next session reaches productive context in one small read.", icon: "clock" },
-  { name: "buglog.json", desc: "Bug encounter and resolution memory. Searchable. Prevents re-discovering the same fix.", icon: "bug" },
-  { name: "hooks/", desc: "7 Node.js lifecycle hooks shared by all wired agents. Pure file I/O, no network, no AI calls.", icon: "code" },
-  { name: "token-ledger.json", desc: "Estimated and measured usage per session and per agent, straight from harness transcripts.", icon: "gear" },
+  { name: "anatomy-index.json", desc: "Durable project index: descriptions, token estimates, content hashes, symbols, and the import graph. Rendered to anatomy.md.", icon: "file" },
+  { name: "cerebrum.md", desc: "Learned preferences, conventions, Do-Not-Repeat mistakes. Budgeted, committed, shared across agents and teammates.", icon: "brain" },
+  { name: "STATUS.md", desc: "Session handoff. Regenerate it with /handoff; the next session reaches productive context in one small read.", icon: "clock" },
+  { name: "buglog.json", desc: "Bug and fix memory with full-text search. The pre-write hook recalls relevant past fixes before an edit repeats them.", icon: "bug" },
+  { name: "hooks/", desc: "10 Node.js lifecycle hooks shared by all wired agents. Pure file I/O, no network, no AI calls, heartbeat-monitored.", icon: "code" },
+  { name: "token-ledger.json", desc: "Estimated, measured, and transcript-verified usage per session and agent, plus governor deltas and cache-rebuild attribution.", icon: "gear" },
 ];
 </script>
 
@@ -119,7 +122,7 @@ const archFiles = [
             </h1>
 
             <p class="ow-hero__desc">
-              Coding agents re-read files they already saw, scan whole directories to find one function, and forget your conventions between sessions. OpenWolf gives Codex, OpenCode, Claude Code, and other agentic systems one persistent project brain: improved context management, optimized architecture scaffolding, and smarter token utilization. No workflow changes.
+              Coding agents flood their own context with grep dumps and re-read files, then forget your conventions between sessions. OpenWolf gives Claude Code, Codex, OpenCode, and other agents one persistent project brain: verbose output governed before it enters context, a durable project index, memory that survives compaction, and every saving measured from your agent's own transcripts. No workflow changes.
             </p>
 
             <div class="ow-hero__actions">
@@ -156,9 +159,10 @@ const archFiles = [
                 <div class="ow-terminal__line"><span class="ow-terminal__ps">$</span> <span class="ow-terminal__cmd">openwolf init</span></div>
                 <div class="ow-terminal__line ow-terminal__line--out"><span class="ow-terminal__ok">✓</span> Agents detected: codex, gemini (auto-wiring)</div>
                 <div class="ow-terminal__line ow-terminal__line--out"><span class="ow-terminal__ok">✓</span> Codex hooks registered (.codex/hooks.json)</div>
-                <div class="ow-terminal__line ow-terminal__line--out"><span class="ow-terminal__ok">✓</span> Skills installed: /security-audit, /reframe</div>
-                <div class="ow-terminal__line ow-terminal__line--out"><span class="ow-terminal__ok">✓</span> OpenWolf v2.0.0 initialized</div>
-                <div class="ow-terminal__line ow-terminal__line--out"><span class="ow-terminal__ok">✓</span> Claude Code hooks registered (7 hooks)</div>
+                <div class="ow-terminal__line ow-terminal__line--out"><span class="ow-terminal__ok">✓</span> Skills installed: /handoff, /security-audit, /reframe</div>
+                <div class="ow-terminal__line ow-terminal__line--out"><span class="ow-terminal__ok">✓</span> OpenWolf v2.4 initialized</div>
+                <div class="ow-terminal__line ow-terminal__line--out"><span class="ow-terminal__ok">✓</span> Claude Code hooks registered (10 hooks)</div>
+                <div class="ow-terminal__line ow-terminal__line--out"><span class="ow-terminal__ok">✓</span> Hook install verified (selfcheck passed)</div>
                 <div class="ow-terminal__line ow-terminal__line--out"><span class="ow-terminal__ok">✓</span> Anatomy scan: 24 files indexed</div>
                 <div class="ow-terminal__line ow-terminal__line--hint">You're ready. Use your agents as normal. OpenWolf is watching.</div>
               </div>
@@ -179,48 +183,48 @@ const archFiles = [
     <section class="ow-section ow-section--alt ow-why">
       <div class="ow-container ow-container--narrow">
         <div class="ow-why__content reveal">
-          <h2 class="ow-why__title">Coding agents are powerful. But they work blind.</h2>
+          <h2 class="ow-why__title">The waste is not where you think it is.</h2>
           <p class="ow-why__text">
-            An agent does not know what a file contains until it opens it. It cannot tell a 50-token config from a 2,000-token module. It reads the same file three times in one session without noticing. It has no map of your project, no memory of past corrections, no awareness of what it already tried.
+            Before building 2.x we audited 16 live projects: 6,869 real API calls of transcripts. Nearly half of all tool-result tokens arrived through Bash: grep floods, git show dumps, test logs, whole files printed with cat. And every one of those tokens is re-read from cache on every later API call for the rest of the session. The cost of a byte is not its size. It is its size times every call that follows.
           </p>
           <p class="ow-why__text">
-            OpenWolf gives every agent a project index, a learning memory, and a token-aware read layer. And in 2.0 it measures real usage from harness transcripts, so the savings are verified rather than estimated.
+            So OpenWolf governs the Bash channel at the source, keeps context healthy across long sessions, and measures everything it claims from your agent's own transcripts. Including its own overhead.
           </p>
           <div class="ow-why__stats">
             <div class="ow-why__stat">
-              <span class="ow-why__stat-num">~66%</span>
-              <span class="ow-why__stat-label">average estimated token reduction (1.x field use)</span>
+              <span class="ow-why__stat-num">48%</span>
+              <span class="ow-why__stat-label">of tool-result tokens flow through Bash (measured, 16-project audit)</span>
             </div>
             <div class="ow-why__stat">
-              <span class="ow-why__stat-num">71%</span>
-              <span class="ow-why__stat-label">repeated reads caught</span>
+              <span class="ow-why__stat-num">10x</span>
+              <span class="ow-why__stat-label">value of keeping bytes out of context vs trimming prompts (cache economics)</span>
             </div>
             <div class="ow-why__stat">
-              <span class="ow-why__stat-num">2M+</span>
-              <span class="ow-why__stat-label">tokens saved</span>
+              <span class="ow-why__stat-num">0</span>
+              <span class="ow-why__stat-label">unverifiable claims: every number traces to a transcript</span>
             </div>
           </div>
 
-          <!-- Token comparison -->
+          <!-- Governor delta -->
           <div class="ow-why__comparison">
-            <h3 class="ow-why__comparison-title">Same project. Same prompts. Different setups.</h3>
+            <h3 class="ow-why__comparison-title">One governed grep flood, measured at the rewrite point.</h3>
             <div class="ow-why__bar-group">
               <div class="ow-why__bar-row">
-                <span class="ow-why__bar-label">Bare agent (no OpenWolf)</span>
+                <span class="ow-why__bar-label">Command output</span>
                 <div class="ow-why__bar-track">
                   <div class="ow-why__bar ow-why__bar--yellow" style="width: 100%"></div>
                 </div>
-                <span class="ow-why__bar-val">~2.5M</span>
+                <span class="ow-why__bar-val">41,203</span>
               </div>
               <div class="ow-why__bar-row">
-                <span class="ow-why__bar-label">Same project with OpenWolf</span>
+                <span class="ow-why__bar-label">Entered context</span>
                 <div class="ow-why__bar-track">
-                  <div class="ow-why__bar ow-why__bar--green" style="width: 17%"></div>
+                  <div class="ow-why__bar ow-why__bar--green" style="width: 5%"></div>
                 </div>
-                <span class="ow-why__bar-val">~425K</span>
+                <span class="ow-why__bar-val">1,850</span>
               </div>
             </div>
-            <p class="ow-why__bar-note">Heuristic estimates from 1.x field use. OpenWolf 2.0 measures your own numbers from harness transcripts: run openwolf report.</p>
+            <p class="ow-why__bar-note">The full output stays on disk with a pointer, so nothing is lost. Your own deltas: run openwolf report.</p>
           </div>
         </div>
       </div>
@@ -294,8 +298,8 @@ const archFiles = [
           <div class="ow-step reveal" style="transition-delay: 200ms">
             <div class="ow-step__num">03</div>
             <div class="ow-step__content">
-              <h3 class="ow-step__title">Get Smarter</h3>
-              <p class="ow-step__desc">Every session, OpenWolf learns preferences, logs bugs, prevents repeated mistakes. View everything on the real-time dashboard.</p>
+              <h3 class="ow-step__title">See the Proof</h3>
+              <p class="ow-step__desc">Every session, OpenWolf learns preferences, logs bugs, and governs output. The dashboard shows tokens verifiably kept out of context, hook health, and what broke your prompt cache.</p>
               <div class="ow-step__cmd"><span class="ow-step__ps">$</span> openwolf dashboard</div>
             </div>
           </div>
@@ -333,7 +337,7 @@ const archFiles = [
         <div class="ow-section__header reveal">
           <span class="ow-label ow-label--warn">Hooks</span>
           <h2 class="ow-heading">The enforcement layer</h2>
-          <p class="ow-subheading">Seven hooks fire on every agent action. They warn but never block. Pure Node.js. No network, no AI, no extra cost.</p>
+          <p class="ow-subheading">Ten hooks fire on every agent action. Heartbeat-monitored, never permission-bypassing. Pure Node.js. No network, no AI, no extra cost.</p>
         </div>
 
         <div class="ow-hooks reveal">

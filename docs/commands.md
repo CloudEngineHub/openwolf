@@ -1,16 +1,10 @@
 # Commands
 
-Complete reference for all OpenWolf CLI commands.
+Complete reference for the OpenWolf CLI.
 
 ## `openwolf init`
 
 Initialize OpenWolf in the current project.
-
-```bash
-openwolf init
-```
-
-**Options:**
 
 ```bash
 openwolf init                          # auto-detect installed agents (default)
@@ -19,318 +13,206 @@ openwolf init --agent all              # wire every supported agent
 openwolf init --agent claude           # Claude Code only, skip detection
 ```
 
-**What it does:**
-1. Detects the project root (looks for `.git`, `package.json`, `Cargo.toml`, etc.)
-2. Creates `.wolf/` with the template files and the durable anatomy store
-3. Copies the lifecycle hook scripts to `.wolf/hooks/`
-4. Registers 7 hooks in `.claude/settings.json`
-5. Auto-detects installed agents (Codex, OpenCode, Gemini CLI, Cursor) and wires each one: hook registrations, protocol blocks, or plugins as appropriate
-6. Installs the bundled skills (`/security-audit`, `/reframe`) for every wired agent
-7. Creates `.claude/rules/openwolf.md` and prepends the OpenWolf snippet to `CLAUDE.md`
-8. Runs the initial anatomy scan (descriptions, token estimates, symbols)
-9. Populates `cerebrum.md` with detected project name and description
+What it does:
 
-If `.wolf/` already exists, it reinitializes (overwrites templates, preserves learned data).
+1. Detects the project root (`.git`, `package.json`, `Cargo.toml`, and so on)
+2. Creates `.wolf/` with the state files, the durable index, and a
+   `.gitignore` splitting committed state from machine-local runtime
+3. Copies the hook scripts to `.wolf/hooks/` and registers 10 hooks in
+   `.claude/settings.json`
+4. Auto-detects other installed agents (Codex, OpenCode, Gemini CLI, Cursor)
+   and wires each one
+5. Installs the skills (`/handoff`, `/security-audit`, `/reframe`,
+   `/designqc`) for every wired agent, plus the `openwolf` protocol skill
+   for Claude Code
+6. Writes a five-line `CLAUDE.md` stub and `.claude/rules/openwolf.md`
+7. Runs the initial anatomy scan (descriptions, symbols, import graph)
 
-::: info
-If `.claude/settings.json` already has hooks, OpenWolf merges its hooks in, existing hooks are not overwritten.
-:::
+Re-running init is safe: templates refresh, learned data is preserved, and
+existing hook entries in `.claude/settings.json` are merged, not replaced.
 
 ---
 
 ## `openwolf status`
 
-Show health, stats, and file integrity.
-
-```bash
-openwolf status
-```
-
-**Output:**
-```
-OpenWolf Status
-===============
-
-  ✓ All core files present
-  ✓ All 7 hook scripts present
-  ✓ Agent hooks registered (claude, codex)
-
-Token Stats:
-  Sessions: 12
-  Total reads: 87
-  Total writes: 34
-  Tokens tracked: ~45,200
-  Estimated savings: ~8,400 tokens
-
-Anatomy: 79 files tracked
-
-Daemon: running
-  Last heartbeat: 2 minutes ago
-```
+Health, stats, and file integrity: core files present, all hook scripts
+present, agent registrations, token stats, index size, daemon state.
 
 ---
 
 ## `openwolf scan`
 
-Force a full anatomy rescan of the project.
+Force a full anatomy rescan.
 
 ```bash
 openwolf scan
 ```
 
-```
-Scanning project...
-  ✓ Anatomy scan complete: 79 files indexed in 42ms
-```
+Rescans descriptions, token estimates, tree-sitter symbols, and the import
+graph. Lockfiles, caches, minified files, and agent-config directories are
+excluded automatically. Normally you never need this: the post-write hook
+updates entries incrementally, and the daemon rescans when the index is
+actually stale.
 
 ### `openwolf scan --check`
 
-Compare the current filesystem against `anatomy.md` without writing any changes. Exits with code 1 if the anatomy is out of date.
+Exits 1 if the index no longer matches the tree. CI-friendly:
 
 ```bash
-openwolf scan --check
+openwolf scan --check || echo "index out of date"
 ```
 
-Useful in CI pipelines to verify that `anatomy.md` has been kept in sync:
+---
+
+## `openwolf find <query>`
+
+Locate a symbol or file from the index alone. Results are ranked by match
+quality, then import-graph importance, and the output is capped near 1,000
+tokens so agents can use it instead of grepping the tree.
 
 ```bash
-openwolf scan --check || echo "anatomy.md is out of date. Run openwolf scan"
+openwolf find validateToken
+```
+
+```
+src/auth/token.ts:82-140 method Auth.validateToken ~450 tok
+src/auth/token.ts:5-160 class Auth ~1,240 tok
+src/middleware/verify.ts file ~380 tok Token verification middleware
+```
+
+### `openwolf find --file <path>`
+
+Full index detail for one file: description, size, importance, and every
+symbol with its line range. The cheap replacement for reading the file, or
+the index, whole.
+
+---
+
+## `openwolf map`
+
+A token-budgeted overview of the most important files, ranked by
+personalized PageRank over the import graph. The ranking is seeded by files
+your recent sessions touched and by `--focus` terms, then fitted to the
+budget by binary search.
+
+```bash
+openwolf map                    # ~1k tokens (2k when no session seeds exist)
+openwolf map --focus auth,jwt   # bias the ranking toward these terms
+openwolf map --budget 500       # explicit output budget
 ```
 
 ---
 
 ## `openwolf report`
 
-Print the token report: estimated usage (character-ratio heuristic) next to
-measured usage (summed from harness transcripts at session end), plus
-lifetime stats and the most recent measured sessions.
+The token report, hardest numbers first:
+
+- **Measured**: real usage scanned from every project transcript right now,
+  per model, subagent sidechains included
+- **Bash governor**: original output versus what entered context, measured
+  at the rewrite point
+- **Cache rebuilds**: the last 7 days of prompt-cache invalidations with
+  their triggers (model switch, compaction, version change, expiry) and
+  token cost
+- **Estimates**: clearly labeled heuristics, including OpenWolf's own
+  injection cost
 
 ```bash
 openwolf report
 ```
 
-Measured figures appear once sessions end under 2.0; older projects show
-estimates only until then.
+---
+
+## `openwolf bench`
+
+The A/B benchmark: the same task set against two fresh clones of a fixture
+repo, one with OpenWolf and one bare, via headless runs.
+
+```bash
+openwolf bench --repo /path/to/fixture --yes
+openwolf bench --repo <git-url> --task bugfix --repeats 5 --yes
+```
+
+Reports medians per token dimension (input, output, cache read, cache
+write), task completion, and the bash re-run rate. Spends real API budget;
+refuses to run without `--yes`. Raw results are written to a JSON file.
+
+---
+
+## `openwolf bug search <term>`
+
+Full-text search over the bug memory, relevance ranked (SQLite FTS on Node
+22.5+, substring fallback below).
+
+```bash
+openwolf bug search "cannot read properties"
+```
+
+---
 
 ## `openwolf dashboard`
 
-Open the real-time dashboard in your default browser.
-
-```bash
-openwolf dashboard
-```
-
-If the daemon is not running, this command **automatically starts it** as a background process. No PM2 required.
-
-The dashboard opens at `http://localhost:18791` and connects via WebSocket for live updates.
+Open the dashboard. Starts the daemon automatically if it is not running; no
+PM2 required. Each project gets its own port and token.
 
 ---
 
 ## `openwolf daemon`
 
-Manage the background daemon process.
-
-### `openwolf daemon start`
-
-Start the daemon via [PM2](https://pm2.keymetrics.io/) for persistent background operation.
-
 ```bash
-openwolf daemon start
-```
-
-The daemon handles:
-- Cron tasks (anatomy rescans, memory consolidation, AI reflections)
-- File watching and WebSocket broadcasting
-- Dashboard HTTP server
-- Health heartbeat
-
-::: info PM2 is optional
-You do not need PM2 to use the daemon. Running `openwolf dashboard` starts the daemon automatically via Node's `fork()`. PM2 is only needed for auto-restart and boot persistence.
-:::
-
-::: tip Windows
-Run `pm2-windows-startup` for boot persistence.
-:::
-
-### `openwolf daemon stop`
-
-Stop the running daemon. Works whether the daemon was started via PM2 or via `openwolf dashboard`:
-
-```bash
-openwolf daemon stop
-```
-
-- First tries to stop via PM2
-- Falls back to finding the process listening on the dashboard port and killing it directly
-
-### `openwolf daemon restart`
-
-```bash
+openwolf daemon start     # persistent daemon via PM2
+openwolf daemon stop      # stops PM2 or forked daemons alike
 openwolf daemon restart
+openwolf daemon logs      # last 50 lines
 ```
 
-### `openwolf daemon logs`
-
-Show the last 50 lines of daemon output.
-
-```bash
-openwolf daemon logs
-```
+The daemon handles stale-gated anatomy rescans, measured-usage refresh,
+memory consolidation, optional AI tasks, and the dashboard server.
 
 ---
 
 ## `openwolf cron`
 
-Manage scheduled cron tasks.
-
-### `openwolf cron list`
-
-Show all tasks with their schedule, status, and last run time.
-
 ```bash
-openwolf cron list
-```
-
-```
-Cron Tasks
-==========
-
-  Full anatomy rescan (anatomy-rescan)
-    Schedule: Every 6 hours
-    Status: enabled
-    Last run: 3 hours ago
-
-  Consolidate old memory (memory-consolidation)
-    Schedule: Daily at 2:00 AM
-    Status: enabled
-    Last run: yesterday
-
-  Token audit report (token-audit)
-    Schedule: Mondays at midnight
-    Status: enabled
-    Last run: 5 days ago
-
-  Cerebrum reflection (cerebrum-reflection)
-    Schedule: Sundays at 3:00 AM
-    Status: enabled
-    Last run: 2 days ago
-    Uses: claude -p (subscription)
-
-  AI suggestions (project-suggestions)
-    Schedule: Mondays at 4:00 AM
-    Status: enabled
-    Last run: 5 days ago
-    Uses: claude -p (subscription)
-```
-
-### `openwolf cron run <id>`
-
-Manually trigger a cron task by ID.
-
-```bash
-openwolf cron run anatomy-rescan
-```
-
-```bash
-openwolf cron run project-suggestions
-```
-
-The command first attempts to dispatch the task through the daemon's HTTP API. If the daemon is not running, it falls back to executing the task directly in the current process. The daemon is **not** required.
-
-### `openwolf cron retry <id>`
-
-Remove a task from the dead letter queue so it retries on its next schedule.
-
-```bash
-openwolf cron retry cerebrum-reflection
+openwolf cron list        # tasks, schedules, last runs
+openwolf cron run <id>    # trigger now (works without the daemon)
+openwolf cron retry <id>  # clear a task from the dead letter queue
 ```
 
 ---
 
 ## `openwolf update`
 
-Update all registered OpenWolf projects to the latest templates.
+Update every registered project to the installed OpenWolf version.
 
 ```bash
-openwolf update
+openwolf update                   # all projects
+openwolf update --project my-app  # one project (partial match)
+openwolf update --dry-run         # preview
+openwolf update --list            # show registered projects
 ```
 
-**Options:**
-
-| Flag | Description |
-|------|-------------|
-| `--dry-run` | Show what would be updated without making changes |
-| `--project <name>` | Update only a specific project (partial name match) |
-| `--list` | List all registered projects and their paths |
-
-Before making any changes, `update` creates a timestamped backup of the existing `.wolf/` directory. You can restore from these backups with [`openwolf restore`](#openwolf-restore).
-
-```bash
-# Preview changes without writing anything
-openwolf update --dry-run
-
-# Update a single project
-openwolf update --project my-app
-
-# See all registered projects
-openwolf update --list
-```
+Each update takes a timestamped backup first, merges new config defaults
+without touching your values, removes dead weight only when it is verifiably
+untouched template content, and then verifies the hook install with a
+per-hook selfcheck. A failed verification fails the update loudly instead of
+leaving a broken install.
 
 ---
 
-## `openwolf restore`
+## `openwolf restore [backup]`
 
-Restore `.wolf/` from a backup created by `openwolf update`. Run this from the project directory.
-
-```bash
-openwolf restore [backup]
-```
-
-Without arguments, lists all available backups:
+List backups (no argument) or restore `.wolf/` from one:
 
 ```bash
 openwolf restore
+openwolf restore 2026-08-20T1655
 ```
-
-With a backup name, restores from that backup:
-
-```bash
-openwolf restore 2026-03-15T10-30-00
-```
-
----
-
-## `openwolf bug search <term>`
-
-Search the bug memory for matching entries.
-
-```bash
-openwolf bug search "cannot read properties"
-```
-
-```
-Found 2 matching bug(s):
-
-  [bug-003] TypeError: Cannot read properties of undefined (reading 'map')
-    File: src/components/UserList.tsx
-    Root cause: API response was null when users array was expected
-    Fix: Added optional chaining: data?.users?.map() and fallback empty array
-    Tags: null-check, api-response, typescript, react
-    Occurrences: 3 | Last seen: 2026-03-09T14:30:00Z
-```
-
-Searches across: error messages, root causes, fixes, tags, and file paths.
 
 ---
 
 ## `openwolf --version`
 
-Print the current OpenWolf version. The version is read from `package.json` at runtime.
-
 ```bash
 openwolf --version
-```
-
-```
-1.0.0
 ```
