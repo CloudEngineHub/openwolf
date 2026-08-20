@@ -90,6 +90,35 @@ async function main(): Promise<void> {
     ? normalizedFile.slice(projectDir.length).replace(/^\//, "")
     : "";
   if (relToProject.startsWith(".wolf/") || relToProject.startsWith(".wolf\\")) {
+    // 2.4: .wolf reads used to be invisible to OpenWolf itself (~147k tokens
+    // of unmeasured self-inflicted reads, including whole-file reads of the
+    // two files the rules say never to read whole). Measure them (tagged
+    // separately so anatomy metrics stay clean) and steer the expensive
+    // pattern to the cheap one, once per file per session.
+    try {
+      const base = path.basename(normalizedFile);
+      const isRanged = input.tool_input?.offset !== undefined || input.tool_input?.limit !== undefined;
+      if (!isRanged && (base === "anatomy.md" || base === "cerebrum.md" || base === "memory.md")) {
+        let sizeTokens = 0;
+        try { sizeTokens = Math.ceil(fs.statSync(filePath).size / 3.5); } catch {}
+        if (sizeTokens > 1500) {
+          const session = readJSON<SessionData>(sessionFile, {
+            session_id: "", files_read: {}, anatomy_hits: 0, anatomy_misses: 0, repeated_reads_warned: 0,
+          });
+          const warned = (session.wolf_read_advised ?? {}) as Record<string, boolean>;
+          if (!warned[base]) {
+            warned[base] = true;
+            session.wolf_read_advised = warned;
+            const note = base === "anatomy.md"
+              ? `OpenWolf: ${base} is ~${sizeTokens} tokens and is an index, not a document. \`openwolf find <symbol or path>\` answers location queries in under 1k tokens; grep it for a single path's line otherwise.`
+              : `OpenWolf: ${base} is ~${sizeTokens} tokens. Grep the section you need (for example "## Do-Not-Repeat") or read with offset/limit; the whole file rarely pays for itself.`;
+            recordInjection(session, "wolf_read_advice", note);
+            writeJSON(sessionFile, session);
+            emitHookJSON("PreToolUse", { additionalContext: note });
+          }
+        }
+      }
+    } catch {}
     return;
   }
 

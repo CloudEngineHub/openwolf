@@ -14,6 +14,7 @@ import { newStore, importFromMarkdown, saveStore, loadStore, STORE_FILE, sha256 
 import { HOOK_SETTINGS, HOOK_FILES } from "./hook-manifest.js";
 import { mergeConfigDefaults } from "./config-merge.js";
 import { syncCerebrumToClaudeMemory } from "./memory-migrate.js";
+import { ensureWolfGitignore } from "./update.js";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -132,6 +133,9 @@ export async function initCommand(options?: { agent?: string[] }): Promise<void>
     ledger.created_at = new Date().toISOString();
     writeJSON(ledgerPath, ledger);
   }
+
+  // --- Committed vs machine-local split (2.5) ---
+  try { ensureWolfGitignore(wolfDir); } catch {}
 
   // --- Hook scripts: always update (bug fixes, new features) ---
   copyHookScripts(wolfDir);
@@ -398,7 +402,7 @@ function readTemplateContent(filename: string, templatesDir: string): string {
 function getEmbeddedTemplate(filename: string): string {
   const templates: Record<string, string> = {
     "claude-md-snippet.md": `# OpenWolf\n\nThis project uses OpenWolf for context management. The always-on rules live in \`.claude/rules/openwolf.md\`; the hooks handle bookkeeping (anatomy index, memory log, read tracking) automatically.\n\nFor the full operating protocol (session handoff, memory discipline, bug logging), load the \`openwolf\` skill, or read \`.wolf/OPENWOLF.md\`. Regenerate the session handoff with \`/handoff\`.`,
-    "claude-rules-openwolf.md": `---\ndescription: OpenWolf protocol enforcement, active on all files\nglobs: **/*\n---\n\n- Before reading an unfamiliar project file, grep .wolf/anatomy.md for its path (one-line description + token estimate). Never read anatomy.md whole; it is an index.\n- Check .wolf/cerebrum.md Do-Not-Repeat list before generating code; after a user correction, update cerebrum.md immediately.\n- Do NOT manually update .wolf/anatomy.md or .wolf/memory.md; the OpenWolf hooks maintain them.\n- BEFORE fixing any bug: grep .wolf/buglog.json for the error message or filename. AFTER fixing one: log it there (error_message, root_cause, fix, tags).\n- When resuming a session, read .wolf/STATUS.md first; regenerate it with /handoff when a quest finishes.`,
+    "claude-rules-openwolf.md": `---\ndescription: OpenWolf protocol enforcement, active on all files\nglobs: **/*\n---\n\n- To locate a symbol or file, run \`openwolf find <name>\` first (ranked shortlist, under 1k tokens). For one file's description and symbol ranges: \`openwolf find --file <path>\`. Never read .wolf/anatomy.md whole; it is an index.\n- Check .wolf/cerebrum.md Do-Not-Repeat list before generating code (grep "## Do-Not-Repeat"); after a user correction, update cerebrum.md immediately.\n- Do NOT manually update .wolf/anatomy.md or .wolf/memory.md; the OpenWolf hooks maintain them.\n- BEFORE fixing any bug: run \`openwolf bug search "<error>"\` or grep .wolf/buglog.json. AFTER fixing one: log it there (error_message, root_cause, fix, tags).\n- When resuming a session, read .wolf/STATUS.md first; regenerate it with /handoff when a quest finishes.`,
   };
   return templates[filename] ?? "";
 }

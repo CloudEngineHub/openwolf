@@ -21,7 +21,7 @@ import { installSkills } from "../agents/skills.js";
 import { HOOK_SETTINGS, HOOK_FILES } from "./hook-manifest.js";
 import { emptyLedger, recomputeLifetime, migrateLegacyBlockedCounts, type LedgerData } from "../hooks/ledger.js";
 import { mergeConfigDefaults } from "./config-merge.js";
-import { syncCerebrumToClaudeMemory } from "./memory-migrate.js";
+import { syncCerebrumToClaudeMemory, syncClaudeMemoryIndexToCerebrum } from "./memory-migrate.js";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -190,6 +190,11 @@ async function updateProject(
       console.log(`    ✓ Config defaults merged (new keys added, existing values preserved)`);
     }
 
+    // 2b2. Committed/machine-local split (2.5).
+    if (ensureWolfGitignore(wolfDir)) {
+      console.log(`    ✓ .wolf/.gitignore created (commit state, ignore machine-local runtime)`);
+    }
+
     // 2c. Dead-weight cleanup (2.2): remove files this project never used,
     // but ONLY when they are verbatim our shipped templates/stubs — anything
     // the user touched stays.
@@ -337,6 +342,13 @@ async function updateProject(
       const sync = syncCerebrumToClaudeMemory(root, wolfDir);
       if (sync.synced.length > 0) {
         console.log(`    ✓ cerebrum synced to Claude auto-memory (${sync.synced.join(", ")})`);
+      }
+    } catch {}
+
+    // 5e2. Reverse bridge (2.5): native memory index -> committed cerebrum.
+    try {
+      if (syncClaudeMemoryIndexToCerebrum(root, wolfDir)) {
+        console.log(`    ✓ Claude auto-memory index mirrored into cerebrum.md (cross-agent visibility)`);
       }
     } catch {}
 
@@ -548,6 +560,42 @@ function removeDeadWeight(wolfDir: string, templatesDir: string): string[] {
 }
 
 /**
+ * 2.5 committed-vs-machine-local split. The durable niche native auto-memory
+ * deliberately leaves open is TEAM-SHARED, REVIEWED project state: cerebrum,
+ * STATUS, buglog, and the anatomy index belong in git; ledgers, caches,
+ * hook runtime state, and tokens are machine-local. An explicit .gitignore
+ * inside .wolf/ makes the split real without touching the project's own
+ * .gitignore. Created once; never overwritten if the user edited it.
+ */
+const WOLF_GITIGNORE = `# OpenWolf: machine-local state (committed state: cerebrum.md, STATUS.md,
+# memory.md, buglog.json, anatomy.md, anatomy-index.json, config.json, OPENWOLF.md)
+hooks/
+backups/
+cache/
+daemon.log
+daemon.pid
+dashboard-token
+token-ledger.json
+suggestions.json
+cron-state.json
+_scan-state.json
+_*.json
+*.lock
+*.tmp
+`;
+
+export function ensureWolfGitignore(wolfDir: string): boolean {
+  const p = path.join(wolfDir, ".gitignore");
+  if (fs.existsSync(p)) return false;
+  try {
+    fs.writeFileSync(p, WOLF_GITIGNORE, "utf-8");
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+/**
  * 2.2 install integrity: every manifest file must exist with content, and
  * every registered hook entry point must load cleanly (`--selfcheck` exits
  * after module resolution — a missing dependency fails right there, which is
@@ -637,7 +685,7 @@ function readTemplateContent(filename: string, templatesDir: string): string {
   }
   const templates: Record<string, string> = {
     "claude-md-snippet.md": `# OpenWolf\n\nThis project uses OpenWolf for context management. The always-on rules live in \`.claude/rules/openwolf.md\`; the hooks handle bookkeeping (anatomy index, memory log, read tracking) automatically.\n\nFor the full operating protocol (session handoff, memory discipline, bug logging), load the \`openwolf\` skill, or read \`.wolf/OPENWOLF.md\`. Regenerate the session handoff with \`/handoff\`.`,
-    "claude-rules-openwolf.md": `---\ndescription: OpenWolf protocol enforcement, active on all files\nglobs: **/*\n---\n\n- Before reading an unfamiliar project file, grep .wolf/anatomy.md for its path (one-line description + token estimate). Never read anatomy.md whole; it is an index.\n- Check .wolf/cerebrum.md Do-Not-Repeat list before generating code; after a user correction, update cerebrum.md immediately.\n- Do NOT manually update .wolf/anatomy.md or .wolf/memory.md; the OpenWolf hooks maintain them.\n- BEFORE fixing any bug: grep .wolf/buglog.json for the error message or filename. AFTER fixing one: log it there (error_message, root_cause, fix, tags).\n- When resuming a session, read .wolf/STATUS.md first; regenerate it with /handoff when a quest finishes.`,
+    "claude-rules-openwolf.md": `---\ndescription: OpenWolf protocol enforcement, active on all files\nglobs: **/*\n---\n\n- To locate a symbol or file, run \`openwolf find <name>\` first (ranked shortlist, under 1k tokens). For one file's description and symbol ranges: \`openwolf find --file <path>\`. Never read .wolf/anatomy.md whole; it is an index.\n- Check .wolf/cerebrum.md Do-Not-Repeat list before generating code (grep "## Do-Not-Repeat"); after a user correction, update cerebrum.md immediately.\n- Do NOT manually update .wolf/anatomy.md or .wolf/memory.md; the OpenWolf hooks maintain them.\n- BEFORE fixing any bug: run \`openwolf bug search "<error>"\` or grep .wolf/buglog.json. AFTER fixing one: log it there (error_message, root_cause, fix, tags).\n- When resuming a session, read .wolf/STATUS.md first; regenerate it with /handoff when a quest finishes.`,
   };
   return templates[filename] ?? "";
 }

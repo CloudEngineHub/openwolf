@@ -4,6 +4,64 @@ All notable changes to OpenWolf are documented here. The format follows
 [Keep a Changelog](https://keepachangelog.com/), and OpenWolf uses
 [Semantic Versioning](https://semver.org/).
 
+## [2.4.0] - 2026-08-20
+
+Context quality and large repos: the last two phases of the evidence-based
+roadmap (2.4 "context quality" + 2.5 "large repos and the moat"), shipped
+together.
+
+### Added
+
+- Progressive-disclosure digest: the session digest is now an index, not a
+  content dump. One line per live .wolf state file (what it is, size,
+  freshness, read on demand), the top 3 Do-Not-Repeat rules verbatim, and the
+  STATUS next-phase when genuinely filled in. Files whose frontmatter says
+  `always: true` still inject content, budget-capped. Target ~400 tokens
+  (previous mean: 794, of which 75% was a staleness nag or placeholder).
+- Instruction-decay countermeasure: every N tool batches (default 25,
+  `openwolf.context.reinjection_interval`, 0 disables) the top Do-Not-Repeat
+  rules are re-surfaced as short factual statements. The only factorial study
+  of instruction adherence (1,650 sessions) found within-session decay of
+  ~5.6% per generated function and null effects for file size; cadence is the
+  fix shape, and no other tool does this.
+- Compaction restore now also re-injects paths-scoped rule contents for files
+  touched this session: the platform documents these rules as silently lost
+  at compaction until a matching file is re-read. Plus the top rules and the
+  in-flight session state, all through the sanctioned SessionStart channel.
+- State-file budgets: writing .wolf/cerebrum.md or STATUS.md past its budget
+  (2k/1k tokens, `openwolf.context.state_budgets`) produces one factual
+  warning per session - the measure-after-write loop native auto-memory uses,
+  applied to the committed cross-agent state.
+- .wolf self-read governance: OpenWolf now measures the tokens agents spend
+  reading its own state files (previously a deliberate blind spot worth ~147k
+  tokens) and, once per session, redirects whole-file reads of anatomy.md or
+  cerebrum.md to the cheap paths (`openwolf find`, section greps).
+- `openwolf find --file <path>`: full index detail for one file (description,
+  size, importance, symbol line ranges) - the replacement for reading
+  anatomy.md or the file itself.
+- `openwolf map [--focus terms] [--budget N]`: a token-budgeted overview of
+  the most important files, ranked by personalized PageRank over the import
+  graph persisted in the index (restart vector biased toward files read in
+  recent sessions and focus-term matches - aider's repo-map algorithm on the
+  durable store), fitted to the budget by binary search.
+- Merkle-style freshness: the index stores a root hash over (path,
+  content-hash) pairs, and a stat sweep answers "is the index stale" without
+  reading file bodies. The daemon's scheduled rescan now runs only when the
+  sweep or a git HEAD move says the index is actually stale.
+- Index hygiene: lockfiles, .DS_Store, caches, coverage, minified and map
+  files are excluded built-in (one audited project carried ~105k tokens of
+  such noise).
+- Cross-agent moat: state templates carry frontmatter (description, budget);
+  `.wolf/.gitignore` enforces the committed-vs-machine-local split (cerebrum,
+  STATUS, memory, buglog, anatomy index committed; ledgers, caches, hook
+  runtime ignored); the native Claude auto-memory index is mirrored into a
+  marker-fenced cerebrum section so learnings captured natively become
+  visible to other agents and teammates.
+- `openwolf bench`: the A/B gate harness - same task set with and without
+  OpenWolf via headless runs, medians per cache dimension, task completion,
+  and the bash re-run rate (the failure signature of over-aggressive output
+  condensation). Requires --yes; spends real API budget.
+
 ## [2.3.0] - 2026-08-20
 
 The Bash channel release. The empirical audit showed Bash carries 48.3% of

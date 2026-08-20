@@ -290,6 +290,9 @@ openwolf scan              Rebuild the project index
 openwolf scan --check      Verify the index matches the filesystem (CI-friendly)
 openwolf report            Token report: measured (all transcripts) + estimates
 openwolf find <query>      Locate a symbol or file via the index (ranked, ~1k tok cap)
+openwolf find --file <p>   Full index detail for one file (description, symbols, ranges)
+openwolf map               Token-budgeted overview of the most important files
+openwolf bench             A/B benchmark: with vs without OpenWolf, measured (--yes)
 openwolf dashboard         Open the web dashboard
 openwolf daemon start      Start the background daemon
 openwolf daemon stop       Stop the daemon

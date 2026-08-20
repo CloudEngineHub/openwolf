@@ -65,6 +65,8 @@ export interface SessionEntry {
     bash_governed_original_tokens?: number;
     bash_governed_entered_tokens?: number;
     bash_governed_calls?: number;
+    /** Tokens the agent spent reading .wolf/ state itself (2.4). */
+    wolf_internal_tokens?: number;
   };
   injected_by_source?: Record<string, number>;
   real_usage?: RealUsage;
@@ -154,6 +156,7 @@ export function buildSessionTotals(
     bash_governed_calls: (session.bash_governed ?? []).length || undefined,
     bash_governed_original_tokens: sumBy(session.bash_governed, (g) => g.original_tokens),
     bash_governed_entered_tokens: sumBy(session.bash_governed, (g) => g.entered_tokens),
+    wolf_internal_tokens: typeof session.wolf_internal_tokens === "number" ? session.wolf_internal_tokens : undefined,
   };
 }
 
@@ -208,6 +211,7 @@ export function foldEntry(acc: Record<string, number>, e: SessionEntry): void {
   addInto(acc, "bash_governed_calls", e.totals.bash_governed_calls);
   addInto(acc, "bash_governed_original_tokens", e.totals.bash_governed_original_tokens);
   addInto(acc, "bash_governed_entered_tokens", e.totals.bash_governed_entered_tokens);
+  addInto(acc, "wolf_internal_tokens", e.totals.wolf_internal_tokens);
   if (e.real_usage) {
     addInto(acc, "real_input_tokens", e.real_usage.input_tokens);
     addInto(acc, "real_output_tokens", e.real_usage.output_tokens);

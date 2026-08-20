@@ -131,42 +131,56 @@ export function extractEdges(files: Record<string, string>): Map<string, string[
 }
 
 /**
- * PageRank over the import graph, normalized to [0, 1] (max score = 1).
- * Every known file participates; files nothing imports settle near the base.
+ * PageRank over an import-edge map, normalized to [0, 1] (max score = 1).
+ * With `seeds`, the restart vector is biased toward those nodes (aider's
+ * personalized repo-map trick, 2.5): files touched this session or matching
+ * the user's focus terms pull their neighborhoods up the ranking.
  */
-export function computeImportance(files: Record<string, string>): Record<string, number> {
-  const nodes = Object.keys(files);
-  if (nodes.length === 0) return {};
-  const edges = extractEdges(files);
-  // No resolvable edges (unsupported language, flat project): every score
-  // would normalize to 1, which reads as "everything maximally important".
-  // No signal beats a false one.
-  if (edges.size === 0) return {};
+export function rankFromEdges(
+  nodes: string[],
+  edges: Map<string, string[]>,
+  seeds?: Record<string, number>
+): Record<string, number> {
+  if (nodes.length === 0 || edges.size === 0) return {};
   const n = nodes.length;
   const index = new Map(nodes.map((f, i) => [f, i]));
+
+  // Restart (teleport) distribution: uniform, or biased toward seeds.
+  const restart = new Array(n).fill(1 / n);
+  if (seeds && Object.keys(seeds).length > 0) {
+    let total = 0;
+    const weights = new Array(n).fill(1); // every node keeps a floor
+    for (const [node, w] of Object.entries(seeds)) {
+      const i = index.get(node);
+      if (i !== undefined && w > 0) weights[i] += w * n * 0.5;
+    }
+    for (const w of weights) total += w;
+    for (let i = 0; i < n; i++) restart[i] = weights[i] / total;
+  }
 
   // Incoming edge lists per node (PageRank flows along "imported by").
   const incoming: number[][] = nodes.map(() => []);
   const outDegree = new Array(n).fill(0);
   for (const [from, targets] of edges) {
-    const fi = index.get(from)!;
-    outDegree[fi] = targets.length;
-    for (const t of targets) {
+    const fi = index.get(from);
+    if (fi === undefined) continue;
+    const valid = targets.filter((t) => index.has(t));
+    outDegree[fi] = valid.length;
+    for (const t of valid) {
       incoming[index.get(t)!].push(fi);
     }
   }
 
-  let rank = new Array(n).fill(1 / n);
+  let rank = [...restart];
   for (let iter = 0; iter < ITERATIONS; iter++) {
-    const next = new Array(n).fill((1 - DAMPING) / n);
-    // Dangling mass (files with no outgoing edges) is spread uniformly.
+    const next = restart.map((r) => (1 - DAMPING) * r);
+    // Dangling mass (files with no outgoing edges) follows the restart vector.
     let dangling = 0;
     for (let i = 0; i < n; i++) if (outDegree[i] === 0) dangling += rank[i];
-    const danglingShare = (DAMPING * dangling) / n;
     for (let i = 0; i < n; i++) {
       let sum = 0;
       for (const j of incoming[i]) sum += rank[j] / outDegree[j];
-      next[i] += DAMPING * sum + danglingShare;
+      next[i] += DAMPING * (sum + dangling * restart[i]);
     }
     rank = next;
   }
@@ -177,4 +191,18 @@ export function computeImportance(files: Record<string, string>): Record<string,
     out[nodes[i]] = max > 0 ? Number((rank[i] / max).toFixed(4)) : 0;
   }
   return out;
+}
+
+/**
+ * Unpersonalized importance over file contents, normalized to [0, 1].
+ * No resolvable edges (unsupported language, flat project): every score
+ * would normalize to 1, which reads as "everything maximally important" —
+ * no signal beats a false one, so return {}.
+ */
+export function computeImportance(files: Record<string, string>): Record<string, number> {
+  const nodes = Object.keys(files);
+  if (nodes.length === 0) return {};
+  const edges = extractEdges(files);
+  if (edges.size === 0) return {};
+  return rankFromEdges(nodes, edges);
 }

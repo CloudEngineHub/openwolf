@@ -24,12 +24,31 @@ function estimateTokens(text: string): number {
   return Math.ceil(text.length / 4);
 }
 
-export function findCommand(query: string): void {
+export function findCommand(query: string, opts: { file?: boolean } = {}): void {
   const projectRoot = findProjectRoot();
   const store = loadStore(path.join(projectRoot, ".wolf"));
   if (!store || Object.keys(store.files).length === 0) {
     console.log("No anatomy index found. Run: openwolf scan");
     process.exitCode = 1;
+    return;
+  }
+
+  // --file: full detail for one indexed path (description, size, symbols) —
+  // the cheap replacement for reading anatomy.md or the file itself (2.4).
+  if (opts.file) {
+    const q = query.trim().replace(/^\.\//, "");
+    const entry = store.files[q] ?? Object.entries(store.files).find(([p]) => p.endsWith("/" + q) || p === q)?.[1];
+    const relPath = store.files[q] ? q : Object.keys(store.files).find((p) => p.endsWith("/" + q) || p === q);
+    if (!entry || !relPath) {
+      console.log(`Not in the index: ${q}. Run openwolf scan, or Grep the tree.`);
+      process.exitCode = 1;
+      return;
+    }
+    console.log(`${relPath} ~${entry.tokens} tok${entry.importance !== undefined ? ` imp ${entry.importance}` : ""}`);
+    if (entry.description) console.log(`  ${entry.description}`);
+    for (const s of entry.symbols ?? []) {
+      console.log(`  ${s.kind} ${s.name} L${s.startLine}-${s.endLine} ~${s.tokens} tok`);
+    }
     return;
   }
 

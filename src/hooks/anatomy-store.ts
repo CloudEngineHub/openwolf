@@ -45,6 +45,9 @@ export interface StoreFileEntry {
   skeleton?: string;
   /** PageRank import-graph importance, 0..1 normalized (J2). */
   importance?: number;
+  /** Resolved project-internal import targets (2.5): persisted so openwolf
+   * map can run personalized PageRank from the index alone. */
+  imports?: string[];
 }
 
 export interface AnatomyStoreData {
@@ -57,6 +60,10 @@ export interface AnatomyStoreData {
     /** sha256 of the markdown this store last rendered — skew detection key. */
     renderedHash: string;
     storeUpdatedAt: string;
+    /** Merkle-style rollup over (path, content-hash) pairs (2.4): a single
+     * comparison answers "does this index describe this tree" — portable
+     * across machines, unlike mtimes. */
+    rootHash?: string;
   };
   /** Keyed by full normalized relative path, e.g. "src/hooks/shared.ts". */
   files: Record<string, StoreFileEntry>;
@@ -102,9 +109,55 @@ export function loadStore(wolfDir: string): AnatomyStoreData | null {
   }
 }
 
+/** Rollup hash over the index's (path, content-hash) pairs, order-independent. */
+export function computeRootHash(store: AnatomyStoreData): string {
+  const pairs = Object.entries(store.files)
+    .map(([p, e]) => `${p}:${e.hash ?? ""}`)
+    .sort()
+    .join("\n");
+  return crypto.createHash("sha256").update(pairs).digest("hex").slice(0, 16);
+}
+
+export interface StaleCheckResult {
+  stale: boolean;
+  /** Indexed files whose on-disk size/mtime no longer matches (capped). */
+  changed: string[];
+  /** Indexed files that no longer exist (capped). */
+  missing: string[];
+  checked: number;
+}
+
+/**
+ * O(indexed files) stat sweep (2.4): is the index still an accurate map of
+ * the tree it indexed? Detects modifications and deletions without reading a
+ * single file body. (Additions are the full scan's job — this check decides
+ * WHETHER a scan is needed, replacing the blind 6h interval and the deleted
+ * always-on staleness nag.)
+ */
+export function quickStaleCheck(store: AnatomyStoreData, projectRoot: string): StaleCheckResult {
+  const changed: string[] = [];
+  const missing: string[] = [];
+  let checked = 0;
+  for (const [relPath, entry] of Object.entries(store.files)) {
+    checked++;
+    try {
+      const st = fs.statSync(path.join(projectRoot, relPath));
+      const sizeMismatch = entry.size !== undefined && st.size !== entry.size;
+      const mtimeMismatch = entry.mtimeMs !== undefined && Math.abs(st.mtimeMs - entry.mtimeMs) > 1;
+      if (sizeMismatch || (entry.size === undefined && mtimeMismatch)) {
+        if (changed.length < 20) changed.push(relPath);
+      }
+    } catch {
+      if (missing.length < 20) missing.push(relPath);
+    }
+  }
+  return { stale: changed.length > 0 || missing.length > 0, changed, missing, checked };
+}
+
 export function saveStore(wolfDir: string, store: AnatomyStoreData): void {
   store.meta.fileCount = Object.keys(store.files).length;
   store.meta.storeUpdatedAt = new Date().toISOString();
+  store.meta.rootHash = computeRootHash(store);
   const filePath = path.join(wolfDir, STORE_FILE);
   const tmp = filePath + "." + crypto.randomBytes(4).toString("hex") + ".tmp";
   const body = JSON.stringify(store, null, 2);

@@ -9,7 +9,7 @@ import {
 import { withAnatomyLock, CLI_LOCK_BUDGET_MS } from "../hooks/anatomy-lock.js";
 import { extractSymbols, symbolsSupported, SYMBOL_MIN_TOKENS } from "../hooks/symbol-extractor.js";
 import { analyzeFileTS, tsSymbolsSupported } from "../anatomy/ts-symbol-extractor.js";
-import { computeImportance } from "../anatomy/importance.js";
+import { computeImportance, extractEdges } from "../anatomy/importance.js";
 import { readJSON, writeJSON, writeText } from "../utils/fs-safe.js";
 import { normalizePath } from "../utils/paths.js";
 
@@ -48,6 +48,28 @@ const CODE_EXTENSIONS = new Set([
 
 const PROSE_EXTENSIONS = new Set([".md", ".txt", ".rst", ".adoc"]);
 
+// 2.4 index hygiene: generated/derived files no agent should be steered
+// toward. Empirical audit: a project's anatomy indexed package-lock.json
+// (~92k tok), .DS_Store, and a phpunit cache — ~105k tokens of noise in one
+// index. Built in (not config) so existing installs are fixed without an
+// array-merge migration; users can still index nothing here worth indexing.
+const NOISE_BASENAMES = new Set([
+  "package-lock.json", "pnpm-lock.yaml", "yarn.lock", "composer.lock",
+  "cargo.lock", "gemfile.lock", "poetry.lock", "uv.lock", "bun.lockb", "bun.lock",
+  ".ds_store", "thumbs.db", ".phpunit.result.cache", ".eslintcache", ".tsbuildinfo",
+]);
+const NOISE_SUFFIXES = [".min.js", ".min.css", ".map", ".cache", ".tsbuildinfo", ".pyc", ".snap"];
+const NOISE_DIRS = new Set(["coverage", ".nyc_output", "__snapshots__", ".pytest_cache", ".mypy_cache", ".ruff_cache"]);
+
+function isNoiseFile(relPath: string): boolean {
+  const parts = relPath.split("/");
+  const basename = parts[parts.length - 1].toLowerCase();
+  if (NOISE_BASENAMES.has(basename)) return true;
+  if (NOISE_SUFFIXES.some((s) => basename.endsWith(s))) return true;
+  if (parts.some((p) => NOISE_DIRS.has(p.toLowerCase()))) return true;
+  return false;
+}
+
 function estimateTokens(text: string, filePath: string): number {
   const ext = path.extname(filePath).toLowerCase();
   let ratio = 3.75;
@@ -84,6 +106,9 @@ function shouldExclude(
 
   // Always exclude sensitive files regardless of config
   if (isSensitiveFile(basename)) return true;
+
+  // Always exclude generated/derived noise (lockfiles, caches, minified).
+  if (isNoiseFile(relPath)) return true;
 
   for (const pattern of excludePatterns) {
     // Simple glob: check if any path segment matches
@@ -218,7 +243,13 @@ export async function buildAnatomy(wolfDir: string, projectRoot: string): Promis
   }
 
   // J2: PageRank importance over the import graph (0..1, max = 1).
+  // 2.5: the resolved edges are also persisted per entry so `openwolf map`
+  // can run personalized PageRank straight from the index, no file reads.
   try {
+    const edges = extractEdges(contents);
+    for (const [relPath, targets] of edges) {
+      if (store.files[relPath]) store.files[relPath].imports = targets;
+    }
     const importance = computeImportance(contents);
     for (const [relPath, score] of Object.entries(importance)) {
       if (store.files[relPath]) store.files[relPath].importance = score;

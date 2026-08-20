@@ -82,6 +82,11 @@
     },
     "context": {
       "session_digest_budget_tokens": 1500,
+      "reinjection_interval": 25,
+      "state_budgets": {
+        ".wolf/cerebrum.md": 2000,
+        ".wolf/STATUS.md": 1000
+      },
       "budgets": {
         "claude": 1500,
         "codex": 1200,

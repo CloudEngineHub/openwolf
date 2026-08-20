@@ -2,6 +2,7 @@ import * as fs from "node:fs";
 import * as path from "node:path";
 import { getWolfDir, ensureWolfDir, writeJSON, appendMarkdown, readJSON, timestamp, timeShort, estimateTokens, readStdin, detectAgent, recordInjectionToSessionFile, getProjectDir, hookMain, getSessionFilePath, gcSessionFiles } from "./shared.js";
 import { loadStore } from "./anatomy-store.js";
+import { topRules, scopedRulesForFiles } from "./rule-reinjection.js";
 
 // ─── Session digest (Workstream E/F: model-aware context budgeting) ─────────
 //
@@ -55,7 +56,31 @@ function claudeMemoryHasSync(): boolean {
   }
 }
 
+/** Parse a leading YAML-ish frontmatter block for description/always keys (2.4). */
+function readFrontmatter(content: string): { description?: string; always?: boolean; body: string } {
+  if (!content.startsWith("---\n")) return { body: content };
+  const end = content.indexOf("\n---", 4);
+  if (end === -1) return { body: content };
+  const fm = content.slice(4, end);
+  const body = content.slice(content.indexOf("\n", end + 1) + 1);
+  const description = fm.match(/^description:\s*(.+)$/m)?.[1]?.trim();
+  const always = /^always:\s*true\s*$/m.test(fm);
+  return { description, always, body };
+}
+
+/**
+ * Progressive-disclosure digest (2.4). The old digest injected content
+ * (mean 794 tok, 75% of it a staleness nag or placeholder text). The new
+ * shape is an INDEX: one line per live .wolf file with what it is, how big,
+ * and how fresh, so the model can decide what to pull with grep or find —
+ * the retrieval pattern claude-mem, Letta, and the platform's own skills
+ * design converged on. Only two things still inject content: the top
+ * Do-Not-Repeat rules (small, highest value, unless native auto-memory
+ * already carries them) and any .wolf file whose frontmatter says
+ * `always: true` (budget-capped). Target: ~400 tokens.
+ */
 function buildSessionDigest(wolfDir: string, budget: number): string {
+  budget = Math.min(budget, 400 + Math.floor(budget / 4));
   const parts: string[] = [];
   let used = 0;
   const tryAdd = (text: string): boolean => {
@@ -66,54 +91,76 @@ function buildSessionDigest(wolfDir: string, budget: number): string {
     used += cost;
     return true;
   };
+  const isPlaceholder = (l: string) => /_<[^>]*>_|\{\{[^}]*\}\}|^_?<[^>]*>_?$/.test(l.trim());
 
-  // 1. STATUS.md "next phase" — the single most valuable resume context.
-  // Unfilled template placeholders are never injected: 8 of 28 measured
-  // digests were literally placeholder text, pure noise at ~100 tok each.
+  // 1. STATUS.md "next phase": the one piece of content that always earns its
+  // tokens on resume — but never template placeholders (8/28 measured digests
+  // were pure placeholder before this filter).
   try {
     const status = fs.readFileSync(path.join(wolfDir, "STATUS.md"), "utf-8");
-    const section = extractSection(status, /^## 🚀/);
-    const meaningful = section
-      .split("\n")
-      .filter((l) => l.trim() && !/_<[^>]*>_|\{\{[^}]*\}\}|^_?<[^>]*>_?$/.test(l.trim()));
-    // Heading alone (or heading + table scaffolding) means the template was
-    // never filled in.
+    const section = extractSection(readFrontmatter(status).body, /^## 🚀/);
+    const meaningful = section.split("\n").filter((l) => l.trim() && !isPlaceholder(l));
     const contentLines = meaningful.filter((l) => !/^#|^\||^-+$/.test(l.trim()));
-    if (contentLines.length > 0) tryAdd(meaningful.join("\n"));
+    if (contentLines.length > 0) tryAdd(meaningful.slice(0, 14).join("\n"));
   } catch {}
 
-  // 2. Do-Not-Repeat list from cerebrum (most recent 10 entries) — skipped
-  // when the cerebrum was synced into Claude Code auto-memory, which already
-  // recalls it natively (double injection would pay for the list twice).
+  // 2. Top Do-Not-Repeat rules (skipped when native auto-memory carries them).
   if (!claudeMemoryHasSync()) {
     try {
-      const cerebrum = fs.readFileSync(path.join(wolfDir, "cerebrum.md"), "utf-8");
+      const cerebrum = readFrontmatter(fs.readFileSync(path.join(wolfDir, "cerebrum.md"), "utf-8")).body;
       const dnr = extractSection(cerebrum, /^## Do-Not-Repeat/);
-      if (dnr) {
-        const entries = dnr.split("\n").filter((l) => l.startsWith("- "));
-        if (entries.length > 0) {
-          tryAdd("## Do-Not-Repeat (from .wolf/cerebrum.md)\n" + entries.slice(-10).join("\n"));
-        }
+      const entries = dnr.split("\n").filter((l) => l.startsWith("- ") && !isPlaceholder(l));
+      if (entries.length > 0) {
+        tryAdd("Do-Not-Repeat (top rules from .wolf/cerebrum.md):\n" + entries.slice(-3).join("\n"));
       }
     } catch {}
   }
 
-  // 3. Recent known bugs — prevents re-deriving fixes (issue #45).
+  // 3. always:true files — the Letta-style explicit always-loaded set, capped.
   try {
-    const buglog = readJSON<{ bugs: Array<{ error_message?: string; fix?: string }> }>(
-      path.join(wolfDir, "buglog.json"), { bugs: [] }
-    );
-    if (buglog.bugs.length > 0) {
-      const recent = buglog.bugs.slice(-5).map((b) => {
-        const line = `- ${b.error_message ?? "?"} → ${b.fix ?? "?"}`;
-        return line.length > 140 ? line.slice(0, 137) + "..." : line;
-      });
-      tryAdd("## Known bugs already fixed (check .wolf/buglog.json before re-debugging)\n" + recent.join("\n"));
+    for (const f of fs.readdirSync(wolfDir)) {
+      if (!f.endsWith(".md") || f === "STATUS.md" || f === "OPENWOLF.md" || f === "anatomy.md") continue;
+      const raw = fs.readFileSync(path.join(wolfDir, f), "utf-8");
+      const fm = readFrontmatter(raw);
+      if (fm.always) {
+        tryAdd(`## .wolf/${f} (always)\n` + fm.body.trim().split("\n").slice(0, 40).join("\n"));
+      }
     }
   } catch {}
 
-  // (No anatomy pointer here: the CLAUDE.md/rules instructions already tell
-  // the model to grep anatomy.md, and repeating it in the digest paid twice.)
+  // 4. The index: one line per live state file. Pointers, not content.
+  try {
+    const indexLines: string[] = [];
+    const describe: Record<string, string> = {
+      "cerebrum.md": "learned preferences, conventions, Do-Not-Repeat rules",
+      "memory.md": "chronological action log per session",
+      "STATUS.md": "session handoff (regenerate with /handoff)",
+      "buglog.json": "known bugs with root causes and fixes (openwolf bug search)",
+      "anatomy.md": "project file index (query with openwolf find, never read whole)",
+    };
+    for (const [file, fallback] of Object.entries(describe)) {
+      const p = path.join(wolfDir, file);
+      let st: fs.Stats;
+      try { st = fs.statSync(p); } catch { continue; }
+      let desc = fallback;
+      let extra = "";
+      if (file === "buglog.json") {
+        const bugs = readJSON<{ bugs: unknown[] }>(p, { bugs: [] }).bugs.length;
+        if (bugs === 0) continue;
+        extra = `, ${bugs} bugs`;
+      } else if (file.endsWith(".md")) {
+        const fm = readFrontmatter(fs.readFileSync(p, "utf-8"));
+        if (fm.description) desc = fm.description;
+        // A template-only file earns no index line.
+        if (fm.body.trim().length < 80) continue;
+      }
+      const tok = Math.ceil(st.size / 4);
+      indexLines.push(`- .wolf/${file}: ${desc} (~${tok} tok${extra}, updated ${st.mtime.toISOString().slice(0, 10)})`);
+    }
+    if (indexLines.length > 0) {
+      tryAdd("OpenWolf state on disk (read on demand, not preloaded):\n" + indexLines.join("\n"));
+    }
+  } catch {}
 
   return parts.join("\n\n");
 }
@@ -257,13 +304,38 @@ async function main(): Promise<void> {
       digest = `OpenWolf hooks are degraded: ${brokenHooks.join("; ")}. Run \`openwolf update\` in this project to repair the install.\n\n` + digest;
     }
 
-    // Post-compaction restore (F3): resurface in-flight session state that
-    // compaction would otherwise erase.
+    // Post-compaction restore (F3 + 2.4): resurface what compaction erased.
+    // The platform documents that paths-scoped rules and nested CLAUDE.md are
+    // LOST at compaction until a matching file is read again — restore the
+    // scoped rules for files this session already touched, plus the top
+    // Do-Not-Repeat rules (decay countermeasure) and the in-flight state.
     if (continuing && source === "compact") {
-      const session = readJSON<{ files_written?: Array<{ file: string }>; edit_counts?: Record<string, number> }>(sessionFile, {});
+      const session = readJSON<{ files_written?: Array<{ file: string }>; files_read?: Record<string, unknown>; edit_counts?: Record<string, number> }>(sessionFile, {});
+      const restoreParts: string[] = [];
+
       const files = [...new Set((session.files_written ?? []).map((w) => w.file))];
       if (files.length > 0) {
-        digest = `## Session in progress (context was just compacted)\nFiles already modified this session: ${files.slice(-15).join(", ")}. Do not re-read them wholesale — check .wolf/memory.md for what was done.\n\n` + digest;
+        restoreParts.push(`## Session in progress (context was just compacted)\nFiles already modified this session: ${files.slice(-15).join(", ")}. Do not re-read them wholesale — check .wolf/memory.md for what was done.`);
+      }
+
+      try {
+        const rules = topRules(fs.readFileSync(path.join(wolfDir, "cerebrum.md"), "utf-8"), 3);
+        if (rules.length > 0) {
+          restoreParts.push(`Project rules still in effect (from .wolf/cerebrum.md Do-Not-Repeat):\n${rules.join("\n")}`);
+        }
+      } catch {}
+
+      try {
+        const projectDir = getProjectDir();
+        const relFiles = [
+          ...Object.keys(session.files_read ?? {}),
+          ...files,
+        ].map((f) => path.isAbsolute(f) ? path.relative(projectDir, f).split(path.sep).join("/") : f);
+        restoreParts.push(...scopedRulesForFiles(projectDir, relFiles));
+      } catch {}
+
+      if (restoreParts.length > 0) {
+        digest = restoreParts.join("\n\n") + (digest ? "\n\n" + digest : "");
       }
     }
 

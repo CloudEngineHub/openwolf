@@ -8,6 +8,7 @@ import { detectWaste } from "../tracker/waste-detector.js";
 import { scanProjectUsage, projectTranscriptDir } from "../tracker/transcript-usage.js";
 import { readUsageSequence, attributeCacheRebuilds, type CacheRebuild } from "../tracker/cache-attribution.js";
 import { withFileLock } from "../hooks/anatomy-lock.js";
+import { loadStore, quickStaleCheck } from "../hooks/anatomy-store.js";
 import type { Logger } from "../utils/logger.js";
 
 interface CronAction {
@@ -232,9 +233,17 @@ export class CronEngine {
 
   private async runAction(action: CronAction): Promise<void> {
     switch (action.type) {
-      case "scan_project":
+      case "scan_project": {
+        // 2.4 freshness without nagging: scan only when the index is actually
+        // stale (stat sweep of indexed files) or git HEAD moved — the blind
+        // 6h interval rescanned fresh indexes and still missed fast staleness.
+        if (this.anatomyIsFresh()) {
+          this.logger.info("anatomy rescan skipped: index matches the tree (stat sweep + git HEAD)");
+          break;
+        }
         await scanProject(this.wolfDir, this.projectRoot);
         break;
+      }
 
       case "consolidate_memory":
         this.consolidateMemory(action.params?.older_than_days as number ?? 7);
@@ -250,6 +259,28 @@ export class CronEngine {
 
       default:
         throw new Error(`Unknown action type: ${action.type}`);
+    }
+  }
+
+  /** True when the anatomy index still matches the tree (2.4 stale gating). */
+  private anatomyIsFresh(): boolean {
+    try {
+      const store = loadStore(this.wolfDir);
+      if (!store || Object.keys(store.files).length === 0) return false;
+      // git HEAD moved since the last scan: branch switches/pulls add files
+      // the stat sweep cannot see (it only checks indexed paths).
+      try {
+        const state = readJSON<{ git_head?: string | null }>(path.join(this.wolfDir, "_scan-state.json"), {});
+        if (state.git_head) {
+          const head = execFileSync("git", ["rev-parse", "HEAD"], {
+            cwd: this.projectRoot, encoding: "utf-8", stdio: ["ignore", "pipe", "ignore"], timeout: 3000,
+          }).trim();
+          if (head && head !== state.git_head) return false;
+        }
+      } catch {}
+      return !quickStaleCheck(store, this.projectRoot).stale;
+    } catch {
+      return false;
     }
   }
 

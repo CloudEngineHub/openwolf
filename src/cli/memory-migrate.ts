@@ -166,6 +166,73 @@ export function syncCerebrumToClaudeMemory(
   return { synced };
 }
 
+const CEREBRUM_BRIDGE_BEGIN = "<!-- openwolf:native-memory-index:begin -->";
+const CEREBRUM_BRIDGE_END = "<!-- openwolf:native-memory-index:end -->";
+
+/**
+ * Reverse bridge (2.5): mirror the NATIVE auto-memory index (the MEMORY.md
+ * lines outside OpenWolf's own marker block — i.e. what Claude Code learned
+ * and recorded natively, machine-locally, Claude-only) into a marker-fenced
+ * section of cerebrum.md. cerebrum is committed and read by every agent, so
+ * learnings captured natively on one machine become at least discoverable to
+ * Codex/Gemini/Cursor and to teammates. Index lines only, never file bodies:
+ * pointers are cheap and honest; native topic files stay machine-local.
+ */
+export function syncClaudeMemoryIndexToCerebrum(
+  projectRoot: string,
+  wolfDir: string,
+  home: string = os.homedir()
+): boolean {
+  let index: string;
+  try {
+    index = fs.readFileSync(path.join(claudeMemoryDir(projectRoot, home), "MEMORY.md"), "utf-8");
+  } catch {
+    return false;
+  }
+  // Everything outside our own marker block, list lines only.
+  const withoutOurs = index.includes(MARKER_BEGIN)
+    ? index.replace(new RegExp(`${MARKER_BEGIN}[\\s\\S]*?${MARKER_END}\\n?`), "")
+    : index;
+  const lines = withoutOurs
+    .split("\n")
+    .filter((l) => l.trim().startsWith("- "))
+    .slice(0, 30);
+  if (lines.length === 0) return false;
+
+  const cerebrumPath = path.join(wolfDir, "cerebrum.md");
+  let cerebrum: string;
+  try {
+    cerebrum = fs.readFileSync(cerebrumPath, "utf-8");
+  } catch {
+    return false;
+  }
+
+  const block = [
+    CEREBRUM_BRIDGE_BEGIN,
+    "## Native memory index (Claude Code, this machine)",
+    "",
+    "Topics Claude Code recorded in its own memory. The files live in the",
+    "machine-local auto-memory directory, not in this repo; ask the person who",
+    "owns this machine, or re-derive, if you need the detail.",
+    "",
+    ...lines,
+    CEREBRUM_BRIDGE_END,
+  ].join("\n");
+
+  let next: string;
+  if (cerebrum.includes(CEREBRUM_BRIDGE_BEGIN) && cerebrum.includes(CEREBRUM_BRIDGE_END)) {
+    next = cerebrum.replace(
+      new RegExp(`${CEREBRUM_BRIDGE_BEGIN}[\\s\\S]*?${CEREBRUM_BRIDGE_END}`),
+      block
+    );
+  } else {
+    next = cerebrum.replace(/\s*$/, "\n\n") + block + "\n";
+  }
+  if (next === cerebrum) return false;
+  fs.writeFileSync(cerebrumPath, next, "utf-8");
+  return true;
+}
+
 /** True when this project's MEMORY.md carries the OpenWolf sync marker. */
 export function claudeMemoryHasSync(projectRoot: string, home: string = os.homedir()): boolean {
   try {

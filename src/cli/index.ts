@@ -8,6 +8,8 @@ import { scanCommand } from "./scan.js";
 import { dashboardCommand } from "./dashboard.js";
 import { reportCommand } from "./report.js";
 import { findCommand } from "./find.js";
+import { mapCommand } from "./map.js";
+import { benchCommand } from "./bench.js";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -61,9 +63,26 @@ export function createProgram(): Command {
     .action(reportCommand);
 
   program
+    .command("bench")
+    .description("A/B benchmark: same tasks with and without OpenWolf, measured from transcripts")
+    .option("--repo <pathOrUrl>", "Fixture repository to clone per run")
+    .option("--task <filter>", "Only run tasks whose filename contains this")
+    .option("--repeats <n>", "Repeats per task per arm (default 3)")
+    .option("--yes", "Confirm spending real API budget")
+    .action((opts: { repo?: string; task?: string; repeats?: string; yes?: boolean }) => benchCommand(opts));
+
+  program
+    .command("map")
+    .description("Token-budgeted overview of the most important files (personalized PageRank)")
+    .option("--budget <tokens>", "Output token budget (default 1000; 2000 unseeded)")
+    .option("--focus <terms>", "Comma/space separated terms to bias the ranking toward")
+    .action((opts: { budget?: string; focus?: string }) => mapCommand(opts));
+
+  program
     .command("find <query>")
     .description("Locate a symbol or file via the anatomy index (ranked, ~1k token cap)")
-    .action(findCommand);
+    .option("--file", "Show full index detail for one path (description, symbols, ranges)")
+    .action((query: string, opts: { file?: boolean }) => findCommand(query, opts));
 
   const daemon = program
     .command("daemon")

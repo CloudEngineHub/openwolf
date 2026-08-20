@@ -67,6 +67,19 @@ async function main(): Promise<void> {
     ? normalizedFile.slice(projectDir.length).replace(/^\//, "")
     : "";
   if (relToProject.startsWith(".wolf/") || relToProject.startsWith(".wolf\\")) {
+    // 2.4: measure OpenWolf's own context cost instead of hiding it. Tagged
+    // separately from project reads so anatomy hit-rates stay meaningful.
+    try {
+      if (content) {
+        const session = readJSON<SessionData>(sessionFile, { files_read: {} });
+        const tok = estimateTokens(content, "prose");
+        session.wolf_internal_tokens = ((session.wolf_internal_tokens as number) ?? 0) + tok;
+        const perFile = (session.wolf_internal_reads ?? {}) as Record<string, number>;
+        perFile[relToProject] = (perFile[relToProject] ?? 0) + tok;
+        session.wolf_internal_reads = perFile;
+        writeJSON(sessionFile, session);
+      }
+    } catch {}
     return;
   }
 

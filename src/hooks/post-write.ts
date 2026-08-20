@@ -66,9 +66,34 @@ async function main(): Promise<void> {
 
   const absolutePath = path.isAbsolute(filePath) ? filePath : path.join(projectRoot, filePath);
 
-  // Skip processing for .wolf/ internal files to avoid slow self-referential updates
+  // .wolf/ state files skip anatomy/memory bookkeeping (self-referential),
+  // but 2.4 adds the budget-enforcement loop the platform's native memory
+  // uses: measure after every write, warn factually when a state file
+  // outgrows its budget. Oversized state gets injected/read every session,
+  // so bloat here is a recurring tax nothing else pushes back on.
   const relPath = normalizePath(path.relative(projectRoot, absolutePath));
-  if (relPath.startsWith(".wolf/")) { return; }
+  if (relPath.startsWith(".wolf/")) {
+    try {
+      const budget = stateBudgetFor(wolfDir, relPath);
+      if (budget !== null) {
+        const content = fs.readFileSync(absolutePath, "utf-8");
+        const tokens = estimateTokens(content, "prose");
+        if (tokens > budget) {
+          const session = readJSON<SessionData>(sessionFile, { files_written: [], edit_counts: {} });
+          const warned = (session.budget_warned ?? {}) as Record<string, boolean>;
+          if (!warned[relPath]) {
+            warned[relPath] = true;
+            session.budget_warned = warned;
+            const warn = `OpenWolf: ${relPath} is now ~${tokens} tokens; its budget is ${budget}. It is read at session starts, so size is a recurring cost. Consolidate or move detail into topic files, keeping the most recent and most important entries.`;
+            recordInjection(session, "budget_warn", warn);
+            writeJSON(sessionFile, session);
+            emitHookJSON("PostToolUse", { additionalContext: warn });
+          }
+        }
+      }
+    } catch {}
+    return;
+  }
 
   // Never track files outside the project root (e.g. the Claude Code scratchpad under
   // /private/tmp). path.relative() yields ../.. section keys that pollute anatomy.md and are
@@ -201,6 +226,19 @@ async function main(): Promise<void> {
       autoDetectBugFix(wolfDir, absolutePath, projectRoot, oldStr, newStr);
     }
   } catch {}
+}
+
+/** Token budget for a .wolf state file, or null when unbudgeted (2.4). */
+function stateBudgetFor(wolfDir: string, relPath: string): number | null {
+  const defaults: Record<string, number> = {
+    ".wolf/cerebrum.md": 2000,
+    ".wolf/STATUS.md": 1000,
+  };
+  const cfg = readJSON<{ openwolf?: { context?: { state_budgets?: Record<string, number> } } }>(
+    path.join(wolfDir, "config.json"), {}
+  );
+  const merged = { ...defaults, ...(cfg.openwolf?.context?.state_budgets ?? {}) };
+  return merged[relPath] ?? null;
 }
 
 // ─── Edit Summarizer ─────────────────────────────────────────────
