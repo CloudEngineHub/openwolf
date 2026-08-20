@@ -33,6 +33,7 @@ export interface SessionData {
   pending_reminders?: string[];
   injected_tokens_estimated?: number;
   injected_by_source?: Record<string, number>;
+  bash_governed?: Array<{ family: string; action: string; original_tokens: number; entered_tokens: number; at: string }>;
   [key: string]: unknown;
 }
 
@@ -60,6 +61,10 @@ export interface SessionEntry {
     savings_estimated?: number;
     /** Tokens OpenWolf itself injected into context (digests, hints, warnings). */
     injection_tokens_estimated?: number;
+    /** Bash governor (2.3): original size of governed outputs vs what entered. */
+    bash_governed_original_tokens?: number;
+    bash_governed_entered_tokens?: number;
+    bash_governed_calls?: number;
   };
   injected_by_source?: Record<string, number>;
   real_usage?: RealUsage;
@@ -144,7 +149,17 @@ export function buildSessionTotals(
     savings_estimated: session.denied_tokens_saved ?? 0,
     // The other side of the scale: what OpenWolf's own context injection cost.
     injection_tokens_estimated: session.injected_tokens_estimated ?? 0,
+    // Bash governor deltas: original-vs-entered is measured at the rewrite
+    // point, which nothing else in the ecosystem can observe.
+    bash_governed_calls: (session.bash_governed ?? []).length || undefined,
+    bash_governed_original_tokens: sumBy(session.bash_governed, (g) => g.original_tokens),
+    bash_governed_entered_tokens: sumBy(session.bash_governed, (g) => g.entered_tokens),
   };
+}
+
+function sumBy<T>(arr: T[] | undefined, fn: (item: T) => number): number | undefined {
+  if (!arr || arr.length === 0) return undefined;
+  return arr.reduce((sum, item) => sum + fn(item), 0);
 }
 
 /**
@@ -190,6 +205,9 @@ export function foldEntry(acc: Record<string, number>, e: SessionEntry): void {
   addInto(acc, "repeated_reads_warned", e.totals.repeated_reads_warned);
   addInto(acc, "estimated_savings_vs_bare_cli", e.totals.savings_estimated);
   addInto(acc, "injection_tokens_estimated", e.totals.injection_tokens_estimated);
+  addInto(acc, "bash_governed_calls", e.totals.bash_governed_calls);
+  addInto(acc, "bash_governed_original_tokens", e.totals.bash_governed_original_tokens);
+  addInto(acc, "bash_governed_entered_tokens", e.totals.bash_governed_entered_tokens);
   if (e.real_usage) {
     addInto(acc, "real_input_tokens", e.real_usage.input_tokens);
     addInto(acc, "real_output_tokens", e.real_usage.output_tokens);

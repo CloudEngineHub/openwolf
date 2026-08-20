@@ -7,7 +7,19 @@
       "skeleton_hints": true
     },
     "bash": {
-      "filter_mode": "suggest"
+      "filter_mode": "suggest",
+      "governor": {
+        "mode": "replace",
+        "threshold_tokens": 2000,
+        "families": {
+          "grep_flood": "replace",
+          "file_print": "replace",
+          "git_show": "replace",
+          "test": "suggest",
+          "build": "suggest",
+          "unknown": "suggest"
+        }
+      }
     },
     "anatomy": {
       "auto_scan_on_init": true,

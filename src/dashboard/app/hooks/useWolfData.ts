@@ -46,6 +46,9 @@ interface TokenLedger {
     repeated_reads_warned?: number;
     estimated_savings_vs_bare_cli: number;
     injection_tokens_estimated?: number;
+    bash_governed_calls?: number;
+    bash_governed_original_tokens?: number;
+    bash_governed_entered_tokens?: number;
     real_input_tokens?: number;
     real_output_tokens?: number;
     real_cache_read_tokens?: number;

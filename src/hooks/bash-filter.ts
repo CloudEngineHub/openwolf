@@ -19,9 +19,12 @@ export const VERBOSE_PREFIXES = [
   "mvn test", "mvn package",
 ];
 
-// Any shell metacharacter or existing output management means the user (or
-// model) already shaped this command — never second-guess it.
-const DISQUALIFIERS = /[|><;&`$]|\btail\b|\bhead\b|\bgrep\b|--silent|--quiet|-q\b/;
+// Only genuinely already-shaped commands are exempt: output redirected to a
+// file, or already capped through head/tail, or explicitly quieted. The old
+// disqualifier list rejected any pipe/metacharacter, which matched 1 of 2,256
+// real commands (0.04%); the PostToolUse governor is now the safety net, so
+// the suggestion can afford to fire on realistic commands.
+const DISQUALIFIERS = /(^|[^>])>[^>]|>>|\btee\b|\|\s*(head|tail|grep)\b|--silent|--quiet|(^|\s)-q\b|&&|;|`|\$\(/;
 
 /** Should this command get an output-capping suggestion? */
 export function shouldSuggestFilter(command: string): boolean {

@@ -26,6 +26,7 @@ export const HOOK_SETTINGS = {
     PostToolUse: [
       { matcher: "Read", hooks: [cmd("post-read.js", 5)] },
       { matcher: "Write|Edit|MultiEdit", hooks: [cmd("post-write.js", 10)] },
+      { matcher: "Bash", hooks: [cmd("post-bash.js", 10)] },
     ],
     PreCompact: [{ matcher: "", hooks: [cmd("precompact.js", 5)] }],
     Stop: [{ matcher: "", hooks: [cmd("stop.js", 10)] }],
@@ -42,7 +43,10 @@ export const HOOK_FILES = [
   "pre-read.js",
   "pre-write.js",
   "pre-bash.js",
+  "post-bash.js",
   "bash-filter.js",
+  "bash-output-governor.js",
+  "bash-path-parser.js",
   "post-read.js",
   "post-write.js",
   "precompact.js",

@@ -54,9 +54,6 @@ export function ProjectOverview({ data }: { data: WolfData }) {
   const measured = (lt.real_api_calls ?? 0) > 0;
   const dupMode = config.reads?.duplicate_mode ?? "warn";
   const denyOn = dupMode === "deny";
-  const savingsPct = lt.total_tokens_estimated > 0
-    ? Math.round((lt.estimated_savings_vs_bare_cli / (lt.total_tokens_estimated + lt.estimated_savings_vs_bare_cli)) * 100)
-    : 0;
   const anatomyTotal = lt.anatomy_hits + lt.anatomy_misses;
   const hitRate = anatomyTotal > 0 ? Math.round((lt.anatomy_hits / anatomyTotal) * 100) : null;
   const scanAgeH = scanState.last_scanned
@@ -86,25 +83,38 @@ export function ProjectOverview({ data }: { data: WolfData }) {
 
       {/* Bento: hero + measured + agents */}
       <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-4">
-        {/* Hero — the inverted tile */}
+        {/* Hero — tokens verifiably kept out of context. The governor delta is
+            measured at the rewrite point (original vs entered), which nothing
+            else in the ecosystem can observe. */}
         <div className="xl:col-span-2">
-          {denyOn ? (
-            <StatTile
-              label="tokens saved · denied re-reads"
-              value={lt.estimated_savings_vs_bare_cli > 0 ? formatTokens(lt.estimated_savings_vs_bare_cli) : "0"}
-              sub={savingsPct > 0 ? `${savingsPct}% vs bare agent` : "accumulates as sessions run"}
-              variant="inverted"
-              size="xl"
-            />
-          ) : (
-            <StatTile
-              label="tokens saved · denied re-reads"
-              value="n/a"
-              sub={`${dupMode} mode active · denial savings not tracked · set reads.duplicate_mode to deny in .wolf/config.json to track`}
-              variant="inverted"
-              size="xl"
-            />
-          )}
+          {(() => {
+            const governedSaved = Math.max(0, (lt.bash_governed_original_tokens ?? 0) - (lt.bash_governed_entered_tokens ?? 0));
+            const totalSaved = governedSaved + (denyOn ? lt.estimated_savings_vs_bare_cli : 0);
+            if (totalSaved > 0) {
+              const parts = [
+                governedSaved > 0 ? `${formatTokens(governedSaved)} bash output governed (${fmt(lt.bash_governed_calls)} calls)` : "",
+                denyOn && lt.estimated_savings_vs_bare_cli > 0 ? `${formatTokens(lt.estimated_savings_vs_bare_cli)} denied re-reads` : "",
+              ].filter(Boolean).join(" · ");
+              return (
+                <StatTile
+                  label="tokens kept out of context · measured"
+                  value={formatTokens(totalSaved)}
+                  sub={parts || "measured at the rewrite point"}
+                  variant="inverted"
+                  size="xl"
+                />
+              );
+            }
+            return (
+              <StatTile
+                label="tokens kept out of context · measured"
+                value="0"
+                sub={`accumulates as the bash governor condenses oversized output${denyOn ? "" : " · deny mode off (reads.duplicate_mode)"}`}
+                variant="inverted"
+                size="xl"
+              />
+            );
+          })()}
         </div>
 
         {/* Measured usage */}

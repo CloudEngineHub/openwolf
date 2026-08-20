@@ -4,6 +4,45 @@ All notable changes to OpenWolf are documented here. The format follows
 [Keep a Changelog](https://keepachangelog.com/), and OpenWolf uses
 [Semantic Versioning](https://semver.org/).
 
+## [2.3.0] - 2026-08-20
+
+The Bash channel release. The empirical audit showed Bash carries 48.3% of
+all tool-result tokens (the Read tool: 35%), oversized results over 2k tokens
+are a quarter of bash output, and every real duplicate file read happened
+through cat/sed/head, invisible to the Read hooks. This release governs that
+channel.
+
+### Added
+
+- Bash output governor (PostToolUse): oversized stdout is condensed
+  structurally, family-aware, and the tool result is replaced before it
+  enters context via the platform's updatedToolOutput channel. grep floods
+  keep the first matches per file plus counts; git show keeps the commit
+  header and per-file diff stats; file re-prints keep a head and tail
+  window. The full output is always preserved verbatim at
+  .wolf/cache/bash/<id>.log and every condensed result ends with a factual
+  pointer to it. stderr is never modified, test and build output is never
+  replaced by default (suggest mode only), and condensation only happens
+  when it saves at least 30%. Config: openwolf.bash.governor (mode,
+  threshold_tokens, per-family actions; global and per-family kill switches).
+- Measured-at-the-rewrite-point accounting: for every governed call the
+  ledger records original vs entered tokens. This number is unique ground
+  truth: the platform's own telemetry logs tool output before hooks run, so
+  only the rewriting hook can measure what actually entered the context
+  window. The dashboard hero tile now shows tokens verifiably kept out of
+  context; openwolf report prints the governor section.
+- Bash-channel read dedupe: simple single-file reads (cat, head, tail,
+  sed -n) are parsed and registered in the session's read tracking, closing
+  the blind spot where all measured duplicate reads lived. A repeated full
+  cat of an unchanged file gets a short factual advisory.
+
+### Changed
+
+- The pre-Bash suggestion filter's disqualifier list matched 1 of 2,256 real
+  commands; it now exempts only genuinely shaped commands (redirects, tee,
+  pipes into head/tail/grep, quiet flags, compound commands) since the
+  PostToolUse governor is the safety net.
+
 ## [2.2.0] - 2026-08-20
 
 The reliability release: OpenWolf proves what it does. Built on an empirical

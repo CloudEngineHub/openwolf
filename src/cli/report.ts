@@ -90,6 +90,15 @@ export function reportCommand(): void {
   console.log(`    Total tokens tracked:   ${fmt(lt.total_tokens_estimated)}`);
   console.log(`    Saved by denied reads:  ${fmt(lt.estimated_savings_vs_bare_cli)}`);
   console.log(`    OpenWolf injected:      ${fmt(lt.injection_tokens_estimated)} (digests, hints, warnings)`);
+  if ((lt.bash_governed_calls ?? 0) > 0) {
+    const kept = (lt.bash_governed_original_tokens ?? 0) - (lt.bash_governed_entered_tokens ?? 0);
+    console.log("");
+    console.log("  Bash governor (measured at the rewrite point)");
+    console.log(`    Governed calls:         ${fmt(lt.bash_governed_calls)}`);
+    console.log(`    Original output:        ${fmt(lt.bash_governed_original_tokens)}`);
+    console.log(`    Entered context:        ${fmt(lt.bash_governed_entered_tokens)}`);
+    console.log(`    Kept out of context:    ${fmt(kept)}`);
+  }
 
   // Cache-invalidation attribution (2.2): the largest waste class, named.
   try {

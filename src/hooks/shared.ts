@@ -680,11 +680,17 @@ export interface HookJSONFields {
   additionalContext?: string;
   permissionDecision?: "deny" | "ask";
   permissionDecisionReason?: string;
+  /** PostToolUse only: replaces the tool's result before Claude sees it.
+   * For built-in tools the value must match the tool's output schema exactly
+   * or the harness silently ignores it — mirror the received tool_response
+   * object and modify only the fields you mean to change. */
+  updatedToolOutput?: unknown;
 }
 
 export function emitHookJSON(hookEventName: string, fields: HookJSONFields): void {
   const out: Record<string, unknown> = { hookEventName };
   if (fields.additionalContext) out.additionalContext = fields.additionalContext;
+  if (fields.updatedToolOutput !== undefined) out.updatedToolOutput = fields.updatedToolOutput;
   if (fields.permissionDecision) {
     out.permissionDecision = fields.permissionDecision;
     out.permissionDecisionReason = fields.permissionDecisionReason ?? "";
