@@ -103,7 +103,6 @@ describe("buildSessionTotals warn/deny split", () => {
       repeated_reads_warned: 4,
       reads_denied: 2,
       denied_tokens_saved: 900,
-      cerebrum_warnings: 0,
       stop_count: 1,
       reminders_sent: {},
     };

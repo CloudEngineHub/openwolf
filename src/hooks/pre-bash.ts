@@ -1,5 +1,5 @@
 import * as path from "node:path";
-import { getWolfDir, ensureWolfDir, readJSON, writeJSON, readStdin, emitHookJSON, recordInjection } from "./shared.js";
+import { getWolfDir, ensureWolfDir, readJSON, writeJSON, readStdin, emitHookJSON, recordInjection, hookMain, getSessionFilePath } from "./shared.js";
 import { shouldSuggestFilter } from "./bash-filter.js";
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -35,26 +35,25 @@ async function main(): Promise<void> {
   ensureWolfDir();
   const wolfDir = getWolfDir();
   const mode = filterMode(wolfDir);
-  if (mode === "off") { process.exit(0); return; }
+  if (mode === "off") { return; }
 
   const raw = await readStdin();
-  let input: { tool_input?: { command?: string } };
+  let input: { tool_input?: { command?: string }; session_id?: string };
   try {
     input = JSON.parse(raw);
   } catch {
-    process.exit(0);
     return;
   }
 
   const command = input.tool_input?.command ?? "";
-  if (!shouldSuggestFilter(command)) { process.exit(0); return; }
+  if (!shouldSuggestFilter(command)) { return; }
 
-  const sessionFile = path.join(wolfDir, "hooks", "_session.json");
+  const sessionFile = getSessionFilePath(input);
   // Once per session per command family: nagging every test run costs more
   // context than it saves.
   const family = command.trim().split(/\s+/).slice(0, 2).join(" ");
   const session = readJSON<{ bash_filter_suggested?: Record<string, boolean>; [k: string]: unknown }>(sessionFile, {});
-  if (session.bash_filter_suggested?.[family]) { process.exit(0); return; }
+  if (session.bash_filter_suggested?.[family]) { return; }
 
   const note =
     `OpenWolf: "${family}" output can be very large and every line enters your context. ` +
@@ -70,7 +69,6 @@ async function main(): Promise<void> {
   writeJSON(sessionFile, session);
 
   emitHookJSON("PreToolUse", { additionalContext: note });
-  process.exit(0);
 }
 
-main().catch(() => process.exit(0));
+hookMain("pre-bash", main);

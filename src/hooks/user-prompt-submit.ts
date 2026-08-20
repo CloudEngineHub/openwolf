@@ -1,5 +1,5 @@
 import * as path from "node:path";
-import { getWolfDir, ensureWolfDir, readJSON, writeJSON, emitHookJSON, recordInjection } from "./shared.js";
+import { ensureWolfDir, readJSON, writeJSON, emitHookJSON, recordInjection, readStdin, hookMain, getSessionFilePath } from "./shared.js";
 
 // UserPromptSubmit hook: drains reminders the Stop hook queued last turn.
 //
@@ -13,24 +13,22 @@ interface SessionData {
   [key: string]: unknown;
 }
 
-function main(): void {
+async function main(): Promise<void> {
   ensureWolfDir();
-  const sessionFile = path.join(getWolfDir(), "hooks", "_session.json");
+  let input: { session_id?: string } = {};
+  try {
+    input = JSON.parse(await readStdin());
+  } catch {}
+  const sessionFile = getSessionFilePath(input);
   const session = readJSON<SessionData>(sessionFile, {});
   const pending = session.pending_reminders ?? [];
   if (pending.length === 0) {
-    process.exit(0);
     return;
   }
   session.pending_reminders = [];
   recordInjection(session, "reminders", pending.join("\n\n"));
   writeJSON(sessionFile, session);
   emitHookJSON("UserPromptSubmit", { additionalContext: pending.join("\n\n") });
-  process.exit(0);
 }
 
-try {
-  main();
-} catch {
-  process.exit(0);
-}
+hookMain("user-prompt-submit", main);

@@ -9,6 +9,7 @@
  */
 import * as fs from "node:fs";
 import * as path from "node:path";
+import { execFileSync } from "node:child_process";
 import { fileURLToPath } from "node:url";
 import { getRegisteredProjects, registerProject, type RegisteredProject } from "./registry.js";
 import { findProjectRoot } from "../scanner/project-root.js";
@@ -36,7 +37,9 @@ function getVersion(): string {
 }
 
 // Files that are safe to overwrite (protocol docs only — never user-edited config)
-const ALWAYS_OVERWRITE = ["OPENWOLF.md", "reframe-frameworks.md"];
+// 2.2: reframe-frameworks.md is no longer shipped into projects (31KB,
+// referenced once in 2,256 measured commands); the /reframe skill carries it.
+const ALWAYS_OVERWRITE = ["OPENWOLF.md"];
 
 // Files that contain user data — NEVER overwrite, only create if missing.
 //
@@ -187,9 +190,26 @@ async function updateProject(
       console.log(`    ✓ Config defaults merged (new keys added, existing values preserved)`);
     }
 
+    // 2c. Dead-weight cleanup (2.2): remove files this project never used,
+    // but ONLY when they are verbatim our shipped templates/stubs — anything
+    // the user touched stays.
+    for (const line of removeDeadWeight(wolfDir, templatesDir)) {
+      console.log(`    ✓ ${line}`);
+    }
+
     // 3. Update hook scripts
     copyHookScripts(wolfDir);
     console.log(`    ✓ Hook scripts updated`);
+
+    // 3b. Install integrity (2.2): a missing dependency file once silently
+    // killed a hook for 3 weeks (440 straight crashes, nothing noticed).
+    // Verify every manifest file landed and every hook entry point can load
+    // its imports; a failed check fails THIS project's update loudly.
+    const integrityErrors = verifyHookInstall(wolfDir);
+    if (integrityErrors.length > 0) {
+      throw new Error(`hook install integrity check failed: ${integrityErrors.join("; ")}`);
+    }
+    console.log(`    ✓ Hook install verified (${HOOK_FILES.length} files, selfcheck passed)`);
 
     // 4. Update .claude/settings.json hooks
     const claudeDir = path.join(root, ".claude");
@@ -463,6 +483,112 @@ function createBackup(wolfDir: string): string {
   }
 
   return backupDir;
+}
+
+/**
+ * 2.2 dead-weight cleanup. Empirical audit: reframe-frameworks.md (7.8k tok)
+ * was referenced once across 2,256 commands, identity.md was untouched in
+ * 16/16 projects, suggestions.json was an empty stub in 15/16, and
+ * designqc-report.json was a 90-byte stub in 10/10. Deletion only happens
+ * when the file is verbatim ours (or a content-free stub) — user edits stay.
+ */
+function removeDeadWeight(wolfDir: string, templatesDir: string): string[] {
+  const actions: string[] = [];
+
+  // reframe-frameworks.md: delete only when byte-identical to the shipped template.
+  try {
+    const installed = path.join(wolfDir, "reframe-frameworks.md");
+    if (fs.existsSync(installed)) {
+      const shipped = readText(path.join(templatesDir, "reframe-frameworks.md"));
+      if (shipped && readText(installed) === shipped) {
+        fs.unlinkSync(installed);
+        actions.push("Removed reframe-frameworks.md (unused 31KB; the /reframe skill carries it)");
+      }
+    }
+  } catch {}
+
+  // identity.md: delete our untouched template (structure + size match).
+  try {
+    const p = path.join(wolfDir, "identity.md");
+    if (fs.existsSync(p)) {
+      const content = readText(p);
+      if (
+        content.length < 600 &&
+        content.includes("# Identity") &&
+        content.includes("**Role:** AI development assistant")
+      ) {
+        fs.unlinkSync(p);
+        actions.push("Removed identity.md (untouched template)");
+      }
+    }
+  } catch {}
+
+  // suggestions.json: delete the empty stub (daemon recreates on first real write).
+  try {
+    const p = path.join(wolfDir, "suggestions.json");
+    if (fs.existsSync(p)) {
+      const parsed = JSON.parse(readText(p) || "null");
+      if (parsed && Array.isArray(parsed.suggestions) && parsed.suggestions.length === 0 && !parsed.generated_at) {
+        fs.unlinkSync(p);
+        actions.push("Removed empty suggestions.json stub (recreated on first real suggestion)");
+      }
+    }
+  } catch {}
+
+  // designqc-report.json: legacy stub nothing writes anymore.
+  try {
+    const p = path.join(wolfDir, "designqc-report.json");
+    if (fs.existsSync(p) && fs.statSync(p).size <= 200) {
+      fs.unlinkSync(p);
+      actions.push("Removed designqc-report.json stub");
+    }
+  } catch {}
+
+  return actions;
+}
+
+/**
+ * 2.2 install integrity: every manifest file must exist with content, and
+ * every registered hook entry point must load cleanly (`--selfcheck` exits
+ * after module resolution — a missing dependency fails right there, which is
+ * exactly the failure class that once ran silently for 3 weeks).
+ */
+function verifyHookInstall(wolfDir: string): string[] {
+  const hooksDir = path.join(wolfDir, "hooks");
+  const errors: string[] = [];
+
+  for (const file of HOOK_FILES) {
+    const p = path.join(hooksDir, file);
+    try {
+      if (fs.statSync(p).size === 0) errors.push(`${file} is empty`);
+    } catch {
+      errors.push(`${file} missing`);
+    }
+  }
+  if (errors.length > 0) return errors;
+
+  // Entry-point hooks (the ones settings.json actually invokes).
+  const entryFiles = new Set<string>();
+  for (const matchers of Object.values(HOOK_SETTINGS.hooks)) {
+    for (const m of matchers) {
+      for (const h of m.hooks) {
+        const match = h.command.match(/\.wolf\/hooks\/([\w.-]+\.js)/);
+        if (match) entryFiles.add(match[1]);
+      }
+    }
+  }
+  for (const file of entryFiles) {
+    try {
+      execFileSync(process.execPath, [path.join(hooksDir, file), "--selfcheck"], {
+        stdio: ["ignore", "ignore", "pipe"],
+        timeout: 10000,
+      });
+    } catch (err) {
+      const stderr = (err as { stderr?: Buffer }).stderr?.toString().split("\n")[0] ?? String(err);
+      errors.push(`${file} selfcheck failed: ${stderr.slice(0, 120)}`);
+    }
+  }
+  return errors;
 }
 
 // Every CLAUDE.md snippet OpenWolf has ever shipped, verbatim (trimmed).

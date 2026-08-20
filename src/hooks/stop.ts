@@ -1,19 +1,19 @@
 import * as fs from "node:fs";
 import * as path from "node:path";
-import { getWolfDir, ensureWolfDir, readJSON, writeJSON, countSemanticEntries, readStdin } from "./shared.js";
+import { getWolfDir, ensureWolfDir, readJSON, writeJSON, countSemanticEntries, readStdin, hookMain, getSessionFilePath } from "./shared.js";
 import { buildSessionEntry, flushSessionToLedger, type SessionData } from "./ledger.js";
+import { verifyHookDelivery } from "./hook-attachments.js";
 
 async function main(): Promise<void> {
   ensureWolfDir();
   const wolfDir = getWolfDir();
-  const hooksDir = path.join(wolfDir, "hooks");
-  const sessionFile = path.join(hooksDir, "_session.json");
 
   // Stop payload → transcript path for real usage measurement (F1)
-  let hookInput: { transcript_path?: string } = {};
+  let hookInput: { transcript_path?: string; session_id?: string } = {};
   try {
     hookInput = JSON.parse(await readStdin());
   } catch {}
+  const sessionFile = getSessionFilePath(hookInput);
 
   const session = readJSON<SessionData>(sessionFile, {
     session_id: "",
@@ -24,7 +24,6 @@ async function main(): Promise<void> {
     anatomy_hits: 0,
     anatomy_misses: 0,
     repeated_reads_warned: 0,
-    cerebrum_warnings: 0,
     stop_count: 0,
     reminders_sent: {},
   });
@@ -37,7 +36,6 @@ async function main(): Promise<void> {
 
   if (readCount === 0 && writeCount === 0) {
     writeJSON(sessionFile, session);
-    process.exit(0);
     return;
   }
 
@@ -71,10 +69,18 @@ async function main(): Promise<void> {
   // appended — Stop fires every turn, and appending per turn is what used to
   // duplicate sessions and quadratically inflate lifetime totals.
   const entry = buildSessionEntry(session, hookInput.transcript_path);
+
+  // Verified delivery (2.2): the transcript records every hook invocation as
+  // an attachment line; that is ground truth for what fired, failed, and what
+  // context actually reached the model — self-reported counters are estimates.
+  if (hookInput.transcript_path) {
+    const verified = verifyHookDelivery(hookInput.transcript_path);
+    if (verified) entry.verified = verified;
+  }
+
   flushSessionToLedger(wolfDir, entry);
 
   writeJSON(sessionFile, session);
-  process.exit(0);
 }
 
 /**
@@ -149,5 +155,5 @@ function checkSemanticSummaries(wolfDir: string, session: SessionData): string |
 // from this module, and main() exits the process).
 import { pathToFileURL } from "node:url";
 if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {
-  main().catch(() => process.exit(0));
+  hookMain("stop", main);
 }

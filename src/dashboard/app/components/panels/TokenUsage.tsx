@@ -195,6 +195,19 @@ export function TokenUsage({ data }: { data: WolfData }) {
         <p className="wd-label mt-3" style={{ color: "var(--text-faint)" }}>
           estimated = char-ratio heuristic · measured = summed from harness transcripts at session end
         </p>
+        {(() => {
+          const withVerified = tokenLedger.sessions.filter((s) => s.verified);
+          if (withVerified.length === 0) return null;
+          const fired = withVerified.reduce((n, s) => n + (s.verified!.hooks_fired ?? 0), 0);
+          const failed = withVerified.reduce((n, s) => n + (s.verified!.hooks_failed ?? 0), 0);
+          const delivered = withVerified.reduce((n, s) => n + (s.verified!.injections_delivered ?? 0), 0);
+          const deliveredTok = withVerified.reduce((n, s) => n + (s.verified!.injection_tokens_delivered ?? 0), 0);
+          return (
+            <p className="wd-label mt-1" style={{ color: failed > 0 ? "var(--accent)" : "var(--text-faint)" }}>
+              verified from transcripts ({withVerified.length} sessions): {fmt(fired)} hook runs · {fmt(failed)} failures · {fmt(delivered)} injections ({formatTokens(deliveredTok)}) actually entered context
+            </p>
+          );
+        })()}
       </div>
 
       {/* Waste alerts */}

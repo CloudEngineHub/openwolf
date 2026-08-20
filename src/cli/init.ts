@@ -35,14 +35,17 @@ function getVersion(): string {
 // user tunables; overwriting it on re-init resets every project to the same
 // default ports (18790 / 18791), so only the first daemon to start can bind
 // and the rest crash-loop on EADDRINUSE. It is handled by reconcileConfig().
+// 2.2 kill list: reframe-frameworks.md (31KB, referenced once across 2,256
+// measured commands), identity.md (untouched in 16/16 projects), and empty
+// suggestions.json stubs are no longer shipped into projects. reframe stays
+// available through the /reframe skill; suggestions.json is created lazily by
+// the daemon on first real write.
 const ALWAYS_OVERWRITE = [
   "OPENWOLF.md",
-  "reframe-frameworks.md",
 ];
 
 // Files that contain user/session data — only create if missing, never overwrite
 const CREATE_IF_MISSING = [
-  "identity.md",
   "cerebrum.md",
   "memory.md",
   "anatomy.md",
@@ -51,7 +54,6 @@ const CREATE_IF_MISSING = [
   "buglog.json",
   "cron-manifest.json",
   "cron-state.json",
-  "suggestions.json",
 ];
 
 
@@ -116,7 +118,6 @@ export async function initCommand(options?: { agent?: string[] }): Promise<void>
   // --- Cerebrum: seed project info only if fresh ---
   if (!isUpgrade) {
     seedCerebrum(wolfDir, projectRoot);
-    seedIdentity(wolfDir, projectRoot);
   }
 
   // --- STATUS.md: substitute {{PROJECT_NAME}} / {{DATE}} when freshly created ---
@@ -475,20 +476,6 @@ function seedStatus(wolfDir: string, projectRoot: string): void {
   content = content.replace(/\{\{PROJECT_NAME\}\}/g, projectName);
   content = content.replace(/\{\{DATE\}\}/g, date);
   writeText(statusPath, content);
-}
-
-function seedIdentity(wolfDir: string, projectRoot: string): void {
-  const projectName = detectProjectName(projectRoot);
-  if (!projectName) return;
-
-  const identityPath = path.join(wolfDir, "identity.md");
-  let content = readText(identityPath);
-  content = content.replace(/\*\*Name:\*\* Wolf/, `**Name:** ${projectName}`);
-  content = content.replace(
-    /\*\*Role:\*\* AI development assistant for this project/,
-    `**Role:** AI development assistant for ${projectName}`
-  );
-  writeText(identityPath, content);
 }
 
 function copyHookScripts(wolfDir: string): void {

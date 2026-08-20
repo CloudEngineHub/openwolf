@@ -4,6 +4,60 @@ All notable changes to OpenWolf are documented here. The format follows
 [Keep a Changelog](https://keepachangelog.com/), and OpenWolf uses
 [Semantic Versioning](https://semver.org/).
 
+## [2.2.0] - 2026-08-20
+
+The reliability release: OpenWolf proves what it does. Built on an empirical
+audit of 16 live projects (6,869 API records) that found a hook crashing
+silently for 3 weeks, self-reported counters drifting ~20x from transcript
+ground truth, and several shipped files no agent ever used.
+
+### Added
+
+- Hook health: every hook records a heartbeat (last success, last error,
+  consecutive failures) and every crash is captured instead of swallowed.
+  Session start self-tests the installed hooks' imports and reports breakage
+  in the digest; `openwolf update` verifies the install (file presence plus a
+  per-hook selfcheck run) and fails loudly instead of leaving a broken
+  install; the dashboard shows failing hooks with the error.
+- Transcript-verified measurement: the ledger now records, per session, how
+  many hook runs the harness actually logged, how many failed, and which
+  injected context verifiably entered the conversation, parsed from the
+  transcript's own hook records with a schema probe that falls back to
+  labeled estimates if the format drifts. The dashboard displays verified
+  numbers next to estimates.
+- Cache-invalidation attribution: `openwolf report` and the daemon name what
+  broke the prompt cache in the last 7 days (model switch, compaction,
+  version change, cache expiry, or honestly unattributed) and how many
+  tokens each rebuild re-wrote. Prefix rebuilds are the largest single waste
+  class in agent sessions and no other tool attributes them.
+- Position-weighted cost model: waste is now valued as tokens times remaining
+  API calls times the cache-read rate, because a byte's real cost is being
+  re-read on every later call, not its size.
+
+### Fixed
+
+- Session state is keyed by the harness session id (`.wolf/hooks/sessions/`),
+  so concurrent sessions in one project no longer cross-contaminate
+  duplicate-read tracking (one of two causes of a ~20x warning inflation).
+- Ranged reads (offset/limit) are recorded as ranged contact and never make a
+  later full read look like a duplicate (the other inflation cause).
+- The edit-count warning fires once per file per session instead of on every
+  edit after the third (it would have hit 39% of all writes).
+- Removed the dead `cerebrum_warnings` counter (it was never incremented
+  anywhere).
+
+### Removed
+
+- The anatomy staleness banner: it led 21 of 28 measured digests because a 6h
+  rescan interval loses to normal commit cadence. Freshness is the scanner's
+  job, not the model's.
+- Unfilled STATUS.md template text is never injected into the digest (8 of 28
+  measured digests were pure placeholder).
+- Dead weight no longer shipped into projects, and removed on update when
+  verifiably untouched: reframe-frameworks.md (31KB, referenced once in 2,256
+  measured commands; the /reframe skill still carries it), identity.md,
+  designqc-report.json stubs, empty suggestions.json stubs.
+
 ## [2.1.0] - 2026-08-20
 
 The measurement release. OpenWolf now proves its numbers instead of asserting

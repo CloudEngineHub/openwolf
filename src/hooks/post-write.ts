@@ -4,7 +4,7 @@ import * as crypto from "node:crypto";
 import {
   getWolfDir, ensureWolfDir, readJSON, writeJSON, readMarkdown,
   extractDescription, estimateTokens, appendMarkdown, timeShort, readStdin, normalizePath,
-  isSensitiveFile, getProjectDir, emitHookJSON, recordInjection
+  isSensitiveFile, getProjectDir, emitHookJSON, recordInjection, hookMain, getSessionFilePath
 } from "./shared.js";
 import { loadStoreReconciled, saveStore, renderToFile, sha256 } from "./anatomy-store.js";
 import { withAnatomyLock, HOOK_LOCK_BUDGET_MS } from "./anatomy-lock.js";
@@ -49,38 +49,36 @@ interface BugLog {
 async function main(): Promise<void> {
   ensureWolfDir();
   const wolfDir = getWolfDir();
-  const hooksDir = path.join(wolfDir, "hooks");
-  const sessionFile = path.join(hooksDir, "_session.json");
   const projectRoot = getProjectDir();
 
   const raw = await readStdin();
-  let input: { tool_name?: string; tool_input?: { file_path?: string; path?: string; content?: string; old_string?: string; new_string?: string } };
+  let input: { tool_name?: string; tool_input?: { file_path?: string; path?: string; content?: string; old_string?: string; new_string?: string }; session_id?: string };
   try {
     input = JSON.parse(raw);
   } catch {
-    process.exit(0);
     return;
   }
+  const sessionFile = getSessionFilePath(input);
 
   const toolName = input.tool_name ?? "Write";
   const filePath = input.tool_input?.file_path ?? input.tool_input?.path ?? "";
-  if (!filePath) { process.exit(0); return; }
+  if (!filePath) { return; }
 
   const absolutePath = path.isAbsolute(filePath) ? filePath : path.join(projectRoot, filePath);
 
   // Skip processing for .wolf/ internal files to avoid slow self-referential updates
   const relPath = normalizePath(path.relative(projectRoot, absolutePath));
-  if (relPath.startsWith(".wolf/")) { process.exit(0); return; }
+  if (relPath.startsWith(".wolf/")) { return; }
 
   // Never track files outside the project root (e.g. the Claude Code scratchpad under
   // /private/tmp). path.relative() yields ../.. section keys that pollute anatomy.md and are
   // wiped again by every full `openwolf scan`, so the index churns instead of converging.
-  if (relPath.startsWith("..") || path.isAbsolute(relPath)) { process.exit(0); return; }
+  if (relPath.startsWith("..") || path.isAbsolute(relPath)) { return; }
 
   // Never track secret-bearing files in anatomy/memory (issue #54): .env is
   // not the only file whose *description* would leak sensitive content.
   const baseName = path.basename(absolutePath);
-  if (isSensitiveFile(baseName)) { process.exit(0); return; }
+  if (isSensitiveFile(baseName)) { return; }
 
   const oldStr = input.tool_input?.old_string ?? "";
   const newStr = input.tool_input?.new_string ?? "";
@@ -182,9 +180,13 @@ async function main(): Promise<void> {
       delete session.files_read[normalizedFile];
     }
 
-    const editWarn = session.edit_counts[editKey] >= 3
+    // Once per file per session: firing on the 3rd edit AND every edit after
+    // it would hit ~39% of all write operations (measured) — pure noise.
+    if (!session.edit_warned) session.edit_warned = {};
+    const editWarn = session.edit_counts[editKey] >= 3 && !(session.edit_warned as Record<string, boolean>)[editKey]
       ? `OpenWolf: ${baseName} has been edited ${session.edit_counts[editKey]} times this session. If you're fixing a bug, log it to .wolf/buglog.json.`
       : "";
+    if (editWarn) (session.edit_warned as Record<string, boolean>)[editKey] = true;
     if (editWarn) recordInjection(session, "edit_warn", editWarn);
     writeJSON(sessionFile, session);
 
@@ -199,8 +201,6 @@ async function main(): Promise<void> {
       autoDetectBugFix(wolfDir, absolutePath, projectRoot, oldStr, newStr);
     }
   } catch {}
-
-  process.exit(0);
 }
 
 // ─── Edit Summarizer ─────────────────────────────────────────────
@@ -624,4 +624,4 @@ function extractCSSProps(code: string): Map<string, string> {
   return props;
 }
 
-main().catch(() => process.exit(0));
+hookMain("post-write", main);

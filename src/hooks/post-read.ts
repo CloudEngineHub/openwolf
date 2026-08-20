@@ -1,9 +1,9 @@
 import * as path from "node:path";
-import { getWolfDir, ensureWolfDir, readJSON, writeJSON, estimateTokens, readStdin, normalizePath, getProjectDir } from "./shared.js";
+import { getWolfDir, ensureWolfDir, readJSON, writeJSON, estimateTokens, readStdin, normalizePath, getProjectDir, hookMain, getSessionFilePath } from "./shared.js";
 import { lookupEntry } from "./anatomy-store.js";
 
 interface SessionData {
-  files_read: Record<string, { count: number; tokens: number; first_read: string }>;
+  files_read: Record<string, { count: number; tokens: number; first_read: string; ranged?: boolean }>;
   [key: string]: unknown;
 }
 
@@ -33,25 +33,31 @@ function extractToolResponseText(resp: unknown): string {
 async function main(): Promise<void> {
   ensureWolfDir();
   const wolfDir = getWolfDir();
-  const hooksDir = path.join(wolfDir, "hooks");
-  const sessionFile = path.join(hooksDir, "_session.json");
 
   const raw = await readStdin();
   let input: {
-    tool_input?: { file_path?: string; path?: string };
+    tool_input?: { file_path?: string; path?: string; offset?: number; limit?: number };
     tool_response?: unknown;
     tool_output?: { content?: string };
+    session_id?: string;
   };
   try {
     input = JSON.parse(raw);
   } catch {
-    process.exit(0);
     return;
   }
+  const sessionFile = getSessionFilePath(input);
 
   const filePath = input.tool_input?.file_path ?? input.tool_input?.path ?? "";
   const content = extractToolResponseText(input.tool_response) || input.tool_output?.content || "";
-  if (!filePath) { process.exit(0); return; }
+  if (!filePath) { return; }
+
+  // Ranged reads: pre-read already recorded the contact with ranged:true.
+  // Registering them as full reads here is what used to make a later
+  // legitimate full read look like a duplicate (~20x warning inflation).
+  if (input.tool_input?.offset !== undefined || input.tool_input?.limit !== undefined) {
+    return;
+  }
 
   const normalizedFile = normalizePath(filePath);
 
@@ -61,7 +67,6 @@ async function main(): Promise<void> {
     ? normalizedFile.slice(projectDir.length).replace(/^\//, "")
     : "";
   if (relToProject.startsWith(".wolf/") || relToProject.startsWith(".wolf\\")) {
-    process.exit(0);
     return;
   }
 
@@ -79,18 +84,19 @@ async function main(): Promise<void> {
   }
 
   const session = readJSON<SessionData>(sessionFile, { files_read: {} });
-  if (session.files_read[normalizedFile]) {
-    session.files_read[normalizedFile].tokens = tokens;
+  const existing = session.files_read[normalizedFile];
+  if (existing && existing.ranged !== true) {
+    existing.tokens = tokens;
   } else {
+    // Fresh full read (or an upgrade of a ranged-only contact to a full read).
     session.files_read[normalizedFile] = {
       count: 1,
       tokens,
-      first_read: new Date().toISOString(),
+      first_read: existing?.first_read ?? new Date().toISOString(),
     };
   }
 
   writeJSON(sessionFile, session);
-  process.exit(0);
 }
 
-main().catch(() => process.exit(0));
+hookMain("post-read", main);

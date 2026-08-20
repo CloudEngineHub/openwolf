@@ -162,6 +162,7 @@ app.get("/api/files", (_req, res) => {
     "OPENWOLF.md", "identity.md", "cerebrum.md", "memory.md", "anatomy.md",
     "config.json", "token-ledger.json", "buglog.json",
     "cron-manifest.json", "cron-state.json", "STATUS.md", "_scan-state.json", "anatomy-index.json",
+    "hooks/_heartbeat.json",
   ];
   for (const file of wolfFiles) {
     try {

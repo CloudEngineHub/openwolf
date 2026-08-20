@@ -1,7 +1,9 @@
 import * as path from "node:path";
 import { findProjectRoot } from "../scanner/project-root.js";
 import { readJSON } from "../utils/fs-safe.js";
-import { scanProjectUsage } from "../tracker/transcript-usage.js";
+import { scanProjectUsage, projectTranscriptDir } from "../tracker/transcript-usage.js";
+import { readUsageSequence, attributeCacheRebuilds, type CacheRebuild } from "../tracker/cache-attribution.js";
+import * as fsMod from "node:fs";
 
 // `openwolf report` — Workstream F1: the verifiable-numbers view.
 // Estimated figures come from OpenWolf's char-ratio heuristics; real figures
@@ -88,6 +90,36 @@ export function reportCommand(): void {
   console.log(`    Total tokens tracked:   ${fmt(lt.total_tokens_estimated)}`);
   console.log(`    Saved by denied reads:  ${fmt(lt.estimated_savings_vs_bare_cli)}`);
   console.log(`    OpenWolf injected:      ${fmt(lt.injection_tokens_estimated)} (digests, hints, warnings)`);
+
+  // Cache-invalidation attribution (2.2): the largest waste class, named.
+  try {
+    const dir = projectTranscriptDir(projectRoot);
+    const cutoff = Date.now() - 7 * 24 * 3600 * 1000;
+    const rebuilds: CacheRebuild[] = [];
+    for (const f of fsMod.readdirSync(dir)) {
+      if (!f.endsWith(".jsonl")) continue;
+      const p = path.join(dir, f);
+      try { if (fsMod.statSync(p).mtimeMs < cutoff) continue; } catch { continue; }
+      const seq = readUsageSequence(p);
+      if (!seq) continue;
+      rebuilds.push(...attributeCacheRebuilds(seq.calls, seq.compactions).rebuilds);
+    }
+    if (rebuilds.length > 0) {
+      const totalTok = rebuilds.reduce((s, r) => s + r.creation_tokens, 0);
+      console.log("");
+      console.log(`  Cache rebuilds (last 7 days): ${rebuilds.length} events, ${fmt(totalTok)} tokens re-written`);
+      const byCause = new Map<string, { n: number; tok: number }>();
+      for (const r of rebuilds) {
+        const b = byCause.get(r.cause) ?? { n: 0, tok: 0 };
+        b.n++; b.tok += r.creation_tokens;
+        byCause.set(r.cause, b);
+      }
+      for (const [cause, b] of [...byCause.entries()].sort((a, z) => z[1].tok - a[1].tok)) {
+        console.log(`    ${cause.padEnd(16)} ${String(b.n).padStart(3)} events  ${fmt(b.tok)} tok`);
+      }
+      console.log("    (each rebuild re-pays the prefix at the cache-write rate instead of 0.1x reads)");
+    }
+  } catch {}
 
   const withReal = ledger.sessions.filter((s) => s.real_usage);
   if (withReal.length > 0) {

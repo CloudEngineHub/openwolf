@@ -46,7 +46,9 @@ function nextPhase(statusDoc: string): string[] {
 }
 
 export function ProjectOverview({ data }: { data: WolfData }) {
-  const { health, tokenLedger, anatomy, buglog, cronState, config, contextHealth, statusDoc, scanState, project, identity } = data;
+  const { health, tokenLedger, anatomy, buglog, cronState, config, contextHealth, hookHealth, statusDoc, scanState, project, identity } = data;
+  const brokenHooks = Object.entries(hookHealth).filter(([, h]) => h.consecutive_failures >= 2);
+  const hookCount = Object.keys(hookHealth).length;
   const lt = tokenLedger.lifetime;
   const projectName = project.name || identity.name;
   const measured = (lt.real_api_calls ?? 0) > 0;
@@ -188,6 +190,12 @@ export function ProjectOverview({ data }: { data: WolfData }) {
               <span>duplicate read mode</span>
               <span>{dupMode}</span>
             </div>
+            <div className="flex justify-between">
+              <span>hook health</span>
+              <span style={brokenHooks.length > 0 ? { color: "var(--accent)" } : undefined}>
+                {hookCount === 0 ? "no heartbeats yet" : brokenHooks.length > 0 ? `${brokenHooks.length} failing` : `${hookCount} healthy`}
+              </span>
+            </div>
             {contextHealth && (
               <div className="flex justify-between">
                 <span>always-on context (est.)</span>
@@ -195,6 +203,15 @@ export function ProjectOverview({ data }: { data: WolfData }) {
               </div>
             )}
           </div>
+          {brokenHooks.length > 0 && (
+            <div className="mt-3 space-y-1.5">
+              {brokenHooks.slice(0, 3).map(([name, h]) => (
+                <p key={name} className="text-sm" style={{ color: "var(--accent)" }}>
+                  {name}: {h.consecutive_failures} consecutive failures. Run openwolf update to repair. {h.last_error_message ? `(${h.last_error_message.slice(0, 80)})` : ""}
+                </p>
+              ))}
+            </div>
+          )}
           {contextHealth && contextHealth.findings.length > 0 && (
             <div className="mt-3 space-y-1.5">
               {contextHealth.findings.map((f) => (

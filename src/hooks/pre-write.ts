@@ -1,6 +1,6 @@
 import * as fs from "node:fs";
 import * as path from "node:path";
-import { getWolfDir, ensureWolfDir, readJSON, readMarkdown, readStdin, emitHookJSON, recordInjectionToSessionFile } from "./shared.js";
+import { getWolfDir, ensureWolfDir, readJSON, readMarkdown, readStdin, emitHookJSON, recordInjectionToSessionFile, hookMain, getSessionFilePath } from "./shared.js";
 import { searchBugsFTS } from "./bug-index.js";
 
 interface BugEntry {
@@ -22,11 +22,10 @@ async function main(): Promise<void> {
   const wolfDir = getWolfDir();
 
   const raw = await readStdin();
-  let input: { tool_input?: { content?: string; old_string?: string; new_string?: string; file_path?: string; path?: string } };
+  let input: { tool_input?: { content?: string; old_string?: string; new_string?: string; file_path?: string; path?: string }; session_id?: string };
   try {
     input = JSON.parse(raw);
   } catch {
-    process.exit(0);
     return;
   }
 
@@ -37,7 +36,7 @@ async function main(): Promise<void> {
   const filePath = input.tool_input?.file_path ?? input.tool_input?.path ?? "";
   const allContent = [content, oldStr, newStr].join("\n");
 
-  if (!allContent.trim()) { process.exit(0); return; }
+  if (!allContent.trim()) { return; }
 
   // Model-visible notes — flushed as ONE additionalContext at exit.
   const notes: string[] = [];
@@ -53,10 +52,9 @@ async function main(): Promise<void> {
   }
 
   if (notes.length > 0) {
-    recordInjectionToSessionFile(path.join(wolfDir, "hooks", "_session.json"), "cerebrum_buglog", notes.join("\n"));
+    recordInjectionToSessionFile(getSessionFilePath(input), "cerebrum_buglog", notes.join("\n"));
     emitHookJSON("PreToolUse", { additionalContext: notes.join("\n") });
   }
-  process.exit(0);
 }
 
 function checkCerebrum(wolfDir: string, content: string): string[] {
@@ -175,4 +173,4 @@ function tokenize(text: string): Set<string> {
   );
 }
 
-main().catch(() => process.exit(0));
+hookMain("pre-write", main);

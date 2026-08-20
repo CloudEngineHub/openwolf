@@ -2,7 +2,8 @@ import * as fs from "node:fs";
 import * as path from "node:path";
 import {
   getWolfDir, ensureWolfDir, readJSON, writeJSON,
-  estimateTokens, readStdin, normalizePath, getProjectDir, emitHookJSON, recordInjection
+  estimateTokens, readStdin, normalizePath, getProjectDir, emitHookJSON, recordInjection,
+  hookMain, getSessionFilePath
 } from "./shared.js";
 import { lookupEntry } from "./anatomy-store.js";
 
@@ -12,6 +13,9 @@ interface FileRead {
   first_read: string;
   read_mtime?: number;
   anatomy_hit?: boolean;
+  /** True when only ranged (offset/limit) reads have touched this file — a
+   * later full read is legitimate, never a duplicate. */
+  ranged?: boolean;
   /** Duplicate denial already spent for this file (one-shot guarantee). */
   denied_once?: boolean;
   /** Set when compaction evicted file contents from context — deny would be wrong. */
@@ -49,24 +53,23 @@ function skeletonHintsEnabled(wolfDir: string): boolean {
 async function main(): Promise<void> {
   ensureWolfDir();
   const wolfDir = getWolfDir();
-  const hooksDir = path.join(wolfDir, "hooks");
-  const sessionFile = path.join(hooksDir, "_session.json");
 
   const raw = await readStdin();
   let input: {
     tool_input?: { file_path?: string; path?: string; offset?: number; limit?: number };
     agent_id?: string;
     agent_type?: string;
+    session_id?: string;
   };
   try {
     input = JSON.parse(raw);
   } catch {
-    process.exit(0);
     return;
   }
+  const sessionFile = getSessionFilePath(input);
 
   const filePath = input.tool_input?.file_path ?? input.tool_input?.path ?? "";
-  if (!filePath) { process.exit(0); return; }
+  if (!filePath) { return; }
 
   // Ranged reads (offset/limit) are exactly what the symbol hints steer the
   // model toward — never warn about, deny, or record them as full reads (a
@@ -87,12 +90,6 @@ async function main(): Promise<void> {
     ? normalizedFile.slice(projectDir.length).replace(/^\//, "")
     : "";
   if (relToProject.startsWith(".wolf/") || relToProject.startsWith(".wolf\\")) {
-    process.exit(0);
-    return;
-  }
-
-  if (isRangedRead) {
-    process.exit(0);
     return;
   }
 
@@ -101,11 +98,25 @@ async function main(): Promise<void> {
     repeated_reads_warned: 0,
   });
 
+  if (isRangedRead) {
+    // Record the contact so dedupe knows about it, but flagged: a ranged
+    // first contact must never make a later full read look like a duplicate
+    // (the old asymmetry with post-read inflated warnings ~20x).
+    if (!session.files_read[normalizedFile]) {
+      session.files_read[normalizedFile] = {
+        count: 1, tokens: 0, first_read: new Date().toISOString(), ranged: true,
+      };
+      writeJSON(sessionFile, session);
+    }
+    return;
+  }
+
   // Model-visible notes for this run — flushed as ONE additionalContext at exit.
   const notes: string[] = [];
 
-  // Check if already read this session
-  if (session.files_read[normalizedFile]) {
+  // Check if already read this session. Only a prior FULL read counts —
+  // ranged-only contact means the model has never seen the whole file.
+  if (session.files_read[normalizedFile] && session.files_read[normalizedFile].ranged !== true) {
     const prev = session.files_read[normalizedFile];
     let modifiedSinceRead = true;
     try {
@@ -136,7 +147,6 @@ async function main(): Promise<void> {
           permissionDecision: "deny",
           permissionDecisionReason: reason,
         });
-        process.exit(0);
         return;
       }
 
@@ -151,7 +161,6 @@ async function main(): Promise<void> {
       if (notes.length > 0) {
         emitHookJSON("PreToolUse", { additionalContext: notes.join("\n") });
       }
-      process.exit(0);
       return;
     }
     delete session.files_read[normalizedFile];
@@ -216,7 +225,6 @@ async function main(): Promise<void> {
   if (notes.length > 0) {
     emitHookJSON("PreToolUse", { additionalContext: notes.join("\n") });
   }
-  process.exit(0);
 }
 
-main().catch(() => process.exit(0));
+hookMain("pre-read", main);

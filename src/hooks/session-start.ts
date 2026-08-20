@@ -1,7 +1,6 @@
 import * as fs from "node:fs";
 import * as path from "node:path";
-import { execFileSync } from "node:child_process";
-import { getWolfDir, ensureWolfDir, writeJSON, appendMarkdown, readJSON, timestamp, timeShort, estimateTokens, readStdin, detectAgent, recordInjectionToSessionFile, getProjectDir } from "./shared.js";
+import { getWolfDir, ensureWolfDir, writeJSON, appendMarkdown, readJSON, timestamp, timeShort, estimateTokens, readStdin, detectAgent, recordInjectionToSessionFile, getProjectDir, hookMain, getSessionFilePath, gcSessionFiles } from "./shared.js";
 import { loadStore } from "./anatomy-store.js";
 
 // ─── Session digest (Workstream E/F: model-aware context budgeting) ─────────
@@ -69,9 +68,18 @@ function buildSessionDigest(wolfDir: string, budget: number): string {
   };
 
   // 1. STATUS.md "next phase" — the single most valuable resume context.
+  // Unfilled template placeholders are never injected: 8 of 28 measured
+  // digests were literally placeholder text, pure noise at ~100 tok each.
   try {
     const status = fs.readFileSync(path.join(wolfDir, "STATUS.md"), "utf-8");
-    tryAdd(extractSection(status, /^## 🚀/));
+    const section = extractSection(status, /^## 🚀/);
+    const meaningful = section
+      .split("\n")
+      .filter((l) => l.trim() && !/_<[^>]*>_|\{\{[^}]*\}\}|^_?<[^>]*>_?$/.test(l.trim()));
+    // Heading alone (or heading + table scaffolding) means the template was
+    // never filled in.
+    const contentLines = meaningful.filter((l) => !/^#|^\||^-+$/.test(l.trim()));
+    if (contentLines.length > 0) tryAdd(meaningful.join("\n"));
   } catch {}
 
   // 2. Do-Not-Repeat list from cerebrum (most recent 10 entries) — skipped
@@ -124,19 +132,30 @@ async function main(): Promise<void> {
     }
   } catch {}
   const hooksDir = path.join(wolfDir, "hooks");
-  const sessionFile = path.join(hooksDir, "_session.json");
   const now = new Date();
-  const sessionId = `session-${now.toISOString().slice(0, 10)}-${String(now.getHours()).padStart(2, "0")}${String(now.getMinutes()).padStart(2, "0")}`;
 
   // SessionStart fires for startup/resume/clear/compact. Only startup and
   // clear begin a genuinely new session — on resume/compact the session is
-  // still live, and resetting _session.json would wipe read/write tracking
-  // mid-flight (Workstream F3: compaction survival).
+  // still live, and resetting the session state would wipe read/write
+  // tracking mid-flight (Workstream F3: compaction survival).
   let source = "startup";
+  let hookInput: { source?: string; session_id?: string } = {};
   try {
-    const hookInput = JSON.parse(await readStdin());
+    hookInput = JSON.parse(await readStdin());
     if (typeof hookInput.source === "string") source = hookInput.source;
   } catch {}
+  // Session state is keyed by the harness session id (2.2): concurrent
+  // sessions in one project no longer cross-contaminate each other.
+  const sessionFile = getSessionFilePath(hookInput);
+  const sessionId = hookInput.session_id ??
+    `session-${now.toISOString().slice(0, 10)}-${String(now.getHours()).padStart(2, "0")}${String(now.getMinutes()).padStart(2, "0")}`;
+  gcSessionFiles();
+
+  // Hook install self-test (2.2): a missing dependency file once silently
+  // killed a hook for 3 weeks across 440 invocations. Verify every installed
+  // hook's relative imports resolve; surface breakage in the digest.
+  const brokenHooks = selfTestHooks(hooksDir);
+
   const continuing = (source === "compact" || source === "resume") && fs.existsSync(sessionFile);
 
   // Compaction evicts verbatim file contents from the model's context, so a
@@ -164,7 +183,6 @@ async function main(): Promise<void> {
       anatomy_hits: 0,
       anatomy_misses: 0,
       repeated_reads_warned: 0,
-      cerebrum_warnings: 0,
       stop_count: 0,
     });
 
@@ -228,12 +246,15 @@ async function main(): Promise<void> {
   try {
     let digest = buildSessionDigest(wolfDir, digestBudget(wolfDir));
 
-    // Anatomy staleness detection (F2b): compare scan state against git HEAD
-    // and the configured rescan interval — detection is free; the agent can
-    // run the actual rescan.
-    const staleReason = anatomyStaleReason(wolfDir);
-    if (staleReason) {
-      digest = `⚠ anatomy.md may be stale (${staleReason}). Run \`openwolf scan\` before relying on it.\n\n` + digest;
+    // (The anatomy-staleness banner is gone in 2.2: it led 21 of 28 measured
+    // digests because a 6h rescan interval loses to normal commit cadence —
+    // a warning firing 75% of the time is a tax, not a signal. Freshness is
+    // the daemon's and scan's job, not the model's.)
+
+    // Hook breakage is the one warning worth its tokens: without it, a broken
+    // install silently loses every feature (happened for 3 weeks once).
+    if (brokenHooks.length > 0) {
+      digest = `OpenWolf hooks are degraded: ${brokenHooks.join("; ")}. Run \`openwolf update\` in this project to repair the install.\n\n` + digest;
     }
 
     // Post-compaction restore (F3): resurface in-flight session state that
@@ -259,36 +280,35 @@ async function main(): Promise<void> {
       }));
     }
   } catch {}
-
-  process.exit(0);
 }
 
-// How the current anatomy scan state is stale, or null if fresh (F2b).
-function anatomyStaleReason(wolfDir: string): string | null {
+/**
+ * Verify every installed hook script's relative imports resolve (2.2). The
+ * 440-crash class was a missing DEPENDENCY file, not a missing hook, so a
+ * bare existence check of registered hooks would have missed it. Cheap static
+ * check: scan each installed hook script for relative import specifiers and
+ * verify the target files exist. Returns problem strings (empty = healthy).
+ */
+function selfTestHooks(hooksDir: string): string[] {
+  const problems: string[] = [];
   try {
-    const state = readJSON<{ last_scanned?: string; git_head?: string | null }>(
-      path.join(wolfDir, "_scan-state.json"), {}
-    );
-    if (!state.last_scanned) return null; // no scan state yet — nothing to compare
-
-    let currentHead: string | null = null;
-    try {
-      currentHead = execFileSync("git", ["rev-parse", "HEAD"], {
-        cwd: path.dirname(wolfDir), encoding: "utf-8", stdio: ["ignore", "pipe", "ignore"], timeout: 2000,
-      }).trim();
-    } catch {}
-    if (state.git_head && currentHead && state.git_head !== currentHead) {
-      return "git HEAD moved since last scan";
+    const files = fs.readdirSync(hooksDir).filter((f) => f.endsWith(".js"));
+    for (const f of files) {
+      let src = "";
+      try {
+        src = fs.readFileSync(path.join(hooksDir, f), "utf-8");
+      } catch {
+        problems.push(`${f} unreadable`);
+        continue;
+      }
+      for (const m of src.matchAll(/from\s+["']\.\/([\w.-]+\.js)["']/g)) {
+        if (!fs.existsSync(path.join(hooksDir, m[1]))) {
+          problems.push(`${f} cannot load ${m[1]}`);
+        }
+      }
     }
-
-    const cfg = readJSON<{ openwolf?: { anatomy?: { rescan_interval_hours?: number } } }>(
-      path.join(wolfDir, "config.json"), {}
-    );
-    const intervalH = cfg.openwolf?.anatomy?.rescan_interval_hours ?? 6;
-    const ageH = (Date.now() - new Date(state.last_scanned).getTime()) / 3600000;
-    if (ageH > intervalH) return `last scanned ${Math.floor(ageH)}h ago`;
   } catch {}
-  return null;
+  return [...new Set(problems)].slice(0, 3);
 }
 
-main().catch(() => process.exit(0));
+hookMain("session-start", main);

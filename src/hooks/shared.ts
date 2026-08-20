@@ -36,6 +36,94 @@ export function ensureWolfDir(): void {
   }
 }
 
+// ─── Hook health (2.2): heartbeat + crash recording ──────────────────────────
+// The PostToolUse write hook crashed on 100% of 440 invocations for 3 weeks
+// with nothing noticing, because every hook swallowed its own errors
+// (main().catch(() => exit(0))). Every hook now runs through hookMain(), which
+// records a per-hook heartbeat (last success / last error / consecutive
+// failures) that session-start, update, and the dashboard can check.
+
+export const HEARTBEAT_FILE = "_heartbeat.json";
+
+interface HeartbeatEntry {
+  last_ok?: string;
+  last_error?: string;
+  last_error_message?: string;
+  consecutive_failures: number;
+}
+
+export function recordHeartbeat(hookName: string, error?: unknown): void {
+  try {
+    const file = path.join(getWolfDir(), "hooks", HEARTBEAT_FILE);
+    const beats = readJSON<Record<string, HeartbeatEntry>>(file, {});
+    const entry = beats[hookName] ?? { consecutive_failures: 0 };
+    if (error === undefined) {
+      entry.last_ok = new Date().toISOString();
+      entry.consecutive_failures = 0;
+    } else {
+      entry.last_error = new Date().toISOString();
+      entry.last_error_message = String(error instanceof Error ? error.stack ?? error.message : error).slice(0, 500);
+      entry.consecutive_failures = (entry.consecutive_failures ?? 0) + 1;
+    }
+    beats[hookName] = entry;
+    writeJSON(file, beats);
+  } catch {}
+}
+
+/**
+ * Standard hook entry point: runs the hook, records a heartbeat either way,
+ * always exits 0 (hooks must never block the agent). `--selfcheck` exits
+ * immediately after module load: reaching this code at all proves every static
+ * import resolved, which is exactly the failure class that went undetected.
+ */
+export function hookMain(hookName: string, fn: () => void | Promise<void>): void {
+  if (process.argv.includes("--selfcheck")) {
+    process.stdout.write(`ok ${hookName}`);
+    process.exit(0);
+  }
+  Promise.resolve()
+    .then(fn)
+    .then(() => {
+      recordHeartbeat(hookName);
+      process.exit(0);
+    })
+    .catch((err) => {
+      recordHeartbeat(hookName, err);
+      process.exit(0);
+    });
+}
+
+// ─── Session-keyed state (2.2) ───────────────────────────────────────────────
+// _session.json used to be one per-PROJECT file, so concurrent Claude sessions
+// cross-contaminated each other's read tracking (one of the two causes of the
+// ledger's ~20x duplicate-warning inflation). State is now keyed by the
+// harness-provided session_id when present.
+
+/** Resolve the session state file for this hook invocation. */
+export function getSessionFilePath(hookInput: { session_id?: string } | undefined): string {
+  const hooksDir = path.join(getWolfDir(), "hooks");
+  const id = hookInput?.session_id;
+  if (typeof id === "string" && /^[\w.-]{4,128}$/.test(id)) {
+    return path.join(hooksDir, "sessions", `${id}.json`);
+  }
+  // Legacy fallback for agents that pass no session id.
+  return path.join(hooksDir, "_session.json");
+}
+
+/** Delete session state files older than maxAgeDays (called from session-start). */
+export function gcSessionFiles(maxAgeDays = 7): void {
+  try {
+    const dir = path.join(getWolfDir(), "hooks", "sessions");
+    const cutoff = Date.now() - maxAgeDays * 24 * 3600 * 1000;
+    for (const f of fs.readdirSync(dir)) {
+      if (!f.endsWith(".json")) continue;
+      try {
+        if (fs.statSync(path.join(dir, f)).mtimeMs < cutoff) fs.unlinkSync(path.join(dir, f));
+      } catch {}
+    }
+  } catch {}
+}
+
 export function readJSON<T = unknown>(filePath: string, fallback: T): T {
   try {
     return JSON.parse(fs.readFileSync(filePath, "utf-8")) as T;

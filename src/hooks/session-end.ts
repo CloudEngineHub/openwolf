@@ -1,6 +1,7 @@
 import * as path from "node:path";
-import { getWolfDir, ensureWolfDir, readJSON, appendMarkdown, timeShort, readStdin } from "./shared.js";
+import { getWolfDir, ensureWolfDir, readJSON, appendMarkdown, timeShort, readStdin, hookMain, getSessionFilePath } from "./shared.js";
 import { buildSessionEntry, flushSessionToLedger, type SessionData } from "./ledger.js";
+import { verifyHookDelivery } from "./hook-attachments.js";
 
 // SessionEnd hook: final ledger flush + the single "Session end" line in
 // memory.md. Fires on clear/logout/exit (not on SIGKILL — the per-turn Stop
@@ -11,27 +12,29 @@ import { buildSessionEntry, flushSessionToLedger, type SessionData } from "./led
 async function main(): Promise<void> {
   ensureWolfDir();
   const wolfDir = getWolfDir();
-  const sessionFile = path.join(wolfDir, "hooks", "_session.json");
 
-  let hookInput: { transcript_path?: string; reason?: string } = {};
+  let hookInput: { transcript_path?: string; reason?: string; session_id?: string } = {};
   try {
     hookInput = JSON.parse(await readStdin());
   } catch {}
+  const sessionFile = getSessionFilePath(hookInput);
 
   const session = readJSON<SessionData | null>(sessionFile, null);
   if (!session || !session.session_id) {
-    process.exit(0);
     return;
   }
 
   const readCount = Object.keys(session.files_read ?? {}).length;
   const writeCount = (session.files_written ?? []).length;
   if (readCount === 0 && writeCount === 0) {
-    process.exit(0);
     return;
   }
 
   const entry = buildSessionEntry(session, hookInput.transcript_path);
+  if (hookInput.transcript_path) {
+    const verified = verifyHookDelivery(hookInput.transcript_path);
+    if (verified) entry.verified = verified;
+  }
   flushSessionToLedger(wolfDir, entry);
 
   if (writeCount > 0) {
@@ -45,8 +48,6 @@ async function main(): Promise<void> {
       );
     } catch {}
   }
-
-  process.exit(0);
 }
 
-main().catch(() => process.exit(0));
+hookMain("session-end", main);

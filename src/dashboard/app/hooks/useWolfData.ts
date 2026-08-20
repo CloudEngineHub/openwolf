@@ -25,6 +25,13 @@ export interface LedgerSession {
     anatomy_lookups: number;
   };
   real_usage?: RealUsage;
+  /** Transcript-verified hook activity; absent = estimates only. */
+  verified?: {
+    hooks_fired: number;
+    hooks_failed: number;
+    injections_delivered: number;
+    injection_tokens_delivered: number;
+  };
 }
 
 interface TokenLedger {
@@ -67,6 +74,13 @@ export interface WolfConfig {
   context?: { session_digest_budget_tokens?: number; budgets?: Record<string, number> };
   reads?: { duplicate_mode?: string };
 }
+
+export type HookHealth = Record<string, {
+  last_ok?: string;
+  last_error?: string;
+  last_error_message?: string;
+  consecutive_failures: number;
+}>;
 
 export interface ContextHealth {
   findings: Array<{ id: string; severity: "info" | "warn"; message: string }>;
@@ -120,6 +134,7 @@ export interface WolfData {
   project: ProjectMeta;
   config: WolfConfig;
   contextHealth: ContextHealth | null;
+  hookHealth: HookHealth;
   statusDoc: string;
   scanState: ScanState;
   loading: boolean;
@@ -142,6 +157,7 @@ export function useWolfData(): WolfData {
   const [project, setProject] = useState<ProjectMeta>({ name: "", description: "", root: "" });
   const [config, setConfig] = useState<WolfConfig>({ agents: ["claude"] });
   const [contextHealth, setContextHealth] = useState<ContextHealth | null>(null);
+  const [hookHealth, setHookHealth] = useState<HookHealth>({});
   const [statusDoc, setStatusDoc] = useState("");
   const [scanState, setScanState] = useState<ScanState>({});
   const [client, setClient] = useState<WolfClient | null>(null);
@@ -202,6 +218,9 @@ export function useWolfData(): WolfData {
     if (files["STATUS.md"] !== undefined && files["STATUS.md"] !== "") setStatusDoc(files["STATUS.md"]);
     if (files["_scan-state.json"]) {
       try { setScanState(JSON.parse(files["_scan-state.json"])); } catch {}
+    }
+    if (files["hooks/_heartbeat.json"]) {
+      try { setHookHealth(JSON.parse(files["hooks/_heartbeat.json"])); } catch {}
     }
     if (files["identity.md"]) {
       const nameMatch = files["identity.md"].match(/\*\*Name:\*\*\s*(.+)/);
@@ -265,5 +284,5 @@ export function useWolfData(): WolfData {
     return () => wsClient.disconnect();
   }, [processFiles]);
 
-  return { anatomy, cerebrum, memory, tokenLedger, cronState, cronManifest, buglog, suggestions, health, identity, project, config, contextHealth, statusDoc, scanState, loading, authError, client };
+  return { anatomy, cerebrum, memory, tokenLedger, cronState, cronManifest, buglog, suggestions, health, identity, project, config, contextHealth, hookHealth, statusDoc, scanState, loading, authError, client };
 }

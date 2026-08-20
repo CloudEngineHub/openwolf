@@ -5,7 +5,8 @@ import cron from "node-cron";
 import { readJSON, writeJSON, readText, writeText, appendText } from "../utils/fs-safe.js";
 import { scanProject } from "../scanner/anatomy-scanner.js";
 import { detectWaste } from "../tracker/waste-detector.js";
-import { scanProjectUsage } from "../tracker/transcript-usage.js";
+import { scanProjectUsage, projectTranscriptDir } from "../tracker/transcript-usage.js";
+import { readUsageSequence, attributeCacheRebuilds, type CacheRebuild } from "../tracker/cache-attribution.js";
 import { withFileLock } from "../hooks/anatomy-lock.js";
 import type { Logger } from "../utils/logger.js";
 
@@ -320,6 +321,37 @@ export class CronEngine {
     try {
       measured = scanProjectUsage(this.projectRoot);
     } catch {}
+
+    // Cache-invalidation attribution (2.2): name what broke the prompt cache
+    // and what it cost, per recent transcript. Nothing else in the ecosystem
+    // attributes this, and it is the largest single waste class.
+    let cacheRebuilds: { generated_at: string; by_cause: Record<string, { events: number; tokens: number }>; recent: CacheRebuild[] } | null = null;
+    try {
+      const dir = projectTranscriptDir(this.projectRoot);
+      const cutoff = Date.now() - 7 * 24 * 3600 * 1000;
+      const byCause: Record<string, { events: number; tokens: number }> = {};
+      const recent: CacheRebuild[] = [];
+      for (const f of fs.readdirSync(dir)) {
+        if (!f.endsWith(".jsonl")) continue;
+        const p = path.join(dir, f);
+        try {
+          if (fs.statSync(p).mtimeMs < cutoff) continue;
+        } catch { continue; }
+        const seq = readUsageSequence(p);
+        if (!seq) continue;
+        const report = attributeCacheRebuilds(seq.calls, seq.compactions);
+        for (const r of report.rebuilds) {
+          const bucket = byCause[r.cause] ?? (byCause[r.cause] = { events: 0, tokens: 0 });
+          bucket.events++;
+          bucket.tokens += r.creation_tokens;
+          recent.push(r);
+        }
+      }
+      if (recent.length > 0) {
+        recent.sort((a, b) => (b.timestamp ?? "").localeCompare(a.timestamp ?? ""));
+        cacheRebuilds = { generated_at: new Date().toISOString(), by_cause: byCause, recent: recent.slice(0, 8) };
+      }
+    } catch {}
     const ledgerPath = path.join(this.wolfDir, "token-ledger.json");
     // Same lock the hooks' ledger writer uses: an unlocked rewrite here could
     // clobber a concurrent Stop-hook flush and lose whole sessions.
@@ -327,6 +359,7 @@ export class CronEngine {
       const ledger = readJSON<Record<string, unknown>>(ledgerPath, {});
       (ledger as { waste_flags: unknown[] }).waste_flags = flags;
       if (measured) (ledger as { measured_project: unknown }).measured_project = measured;
+      if (cacheRebuilds) (ledger as { cache_rebuilds: unknown }).cache_rebuilds = cacheRebuilds;
       (ledger as { optimization_report: { last_generated: string; patterns: unknown[] } }).optimization_report = {
         last_generated: new Date().toISOString(),
         patterns: flags.map((f) => f.pattern),

@@ -28,7 +28,6 @@ export interface SessionData {
   repeated_reads_warned: number;
   reads_denied?: number;
   denied_tokens_saved?: number;
-  cerebrum_warnings: number;
   stop_count: number;
   reminders_sent: Record<string, number>;
   pending_reminders?: string[];
@@ -64,6 +63,17 @@ export interface SessionEntry {
   };
   injected_by_source?: Record<string, number>;
   real_usage?: RealUsage;
+  /** Transcript-verified hook activity (2.2). Absent = verification
+   * unavailable (old transcript, format drift, or non-Claude agent); the
+   * self-reported totals are then estimates, not facts. */
+  verified?: {
+    hooks_fired: number;
+    hooks_failed: number;
+    injections_delivered: number;
+    injection_tokens_delivered: number;
+    per_hook: Record<string, { fired: number; failed: number; last_exit: number }>;
+    last_failure?: { hook: string; stderr_head: string };
+  };
 }
 
 export interface LifetimeTotals {
@@ -135,6 +145,25 @@ export function buildSessionTotals(
     // The other side of the scale: what OpenWolf's own context injection cost.
     injection_tokens_estimated: session.injected_tokens_estimated ?? 0,
   };
+}
+
+/**
+ * Position-weighted context cost (2.2). Fresh input is ~0.004% of a session's
+ * input-side tokens; the real cost of a byte is that it sits in the cached
+ * prefix and is re-read at the cache-read rate on EVERY subsequent API call:
+ *   cost = tokens x (total_calls - call_index) x rate_per_token
+ * A 10k-token read at call 500 of 1,458 costs ~$2.87 (Sonnet-class rates);
+ * the same read at call 1,450 costs ~$0.02. Waste rankings must use this,
+ * not raw token counts.
+ */
+export function positionWeightedCostUsd(
+  tokens: number,
+  callIndex: number,
+  totalCalls: number,
+  cacheReadUsdPerMTok: number
+): number {
+  const remaining = Math.max(0, totalCalls - callIndex);
+  return (tokens * remaining * cacheReadUsdPerMTok) / 1_000_000;
 }
 
 export function addInto(target: Record<string, number>, key: string, value: number | undefined): void {
