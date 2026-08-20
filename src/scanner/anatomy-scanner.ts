@@ -59,7 +59,13 @@ const NOISE_BASENAMES = new Set([
   ".ds_store", "thumbs.db", ".phpunit.result.cache", ".eslintcache", ".tsbuildinfo",
 ]);
 const NOISE_SUFFIXES = [".min.js", ".min.css", ".map", ".cache", ".tsbuildinfo", ".pyc", ".snap"];
-const NOISE_DIRS = new Set(["coverage", ".nyc_output", "__snapshots__", ".pytest_cache", ".mypy_cache", ".ruff_cache"]);
+const NOISE_DIRS = new Set([
+  "coverage", ".nyc_output", "__snapshots__", ".pytest_cache", ".mypy_cache", ".ruff_cache",
+  // Agent config surfaces: steering the model toward its own harness config
+  // via the index is noise (audit: .claude/*.md topped a project's importance
+  // ranking), and the agent already knows these files natively.
+  ".claude", ".codex", ".opencode", ".gemini", ".cursor", ".agents",
+]);
 
 function isNoiseFile(relPath: string): boolean {
   const parts = relPath.split("/");

@@ -4,6 +4,16 @@ All notable changes to OpenWolf are documented here. The format follows
 [Keep a Changelog](https://keepachangelog.com/), and OpenWolf uses
 [Semantic Versioning](https://semver.org/).
 
+## [2.4.1] - 2026-08-21
+
+### Fixed
+
+- The anatomy scanner no longer indexes agent-config directories (.claude,
+  .codex, .opencode, .gemini, .cursor): steering the model toward its own
+  harness config through the index is noise, and those files topped the
+  importance ranking in real projects. Found during the 2.4.0 pre-publish
+  end-to-end test of the Claude and Codex paths.
+
 ## [2.4.0] - 2026-08-20
 
 Context quality and large repos: the last two phases of the evidence-based
