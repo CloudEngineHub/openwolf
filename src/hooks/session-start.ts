@@ -1,6 +1,6 @@
 import * as fs from "node:fs";
 import * as path from "node:path";
-import { getWolfDir, ensureWolfDir, writeJSON, appendMarkdown, readJSON, timestamp, timeShort, estimateTokens, readStdin, detectAgent, recordInjectionToSessionFile, getProjectDir, hookMain, getSessionFilePath, gcSessionFiles } from "./shared.js";
+import { getWolfDir, ensureWolfDir, writeJSON, appendMarkdown, readJSON, readBugLogFile, timestamp, timeShort, estimateTokens, readStdin, detectAgent, recordInjectionToSessionFile, getProjectDir, hookMain, getSessionFilePath, gcSessionFiles } from "./shared.js";
 import { loadStore } from "./anatomy-store.js";
 import { topRules, scopedRulesForFiles } from "./rule-reinjection.js";
 
@@ -145,7 +145,7 @@ function buildSessionDigest(wolfDir: string, budget: number): string {
       let desc = fallback;
       let extra = "";
       if (file === "buglog.json") {
-        const bugs = readJSON<{ bugs: unknown[] }>(p, { bugs: [] }).bugs.length;
+        const bugs = readBugLogFile(wolfDir).bugs.length;
         if (bugs === 0) continue;
         extra = `, ${bugs} bugs`;
       } else if (file.endsWith(".md")) {
@@ -266,9 +266,7 @@ async function main(): Promise<void> {
   } catch {}
 
   try {
-    const buglogPath = path.join(wolfDir, "buglog.json");
-    const buglog = readJSON<{ bugs: unknown[] }>(buglogPath, { bugs: [] });
-    if (buglog.bugs.length === 0) {
+    if (readBugLogFile(wolfDir).bugs.length === 0) {
       startupNotes.push(
         `buglog.json is empty. If you encounter or fix any bugs, errors, or failed tests this session, log them to .wolf/buglog.json.`
       );

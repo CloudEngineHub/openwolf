@@ -18,7 +18,7 @@ import { ensureDir } from "../utils/paths.js";
 import { resolveAgents, availableAgents } from "../agents/index.js";
 import { newStore, importFromMarkdown, saveStore, STORE_FILE, sha256 as storeSha256 } from "../hooks/anatomy-store.js";
 import { installSkills } from "../agents/skills.js";
-import { HOOK_SETTINGS, HOOK_FILES } from "./hook-manifest.js";
+import { buildHookSettings, HOOK_FILES, HOOK_ENTRY_FILES, HOOK_COUNT, type HookSettings } from "./hook-manifest.js";
 import { emptyLedger, recomputeLifetime, migrateLegacyBlockedCounts, type LedgerData } from "../hooks/ledger.js";
 import { mergeConfigDefaults } from "./config-merge.js";
 import { syncCerebrumToClaudeMemory, syncClaudeMemoryIndexToCerebrum } from "./memory-migrate.js";
@@ -55,7 +55,6 @@ const USER_DATA_FILES = [
   "config.json",
   "identity.md", "cerebrum.md", "memory.md", "anatomy.md", "anatomy-index.json", "STATUS.md",
   "token-ledger.json", "buglog.json", "cron-manifest.json", "cron-state.json",
-  "suggestions.json",
 ];
 
 // Files to include in backup
@@ -220,12 +219,13 @@ async function updateProject(
     const claudeDir = path.join(root, ".claude");
     ensureDir(claudeDir);
     const settingsPath = path.join(claudeDir, "settings.json");
+    const hookSettings = buildHookSettings(root);
     if (fs.existsSync(settingsPath)) {
       const existing = readJSON<Record<string, unknown>>(settingsPath, {});
-      const merged = replaceOpenWolfHooks(existing, HOOK_SETTINGS);
+      const merged = replaceOpenWolfHooks(existing, hookSettings);
       writeJSON(settingsPath, merged);
     } else {
-      writeJSON(settingsPath, HOOK_SETTINGS);
+      writeJSON(settingsPath, hookSettings);
     }
     console.log(`    ✓ Claude settings updated`);
 
@@ -535,15 +535,14 @@ function removeDeadWeight(wolfDir: string, templatesDir: string): string[] {
     }
   } catch {}
 
-  // suggestions.json: delete the empty stub (daemon recreates on first real write).
+  // suggestions.json: retired in 2.5. Nothing writes it now that OpenWolf
+  // makes no model calls, and nothing reads it now that the Insights panel
+  // is gone, so a leftover file is pure noise in the project directory.
   try {
     const p = path.join(wolfDir, "suggestions.json");
     if (fs.existsSync(p)) {
-      const parsed = JSON.parse(readText(p) || "null");
-      if (parsed && Array.isArray(parsed.suggestions) && parsed.suggestions.length === 0 && !parsed.generated_at) {
-        fs.unlinkSync(p);
-        actions.push("Removed empty suggestions.json stub (recreated on first real suggestion)");
-      }
+      fs.unlinkSync(p);
+      actions.push("Removed suggestions.json (AI suggestions retired; OpenWolf makes no model calls)");
     }
   } catch {}
 
@@ -616,15 +615,7 @@ function verifyHookInstall(wolfDir: string): string[] {
   if (errors.length > 0) return errors;
 
   // Entry-point hooks (the ones settings.json actually invokes).
-  const entryFiles = new Set<string>();
-  for (const matchers of Object.values(HOOK_SETTINGS.hooks)) {
-    for (const m of matchers) {
-      for (const h of m.hooks) {
-        const match = h.command.match(/\.wolf\/hooks\/([\w.-]+\.js)/);
-        if (match) entryFiles.add(match[1]);
-      }
-    }
-  }
+  const entryFiles = new Set<string>(HOOK_ENTRY_FILES);
   for (const file of entryFiles) {
     try {
       execFileSync(process.execPath, [path.join(hooksDir, file), "--selfcheck"], {
@@ -726,7 +717,7 @@ function copyHookScripts(wolfDir: string): void {
 
 function replaceOpenWolfHooks(
   existing: Record<string, unknown>,
-  hookSettings: typeof HOOK_SETTINGS
+  hookSettings: HookSettings
 ): Record<string, unknown> {
   const merged = { ...existing };
   if (!merged.hooks) merged.hooks = {};
@@ -735,10 +726,13 @@ function replaceOpenWolfHooks(
   for (const [event, newMatchers] of Object.entries(hookSettings.hooks)) {
     if (!hooks[event]) hooks[event] = [];
 
-    // Remove existing OpenWolf hook entries
+    // Remove existing OpenWolf hook entries. Backslashes are normalised first:
+    // Windows users who hand-patched settings.json around the broken
+    // %CLAUDE_PROJECT_DIR% commands wrote native paths, and those would
+    // otherwise survive the filter and run twice alongside the new entries.
     hooks[event] = hooks[event].filter((entry) => {
       const isOpenWolfHook = entry.hooks?.some(
-        (h) => h.command && h.command.includes(".wolf/hooks/")
+        (h) => h.command && h.command.replace(/\\/g, "/").includes(".wolf/hooks/")
       );
       return !isOpenWolfHook;
     });

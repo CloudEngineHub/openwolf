@@ -1,15 +1,36 @@
 import * as fs from "node:fs";
 import * as path from "node:path";
 import * as crypto from "node:crypto";
+import { fileURLToPath } from "node:url";
 
 // Prefer the harness-provided project dir so hooks work even if CWD changes
 // during a session. Each supported agent exposes its own env var; hooks are
 // provider-agnostic (Workstream C) so all are checked.
+//
+// None of those vars are guaranteed. Claude Code in particular does not put
+// CLAUDE_PROJECT_DIR in the hook process's environment on any platform: it
+// delivers project context through the stdin JSON payload instead. So before
+// falling back to CWD, derive the root from this script's own location. A hook
+// always runs as <project>/.wolf/hooks/<name>.js, which makes the project root
+// two directories up, verified by the .wolf/ directory being there.
+function projectDirFromScriptLocation(): string | null {
+  try {
+    const here = path.dirname(fileURLToPath(import.meta.url));
+    if (path.basename(here) !== "hooks") return null;
+    const root = path.resolve(here, "..", "..");
+    if (path.basename(path.dirname(here)) !== ".wolf") return null;
+    return fs.existsSync(path.join(root, ".wolf")) ? root : null;
+  } catch {
+    return null;
+  }
+}
+
 export function getProjectDir(): string {
   return (
     process.env.CLAUDE_PROJECT_DIR ||
     process.env.CODEX_PROJECT_ROOT ||
     process.env.OPENWOLF_PROJECT_ROOT ||
+    projectDirFromScriptLocation() ||
     process.cwd()
   );
 }
@@ -20,8 +41,12 @@ export function getWolfDir(): string {
 
 /** Which agent harness invoked this hook — used for per-agent ledger attribution. */
 export function detectAgent(): string {
-  if (process.env.CLAUDE_PROJECT_DIR) return "claude";
-  if (process.env.CODEX_PROJECT_ROOT) return "codex";
+  // CLAUDECODE is set in every Claude Code hook process; CLAUDE_PROJECT_DIR is
+  // not set at all, so checking it alone attributed real Claude sessions to
+  // "default" and lost their per-agent ledger rows.
+  if (process.env.CLAUDECODE || process.env.CLAUDE_CODE_ENTRYPOINT || process.env.CLAUDE_PROJECT_DIR) return "claude";
+  if (process.env.CODEX_PROJECT_ROOT || process.env.CODEX_SANDBOX) return "codex";
+  if (process.env.OPENCODE || process.env.OPENCODE_PROJECT_ROOT) return "opencode";
   return "default";
 }
 
@@ -130,6 +155,23 @@ export function readJSON<T = unknown>(filePath: string, fallback: T): T {
   } catch {
     return fallback;
   }
+}
+
+/**
+ * Reads .wolf/buglog.json in any shape a project might have on disk and always
+ * returns { version, bugs }. A hand-written log is often a bare array of
+ * entries; that shape used to reach `bugLog.bugs.length` and throw, which is
+ * how pre-write racked up 465 consecutive failures on one project before
+ * anyone noticed (the hook heartbeat was the only witness).
+ */
+export function readBugLogFile(wolfDir: string): { version: number; bugs: any[] } {
+  const raw = readJSON<unknown>(path.join(wolfDir, "buglog.json"), null);
+  if (Array.isArray(raw)) return { version: 1, bugs: raw };
+  if (raw && typeof raw === "object") {
+    const bugs = (raw as { bugs?: unknown }).bugs;
+    if (Array.isArray(bugs)) return { ...(raw as object), version: 1, bugs } as { version: number; bugs: any[] };
+  }
+  return { version: 1, bugs: [] };
 }
 
 export function writeJSON(filePath: string, data: unknown): void {

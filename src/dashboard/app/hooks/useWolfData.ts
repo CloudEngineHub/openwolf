@@ -55,6 +55,12 @@ interface TokenLedger {
     real_cache_creation_tokens?: number;
     real_api_calls?: number;
   };
+  /** Lifetime per-key rollups (2.5): governor deltas per command family and
+   * measured usage per model. Both survive session trimming. */
+  lifetime_maps?: {
+    bash_governed_by_family?: Record<string, { calls: number; original_tokens: number; entered_tokens: number }>;
+    real_by_model?: Record<string, { input_tokens: number; output_tokens: number; cache_read_input_tokens: number; cache_creation_input_tokens: number; api_calls: number }>;
+  };
   sessions: LedgerSession[];
   waste_flags: any[];
   /** Project-wide transcript scan written by the daemon (J1 ground truth). */
@@ -131,7 +137,6 @@ export interface WolfData {
   cronState: CronState;
   cronManifest: CronManifest;
   buglog: BugLog;
-  suggestions: any;
   health: Health;
   identity: { name: string; role: string };
   project: ProjectMeta;
@@ -154,7 +159,6 @@ export function useWolfData(): WolfData {
   const [cronState, setCronState] = useState<CronState>({ engine_status: "unknown", last_heartbeat: null, execution_log: [], dead_letter_queue: [] });
   const [cronManifest, setCronManifest] = useState<CronManifest>({ tasks: [] });
   const [buglog, setBuglog] = useState<BugLog>({ bugs: [] });
-  const [suggestions, setSuggestions] = useState<any>(null);
   const [health, setHealth] = useState<Health>({ status: "unknown", uptime_seconds: 0 });
   const [identity, setIdentity] = useState({ name: "Wolf", role: "AI development assistant" });
   const [project, setProject] = useState<ProjectMeta>({ name: "", description: "", root: "" });
@@ -207,10 +211,13 @@ export function useWolfData(): WolfData {
       try { setCronManifest(JSON.parse(files["cron-manifest.json"])); } catch {}
     }
     if (files["buglog.json"]) {
-      try { setBuglog(JSON.parse(files["buglog.json"])); } catch {}
-    }
-    if (files["suggestions.json"]) {
-      try { setSuggestions(JSON.parse(files["suggestions.json"])); } catch {}
+      // A hand-written buglog is often a bare array of entries. Coerce here so
+      // no panel ever sees `bugs` undefined — one malformed state file used to
+      // blank the whole dashboard from ProjectOverview's first render.
+      try {
+        const b = JSON.parse(files["buglog.json"]);
+        setBuglog(Array.isArray(b) ? { bugs: b } : Array.isArray(b?.bugs) ? b : { bugs: [] });
+      } catch {}
     }
     if (files["config.json"]) {
       try {
@@ -287,5 +294,5 @@ export function useWolfData(): WolfData {
     return () => wsClient.disconnect();
   }, [processFiles]);
 
-  return { anatomy, cerebrum, memory, tokenLedger, cronState, cronManifest, buglog, suggestions, health, identity, project, config, contextHealth, hookHealth, statusDoc, scanState, loading, authError, client };
+  return { anatomy, cerebrum, memory, tokenLedger, cronState, cronManifest, buglog, health, identity, project, config, contextHealth, hookHealth, statusDoc, scanState, loading, authError, client };
 }

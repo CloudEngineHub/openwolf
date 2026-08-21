@@ -2,7 +2,7 @@ import * as fs from "node:fs";
 import * as path from "node:path";
 import * as crypto from "node:crypto";
 import {
-  getWolfDir, ensureWolfDir, readJSON, writeJSON, readMarkdown,
+  getWolfDir, ensureWolfDir, readJSON, writeJSON, readBugLogFile, readMarkdown,
   extractDescription, estimateTokens, appendMarkdown, timeShort, readStdin, normalizePath,
   isSensitiveFile, getProjectDir, emitHookJSON, recordInjection, hookMain, getSessionFilePath
 } from "./shared.js";
@@ -366,7 +366,7 @@ function autoDetectBugFix(wolfDir: string, absolutePath: string, projectRoot: st
   if (!bugAutoDetectEnabled(wolfDir)) return;
 
   const bugLogPath = path.join(wolfDir, "buglog.json");
-  const bugLog = readJSON<BugLog>(bugLogPath, { version: 1, bugs: [] });
+  const bugLog = readBugLogFile(wolfDir) as BugLog;
   const relFile = normalizePath(path.relative(projectRoot, absolutePath));
 
   // Detect what kind of fix this is

@@ -1,6 +1,6 @@
 import * as fs from "node:fs";
 import * as path from "node:path";
-import { getWolfDir, ensureWolfDir, readJSON, readMarkdown, readStdin, emitHookJSON, recordInjectionToSessionFile, hookMain, getSessionFilePath } from "./shared.js";
+import { getWolfDir, ensureWolfDir, readJSON, readBugLogFile, readMarkdown, readStdin, emitHookJSON, recordInjectionToSessionFile, hookMain, getSessionFilePath } from "./shared.js";
 import { searchBugsFTS } from "./bug-index.js";
 
 interface BugEntry {
@@ -109,7 +109,7 @@ function checkBugLog(wolfDir: string, filePath: string, oldStr: string, newStr: 
   const bugLogPath = path.join(wolfDir, "buglog.json");
   if (!fs.existsSync(bugLogPath)) return [];
 
-  const bugLog = readJSON<BugLog>(bugLogPath, { version: 1, bugs: [] });
+  const bugLog = readBugLogFile(wolfDir) as BugLog;
   if (bugLog.bugs.length === 0) return [];
 
   const basename = path.basename(filePath);

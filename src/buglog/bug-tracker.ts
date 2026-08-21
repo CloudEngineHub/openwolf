@@ -25,8 +25,19 @@ export function getBugLogPath(wolfDir: string): string {
   return path.join(wolfDir, "buglog.json");
 }
 
+/**
+ * Always returns { version, bugs } whatever shape is on disk. A hand-written
+ * buglog is often a bare array of entries, which readJSON passes through
+ * untouched (deepMergeDefaults only fills plain objects) — that shape reaches
+ * `bugLog.bugs` as undefined and throws in every caller below.
+ */
 export function readBugLog(wolfDir: string): BugLog {
-  return readJSON<BugLog>(getBugLogPath(wolfDir), { version: 1, bugs: [] });
+  const raw = readJSON<unknown>(getBugLogPath(wolfDir), null);
+  if (Array.isArray(raw)) return { version: 1, bugs: raw as BugEntry[] };
+  if (raw && typeof raw === "object" && Array.isArray((raw as BugLog).bugs)) {
+    return { ...(raw as BugLog), version: (raw as BugLog).version ?? 1 };
+  }
+  return { version: 1, bugs: [] };
 }
 
 export function logBug(

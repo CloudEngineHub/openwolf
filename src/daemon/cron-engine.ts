@@ -1,6 +1,6 @@
 import * as fs from "node:fs";
 import * as path from "node:path";
-import { execFileSync, spawn } from "node:child_process";
+import { execFileSync } from "node:child_process";
 import cron from "node-cron";
 import { readJSON, writeJSON, readText, writeText, appendText } from "../utils/fs-safe.js";
 import { scanProject } from "../scanner/anatomy-scanner.js";
@@ -253,9 +253,15 @@ export class CronEngine {
         this.generateTokenReport();
         break;
 
+      // 2.5: OpenWolf makes no model calls of any kind. The old "ai_task"
+      // action shelled out to `claude -p`, which is the one thing that made
+      // "local file I/O only, no API calls" untrue. Tasks of this type are
+      // left in place but refused, so a stale manifest fails loudly instead
+      // of silently reaching the network.
       case "ai_task":
-        await this.runAiTask(action.params as { prompt: string; context_files: string[] });
-        break;
+        throw new Error(
+          "ai_task is no longer supported: OpenWolf makes no model calls. Remove this task from .wolf/cron-manifest.json."
+        );
 
       default:
         throw new Error(`Unknown action type: ${action.type}`);
@@ -399,150 +405,5 @@ export class CronEngine {
     });
   }
 
-  private hasClaude(): boolean {
-    try {
-      execFileSync(process.platform === "win32" ? "where" : "which", ["claude"], { stdio: "ignore" });
-      return true;
-    } catch {
-      return false;
-    }
-  }
-
-  private async runAiTask(params: { prompt: string; context_files: string[] }): Promise<void> {
-    if (!this.hasClaude()) {
-      throw new Error("Claude CLI not found. Install it from https://claude.ai/download or add it to PATH.");
-    }
-
-    const contextParts: string[] = [];
-    const contextFiles = Array.isArray(params.context_files) ? params.context_files : [];
-    for (const file of contextFiles) {
-      if (typeof file !== "string") continue;
-      try {
-        const filePath = this.resolveProjectContextFile(file);
-        contextParts.push(`--- ${file} ---\n${fs.readFileSync(filePath, "utf-8")}`);
-      } catch (err) {
-        const reason = err instanceof Error ? err.message : "not found";
-        contextParts.push(`--- ${file} --- (${reason})`);
-      }
-    }
-
-    const fullPrompt = `${params.prompt}\n\n---\nContext:\n${contextParts.join("\n\n")}`;
-
-    try {
-      // Use spawnSync to pipe prompt via stdin — avoids command-line length limits on Windows
-      // claude -p (no argument) reads prompt from stdin
-      // Strip ANTHROPIC_API_KEY so claude uses OAuth subscription credentials
-      // instead of a potentially depleted API key
-      const env = { ...process.env };
-      delete env.ANTHROPIC_API_KEY;
-
-      const claudeBin = process.platform === "win32" ? "claude.cmd" : "claude";
-      // Async spawn: spawnSync froze the daemon's whole event loop (HTTP API,
-      // websockets, heartbeat, other cron tasks) for up to 2 minutes per task.
-      const proc = await runClaudeAsync(claudeBin, ["-p", "--output-format", "text"], fullPrompt, {
-        timeout: 120000,
-        cwd: this.projectRoot,
-        env,
-      });
-
-      if (proc.error) {
-        throw proc.error;
-      }
-
-      if (proc.status !== 0) {
-        const stderr = proc.stderr?.trim();
-        const stdout = proc.stdout?.trim();
-        const errMsg = stderr || stdout || "Unknown error";
-        throw new Error(`Exit code ${proc.status}: ${errMsg}`);
-      }
-
-      let result = (proc.stdout || "").replace(/\r\n/g, "\n").trim();
-
-      // Strip markdown code fences if present (```markdown ... ``` or ```json ... ```)
-      const fenceMatch = result.match(/```[\w]*\n([\s\S]*?)\n```/);
-      if (fenceMatch) {
-        result = fenceMatch[1].trim();
-      }
-
-      // Write result to suggestions.json if it looks like JSON
-      try {
-        const parsed = JSON.parse(result);
-        writeJSON(path.join(this.wolfDir, "suggestions.json"), {
-          generated_at: new Date().toISOString(),
-          ...parsed,
-        });
-      } catch {
-        // Not JSON, might be a cerebrum update
-        if (result.includes("## User Preferences") || result.includes("## Key Learnings") || result.includes("# Cerebrum")) {
-          writeText(path.join(this.wolfDir, "cerebrum.md"), result);
-        }
-      }
-    } catch (err) {
-      throw new Error(`claude -p failed: ${err instanceof Error ? err.message : String(err)}`);
-    }
-  }
-
-  private resolveProjectContextFile(file: string): string {
-    if (file.includes("\0")) {
-      throw new Error("invalid path");
-    }
-
-    const root = fs.realpathSync(this.projectRoot);
-    const requested = path.resolve(this.projectRoot, file);
-    const resolved = fs.realpathSync(requested);
-    const relative = path.relative(root, resolved);
-
-    if (relative.startsWith("..") || path.isAbsolute(relative)) {
-      throw new Error("outside project root");
-    }
-
-    return resolved;
-  }
 }
 
-/**
- * Async replacement for spawnSync with the same result shape the caller
- * checks (error/status/stdout/stderr). Pipes the prompt via stdin to avoid
- * command-line length limits on Windows.
- */
-function runClaudeAsync(
-  bin: string,
-  args: string[],
-  input: string,
-  opts: { timeout: number; cwd: string; env: NodeJS.ProcessEnv }
-): Promise<{ error?: Error; status: number | null; stdout: string; stderr: string }> {
-  return new Promise((resolve) => {
-    const child = spawn(bin, args, {
-      cwd: opts.cwd,
-      env: opts.env,
-      stdio: ["pipe", "pipe", "pipe"],
-      windowsHide: true,
-    });
-    let stdout = "";
-    let stderr = "";
-    let settled = false;
-    const timer = setTimeout(() => {
-      if (settled) return;
-      settled = true;
-      try { child.kill("SIGKILL"); } catch {}
-      resolve({ error: new Error(`Timed out after ${opts.timeout}ms`), status: null, stdout, stderr });
-    }, opts.timeout);
-
-    child.stdout.on("data", (d) => { stdout += String(d); });
-    child.stderr.on("data", (d) => { stderr += String(d); });
-    child.on("error", (err) => {
-      if (settled) return;
-      settled = true;
-      clearTimeout(timer);
-      resolve({ error: err, status: null, stdout, stderr });
-    });
-    child.on("close", (code) => {
-      if (settled) return;
-      settled = true;
-      clearTimeout(timer);
-      resolve({ status: code, stdout, stderr });
-    });
-    child.stdin.on("error", () => {});
-    child.stdin.end(input);
-  });
-}

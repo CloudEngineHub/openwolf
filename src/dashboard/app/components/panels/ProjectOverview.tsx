@@ -1,6 +1,8 @@
 import React from "react";
 import { StatusBadge } from "../shared/StatusBadge.js";
 import { StatTile } from "../shared/StatTile.js";
+import { costOfProject, formatUsd } from "../../lib/pricing.js";
+import type { ModelUsage } from "../../lib/pricing.js";
 import { DotBar, type DotBarDatum } from "../shared/DotBar.js";
 import { formatTokens } from "../../lib/utils.js";
 import type { WolfData } from "../../hooks/useWolfData.js";
@@ -61,6 +63,12 @@ export function ProjectOverview({ data }: { data: WolfData }) {
     : null;
   const phase = nextPhase(statusDoc);
 
+  // What this project's measured usage is worth at list price. Prefer the
+  // daemon's whole-project scan; the per-session rollup is there from day one.
+  const perModel = (tokenLedger.measured_project?.by_model ??
+    tokenLedger.lifetime_maps?.real_by_model) as Record<string, ModelUsage> | undefined;
+  const cost = costOfProject(perModel);
+
   return (
     <div className="space-y-4">
       {/* Header row */}
@@ -95,6 +103,11 @@ export function ProjectOverview({ data }: { data: WolfData }) {
                 governedSaved > 0 ? `${formatTokens(governedSaved)} bash output governed (${fmt(lt.bash_governed_calls)} calls)` : "",
                 denyOn && lt.estimated_savings_vs_bare_cli > 0 ? `${formatTokens(lt.estimated_savings_vs_bare_cli)} denied re-reads` : "",
               ].filter(Boolean).join(" · ");
+              // The hero number is meaningless to anyone not reading a ledger
+              // unless it says what it means. One sentence, plain words, and
+              // the denominator so the figure can be sized.
+              const governedOriginal = lt.bash_governed_original_tokens ?? 0;
+              const sharePct = governedOriginal > 0 ? Math.round((governedSaved / governedOriginal) * 100) : null;
               return (
                 <StatTile
                   label="tokens kept out of context · measured"
@@ -102,7 +115,15 @@ export function ProjectOverview({ data }: { data: WolfData }) {
                   sub={parts || "measured at the rewrite point"}
                   variant="inverted"
                   size="xl"
-                />
+                >
+                  <p className="text-sm mt-4 leading-relaxed"
+                    style={{ color: "color-mix(in srgb, var(--invert-text) 70%, transparent)" }}>
+                    Text your agent never had to carry, and never had to pay for again on every
+                    later message.
+                    {sharePct !== null && ` That is ${sharePct}% of ${formatTokens(governedOriginal)} of command output.`}
+                    {" "}The full text is still on disk.
+                  </p>
+                </StatTile>
               );
             }
             return (
@@ -156,15 +177,41 @@ export function ProjectOverview({ data }: { data: WolfData }) {
 
       {/* Stat row */}
       <div className="grid grid-cols-2 md:grid-cols-4 xl:grid-cols-6 gap-4">
-        <StatTile label="sessions" value={fmt(lt.total_sessions)} size="md" />
+        <StatTile
+          label="usage worth · list price"
+          value={cost.priced ? formatUsd(cost.total) : "—"}
+          sub={cost.priced ? `${fmt(lt.real_api_calls)} api calls` : "fills in as sessions end"}
+          size="md"
+        />
         <StatTile label="files tracked" value={fmt(anatomy.metadata.files)} size="md" />
-        <StatTile label="reads / writes" value={`${fmt(lt.total_reads)}·${fmt(lt.total_writes)}`} size="md" />
+        {/* Reads and writes glued with a dot said nothing. The ratio is the
+            signal: an agent writing far more than it reads is working from the
+            index instead of re-reading the tree, which is the point. */}
+        <StatTile
+          label="edits per file read"
+          value={lt.total_reads > 0 ? `${(lt.total_writes / lt.total_reads).toFixed(1)}x` : fmt(lt.total_writes)}
+          sub={`${fmt(lt.total_writes)} edits · ${fmt(lt.total_reads)} reads`}
+          size="md"
+        />
         {denyOn ? (
           <StatTile label="re-reads denied" value={fmt(lt.repeated_reads_blocked)} size="md" />
         ) : (
-          <StatTile label="re-read warnings" value={fmt(lt.repeated_reads_warned)} size="md" />
+          <StatTile
+            label="re-read warnings"
+            value={fmt(lt.repeated_reads_warned)}
+            sub={(lt.repeated_reads_warned ?? 0) > 0 ? "warned, not blocked" : undefined}
+            size="md"
+          />
         )}
-        <StatTile label="anatomy hit rate" value={hitRate !== null ? `${hitRate}%` : "—"} size="md" />
+        {/* A low hit rate means the agent is reading files the index cannot
+            describe, which is the single most actionable number here. */}
+        <StatTile
+          label="anatomy hit rate"
+          value={hitRate !== null ? `${hitRate}%` : "—"}
+          accent={hitRate !== null && hitRate < 30}
+          sub={hitRate !== null && hitRate < 30 ? "low · agent is not using openwolf find" : undefined}
+          size="md"
+        />
         <StatTile
           label="bugs on file"
           value={fmt(buglog.bugs.length)}

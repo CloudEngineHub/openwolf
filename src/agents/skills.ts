@@ -32,6 +32,10 @@ export function installSkills(projectRoot: string, templatesDir: string, agents:
   }
 
   const actions: string[] = [];
+  // One line for all agents rather than one per agent: the skill set is
+  // identical everywhere, and four near-identical lines pushed the useful
+  // part of `openwolf init` off the top of the screen.
+  const skillsInstalledFor: string[] = [];
   for (const { agent, dir } of destinations) {
     fs.mkdirSync(dir, { recursive: true });
     let installed = 0;
@@ -55,11 +59,17 @@ export function installSkills(projectRoot: string, templatesDir: string, agents:
       installed++;
     }
     if (installed > 0) {
-      actions.push(`Skills installed for ${agent}: ${SKILLS.map((s) => `/${s}`).join(", ")}`);
+      skillsInstalledFor.push(agent);
     }
     if (skipped.length > 0) {
       actions.push(`Skills left untouched for ${agent} (customized): ${skipped.join(", ")} (delete the file to get the updated template)`);
     }
+  }
+
+  if (skillsInstalledFor.length > 0) {
+    actions.push(
+      `Skills installed: ${SKILLS.map((sk) => `/${sk}`).join(", ")} (${skillsInstalledFor.join(", ")})`
+    );
   }
 
   // Claude Code skills: same never-clobber-customized contract.

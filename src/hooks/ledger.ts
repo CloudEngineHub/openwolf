@@ -7,6 +7,8 @@ import {
   buildSessionTotals,
   numericFields,
   foldEntry,
+  foldEntryMaps,
+  emptyMaps,
   recomputeLifetime,
   type SessionData,
   type SessionEntry,
@@ -88,6 +90,12 @@ export function flushSessionToLedger(wolfDir: string, entry: SessionEntry): void
       const baseline = numericFields(ledger.lifetime_baseline);
       foldEntry(baseline, oldest);
       ledger.lifetime_baseline = baseline;
+      // The per-family and per-model rollups have to be folded off separately:
+      // numericFields() keeps scalars only, so a map left in lifetime_baseline
+      // would be silently dropped the first time a session rolled off.
+      const baselineMaps = ledger.lifetime_baseline_maps ?? emptyMaps();
+      foldEntryMaps(baselineMaps, oldest);
+      ledger.lifetime_baseline_maps = baselineMaps;
     }
 
     recomputeLifetime(ledger);

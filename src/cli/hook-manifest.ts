@@ -2,40 +2,77 @@
 // registered in Claude Code settings. init.ts and update.ts both consume this
 // so the two can never drift (they used to carry hand-mirrored copies).
 
-// Use the CLAUDE_PROJECT_DIR env var so hooks resolve correctly even if CWD
-// changes during a session. The expansion syntax is platform-specific:
-// $VAR never expands under cmd.exe, which silently disabled all hooks for
-// Windows installs. Settings are generated per machine at init/update time,
-// so baking in the local platform's syntax is safe.
-const PROJECT_DIR_VAR = process.platform === "win32" ? "%CLAUDE_PROJECT_DIR%" : "$CLAUDE_PROJECT_DIR";
-const cmd = (file: string, timeout: number) => ({
+// The hook command carries the project's absolute path, baked in at
+// init/update time. It used to reference $CLAUDE_PROJECT_DIR (and
+// %CLAUDE_PROJECT_DIR% on Windows), which fails twice over:
+//
+//   1. %VAR% is cmd.exe syntax. PowerShell is Claude Code's shell on Windows
+//      and passes it through as a literal, so node looked for a file named
+//      "%CLAUDE_PROJECT_DIR%\.wolf\hooks\stop.js" and every hook died with
+//      MODULE_NOT_FOUND on every tool call.
+//   2. CLAUDE_PROJECT_DIR is not in the hook process's environment at all.
+//      Claude Code passes project context through the stdin JSON payload, not
+//      the env, so no variable syntax could have worked. Reported by
+//      @aevnar (issue: "Windows hooks still broken on PowerShell").
+//
+// An absolute path needs no expansion, so it behaves identically under bash,
+// zsh, cmd.exe and PowerShell, and it survives a CWD change mid-session.
+// Forward slashes are used on every platform: node accepts them on Windows,
+// and they keep the command free of backslash escaping inside JSON.
+const cmd = (projectDir: string, file: string, timeout: number) => ({
   type: "command" as const,
-  command: `node "${PROJECT_DIR_VAR}/.wolf/hooks/${file}"`,
+  command: `node "${projectDir.replace(/\\/g, "/").replace(/\/+$/, "")}/.wolf/hooks/${file}"`,
   timeout,
 });
 
-export const HOOK_SETTINGS = {
-  hooks: {
-    SessionStart: [{ matcher: "", hooks: [cmd("session-start.js", 5)] }],
-    UserPromptSubmit: [{ matcher: "", hooks: [cmd("user-prompt-submit.js", 5)] }],
-    PreToolUse: [
-      { matcher: "Read", hooks: [cmd("pre-read.js", 5)] },
-      { matcher: "Write|Edit|MultiEdit", hooks: [cmd("pre-write.js", 5)] },
-      { matcher: "Bash", hooks: [cmd("pre-bash.js", 5)] },
-    ],
-    PostToolUse: [
-      { matcher: "Read", hooks: [cmd("post-read.js", 5)] },
-      { matcher: "Write|Edit|MultiEdit", hooks: [cmd("post-write.js", 10)] },
-      { matcher: "Bash", hooks: [cmd("post-bash.js", 10)] },
-    ],
-    PostToolBatch: [{ matcher: "", hooks: [cmd("post-batch.js", 5)] }],
-    PreCompact: [{ matcher: "", hooks: [cmd("precompact.js", 5)] }],
-    Stop: [{ matcher: "", hooks: [cmd("stop.js", 10)] }],
-    SessionEnd: [{ matcher: "", hooks: [cmd("session-end.js", 10)] }],
-  },
-};
+/**
+ * Build the settings.json hook block for one project.
+ * `projectDir` must be an absolute path; it is written into every command.
+ */
+export function buildHookSettings(projectDir: string) {
+  const c = (file: string, timeout: number) => cmd(projectDir, file, timeout);
+  return {
+    hooks: {
+      SessionStart: [{ matcher: "", hooks: [c("session-start.js", 5)] }],
+      UserPromptSubmit: [{ matcher: "", hooks: [c("user-prompt-submit.js", 5)] }],
+      PreToolUse: [
+        { matcher: "Read", hooks: [c("pre-read.js", 5)] },
+        { matcher: "Write|Edit|MultiEdit", hooks: [c("pre-write.js", 5)] },
+        { matcher: "Bash", hooks: [c("pre-bash.js", 5)] },
+      ],
+      PostToolUse: [
+        { matcher: "Read", hooks: [c("post-read.js", 5)] },
+        { matcher: "Write|Edit|MultiEdit", hooks: [c("post-write.js", 10)] },
+        { matcher: "Bash", hooks: [c("post-bash.js", 10)] },
+      ],
+      PostToolBatch: [{ matcher: "", hooks: [c("post-batch.js", 5)] }],
+      PreCompact: [{ matcher: "", hooks: [c("precompact.js", 5)] }],
+      Stop: [{ matcher: "", hooks: [c("stop.js", 10)] }],
+      SessionEnd: [{ matcher: "", hooks: [c("session-end.js", 10)] }],
+    },
+  };
+}
 
-export type HookSettings = typeof HOOK_SETTINGS;
+/** Entry-point scripts settings.json invokes, in registration order. */
+export const HOOK_ENTRY_FILES = [
+  "session-start.js",
+  "user-prompt-submit.js",
+  "pre-read.js",
+  "pre-write.js",
+  "pre-bash.js",
+  "post-read.js",
+  "post-write.js",
+  "post-bash.js",
+  "post-batch.js",
+  "precompact.js",
+  "stop.js",
+  "session-end.js",
+];
+
+/** How many hooks `init` and `update` report as registered. */
+export const HOOK_COUNT = HOOK_ENTRY_FILES.length;
+
+export type HookSettings = ReturnType<typeof buildHookSettings>;
 
 /** Compiled hook scripts installed into <project>/.wolf/hooks/. */
 export const HOOK_FILES = [

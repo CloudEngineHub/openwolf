@@ -171,12 +171,6 @@ app.get("/api/files", (_req, res) => {
       files[file] = "";
     }
   }
-  // Also try suggestions.json
-  try {
-    files["suggestions.json"] = fs.readFileSync(path.join(wolfDir, "suggestions.json"), "utf-8");
-  } catch {
-    files["suggestions.json"] = "";
-  }
   res.json(files);
 });
 

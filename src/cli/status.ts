@@ -17,8 +17,11 @@ export async function statusCommand(): Promise<void> {
   console.log("===============\n");
 
   // File integrity check
+  // identity.md is deliberately absent: `openwolf update` deletes it as dead
+  // weight (untouched in 16/16 audited projects), so listing it here made
+  // status report a missing file on every project the product itself cleaned.
   const requiredFiles = [
-    "OPENWOLF.md", "identity.md", "cerebrum.md", "memory.md",
+    "OPENWOLF.md", "cerebrum.md", "memory.md",
     "anatomy.md", "config.json", "token-ledger.json", "buglog.json",
     "cron-manifest.json", "cron-state.json",
   ];

@@ -4,6 +4,89 @@ All notable changes to OpenWolf are documented here. The format follows
 [Keep a Changelog](https://keepachangelog.com/), and OpenWolf uses
 [Semantic Versioning](https://semver.org/).
 
+## [2.5.0] - 2026-08-22
+
+Positioning, and the removal of the last thing that made "no API calls"
+untrue.
+
+### Added
+
+- **Cost.** The dashboard prices measured usage at Anthropic's published
+  rates, per model, split into cache reads, output, cache writes and fresh
+  input. On one real 277-call project that is $84, of which 67% is cache
+  reads: a number that was previously visible only as "102.3M" with no way to
+  size it. Labelled as list price throughout, because a subscription user is
+  not billed per token.
+- **Overhead as a ratio.** "1.4K injected" now reads "1.6% of what it kept
+  out", which is the claim the footnote on openwolf.com already makes.
+- **Governor breakdown by command family.** The classifier always knew the
+  family at the rewrite point, but the rollup threw it away and kept only
+  scalars. Sessions now carry `bash_governed_by_family`, folded into a
+  lifetime map that survives session trimming, so the dashboard can answer
+  which families are paying off and which are set to suggest.
+- **A plain-language panel.** Not everyone using OpenWolf reads ledgers. One
+  paragraph states how many tokens were kept out of context, what that would
+  have cost at the ceiling, what OpenWolf spent doing it, and the net.
+
+### Changed
+
+- Reads and writes were two numbers glued with a dot; they are now "edits per
+  file read", with the raw counts underneath.
+- A sub-30% anatomy hit rate is called out in the accent colour instead of
+  sitting in a neutral tile: it is the most actionable number on the page.
+- The "saved · denied re-reads" tile no longer renders a dead "n/a" in warn
+  mode. Warn mode says what it caught and how to switch to deny.
+
+### Removed
+
+- **AI suggestions and every other model call.** The `ai_task` cron action
+  shelled out to `claude -p` for two weekly tasks (cerebrum reflection and
+  project suggestions). It was the only path in OpenWolf that reached a
+  model, and it contradicted the one claim the whole project rests on. Gone,
+  along with the Insights dashboard panel, `suggestions.json`, and the
+  `cron.use_claude_p` / `cron.api_key_env` settings. `openwolf update`
+  deletes the leftover file; a stale manifest entry now fails loudly instead
+  of silently reaching the network.
+
+### Fixed
+
+- **Windows hooks, properly this time.** 2.0.4 swapped `$CLAUDE_PROJECT_DIR`
+  for `%CLAUDE_PROJECT_DIR%` on Windows, which fixed nothing: PowerShell is
+  Claude Code's shell there and has no `%VAR%` expansion, and the variable is
+  not in the hook environment on any platform to begin with (project context
+  arrives through the stdin JSON payload). Every hook died with
+  MODULE_NOT_FOUND on every tool call. Hook commands now carry the resolved
+  absolute path, so no shell expansion is involved at all. Hooks also derive
+  the project root from their own location when no environment variable is
+  set. Reported in detail by [@aevnar](https://github.com/aevnar).
+- **A malformed buglog no longer takes anything down.** A `.wolf/buglog.json`
+  written as a bare array of entries (the natural shape when an agent writes
+  the file by hand) reached `bugs.length` unguarded. In one real project the
+  pre-write hook failed on 465 consecutive invocations with nothing but the
+  heartbeat noticing, `openwolf bug search` threw, the SessionStart file
+  index was silently dropped, and the dashboard rendered a blank page. Both
+  shapes are now normalised at the boundary, in the hooks, the CLI, and the
+  dashboard loader.
+- Dashboard panels render inside an error boundary: one malformed state file
+  degrades a single panel instead of blanking the page.
+- `detectAgent()` recognises Claude Code by `CLAUDECODE`, which is actually
+  set, instead of `CLAUDE_PROJECT_DIR`, which is not. Sessions were being
+  attributed to "default" and losing their per-agent ledger rows.
+- `openwolf update` now also removes hand-patched hook entries written with
+  native Windows path separators, which previously survived the filter and
+  ran alongside the new ones.
+
+### Changed
+
+- New positioning across the README, openwolf.com, the npm package and the
+  GitHub description: portable project memory across agents, plus measured
+  token accounting. "Second brain" is retired.
+- `openwolf init` prints a banner and a scannable summary instead of a wall
+  of checkmarks, names whichever agents it actually wired rather than telling
+  every user to run `claude`, and reports the real hook count.
+- Hook count corrected to 12 everywhere. The docs said 10 while documenting
+  12.
+
 ## [2.4.1] - 2026-08-21
 
 ### Fixed

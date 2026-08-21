@@ -11,7 +11,7 @@ import { registerProject, getRegisteredProjects } from "./registry.js";
 import { resolveAgents, detectInstalledAgents } from "../agents/index.js";
 import { installSkills } from "../agents/skills.js";
 import { newStore, importFromMarkdown, saveStore, loadStore, STORE_FILE, sha256 as storeSha256 } from "../hooks/anatomy-store.js";
-import { HOOK_SETTINGS, HOOK_FILES } from "./hook-manifest.js";
+import { buildHookSettings, HOOK_FILES, HOOK_COUNT, type HookSettings } from "./hook-manifest.js";
 import { mergeConfigDefaults } from "./config-merge.js";
 import { syncCerebrumToClaudeMemory } from "./memory-migrate.js";
 import { ensureWolfGitignore } from "./update.js";
@@ -39,8 +39,9 @@ function getVersion(): string {
 // 2.2 kill list: reframe-frameworks.md (31KB, referenced once across 2,256
 // measured commands), identity.md (untouched in 16/16 projects), and empty
 // suggestions.json stubs are no longer shipped into projects. reframe stays
-// available through the /reframe skill; suggestions.json is created lazily by
-// the daemon on first real write.
+// available through the /reframe skill. As of 2.5 nothing writes
+// suggestions.json at all: the AI task that produced it was removed along
+// with every other model call.
 const ALWAYS_OVERWRITE = [
   "OPENWOLF.md",
 ];
@@ -68,16 +69,13 @@ export async function initCommand(options?: { agent?: string[] }): Promise<void>
 
   // Detect project root
   const projectRoot = findProjectRoot();
-  console.log(`Project root: ${projectRoot}`);
 
   const wolfDir = path.join(projectRoot, ".wolf");
   const isUpgrade = fs.existsSync(wolfDir);
 
   const version = getVersion();
 
-  if (isUpgrade) {
-    console.log(`Upgrading OpenWolf to v${version}...`);
-  }
+  printBanner(version, projectRoot, isUpgrade);
 
   // Create .wolf/ directory
   ensureDir(wolfDir);
@@ -145,12 +143,13 @@ export async function initCommand(options?: { agent?: string[] }): Promise<void>
   ensureDir(claudeDir);
 
   const settingsPath = path.join(claudeDir, "settings.json");
+  const hookSettings = buildHookSettings(projectRoot);
   if (fs.existsSync(settingsPath)) {
     const existing = readJSON<Record<string, unknown>>(settingsPath, {});
-    const merged = replaceOpenWolfHooks(existing, HOOK_SETTINGS);
+    const merged = replaceOpenWolfHooks(existing, hookSettings);
     writeJSON(settingsPath, merged);
   } else {
-    writeJSON(settingsPath, HOOK_SETTINGS);
+    writeJSON(settingsPath, hookSettings);
   }
 
   // --- Claude rules: always update ---
@@ -232,7 +231,7 @@ export async function initCommand(options?: { agent?: string[] }): Promise<void>
   const installedAgents: string[] = ["claude"];
   if (agentNames.length > 0) {
     if (autoDetected) {
-      console.log(`  ✓ Agents detected on this machine: ${agentNames.join(", ")} (auto-wiring; use --agent claude to skip)`);
+      console.log(`  ✓ Agents detected: ${agentNames.join(", ")} (wiring all; --agent claude to skip)`);
     }
     const adapters = resolveAgents(agentNames); // throws on unknown names
     const ctx = { projectRoot, wolfDir, templatesDir: actualTemplatesDir };
@@ -289,22 +288,27 @@ export async function initCommand(options?: { agent?: string[] }): Promise<void>
   // --- Summary ---
   console.log("");
   if (isUpgrade) {
-    console.log(`  ✓ OpenWolf upgraded to v${version}`);
-    console.log(`  ✓ All .wolf data preserved (${skippedCount} files: cerebrum, memory, anatomy, buglog, ledger)`);
-    console.log(`  ✓ Hook scripts updated (9 hooks)`);
-    console.log(`  ✓ ${createdCount} config files updated`);
-    console.log(`  ✓ Anatomy: ${fileCount} files tracked (unchanged)`);
+    row("upgraded", `v${version}`, `${createdCount} config files refreshed`);
+    row("kept", `${skippedCount} files`, "cerebrum, memory, index, buglog");
+    row("hooks", `${HOOK_COUNT} registered`, "scripts refreshed to this version");
+    row("index", `${fileCount} files`, "rescan with openwolf scan");
   } else {
-    console.log(`  ✓ OpenWolf v${version} initialized`);
-    console.log(`  ✓ .wolf/ created with ${createdCount} files`);
-    console.log(`  ✓ Claude Code hooks registered (9 hooks)`);
-    console.log(`  ✓ CLAUDE.md updated`);
-    console.log(`  ✓ .claude/rules/openwolf.md created`);
-    console.log(`  ✓ Anatomy scan: ${fileCount} files indexed`);
+    row("created", `.wolf/ · ${createdCount} files`, "memory every agent shares");
+    row("hooks", `${HOOK_COUNT} registered`, "fire on their own, invisibly");
+    row("index", `${fileCount} files`, "query with openwolf find <name>");
+    row("rules", "CLAUDE.md + .claude/rules", "protocol every session reads");
   }
-  console.log(`  ✓ Daemon: ${daemonStatus}`);
+  row("agents", installedAgents.join(", "), "all sharing one project memory");
+  row("daemon", daemonStatus, "openwolf dashboard for live view");
+
   console.log("");
-  console.log("  You're ready. Just use 'claude' as normal — OpenWolf is watching.");
+  console.log("  Next");
+  console.log("    Work as before. Whichever agent you start, OpenWolf runs underneath.");
+  console.log("    openwolf dashboard       measured token usage, hook health, bug memory");
+  console.log("    openwolf find <name>     locate a symbol without reading whole files");
+  console.log("    openwolf report          what was governed, saved, and attributed");
+  console.log("");
+  console.log("  Everything stays on this machine. No API calls, no telemetry.");
   console.log("");
 }
 
@@ -421,7 +425,7 @@ function generateTemplate(destPath: string, file: string): void {
         enabled: true,
         anatomy: { auto_scan_on_init: true, rescan_interval_hours: 6, max_description_length: 100, max_files: 500, exclude_patterns: ["node_modules", ".git", "dist", "build", ".wolf", ".next", ".nuxt", "coverage", "__pycache__", ".cache", "target", ".vscode", ".idea", ".turbo", ".vercel", ".netlify", ".output", "*.min.js", "*.min.css"] },
         token_audit: { enabled: true, report_frequency: "weekly", waste_threshold_percent: 15, chars_per_token_code: 3.5, chars_per_token_prose: 4.0 },
-        cron: { enabled: true, max_retry_attempts: 3, dead_letter_enabled: true, heartbeat_interval_minutes: 30, use_claude_p: true, api_key_env: null },
+        cron: { enabled: true, max_retry_attempts: 3, dead_letter_enabled: true, heartbeat_interval_minutes: 30 },
         memory: { consolidation_after_days: 7, max_entries_before_consolidation: 200 },
         cerebrum: { max_tokens: 2000, reflection_frequency: "weekly" },
         context: { session_digest_budget_tokens: 1500, budgets: { claude: 1500, codex: 1200, gemini: 1200, opencode: 1200, cursor: 800 } },
@@ -434,7 +438,6 @@ function generateTemplate(destPath: string, file: string): void {
     "buglog.json": JSON.stringify({ version: 1, bugs: [] }, null, 2),
     "cron-manifest.json": JSON.stringify({ version: 1, tasks: [] }, null, 2),
     "cron-state.json": JSON.stringify({ last_heartbeat: null, engine_status: "initialized", execution_log: [], dead_letter_queue: [], upcoming: [] }, null, 2),
-    "suggestions.json": JSON.stringify({ suggestions: [], generated_at: null }, null, 2),
   };
 
   const content = templates[file] ?? "";
@@ -539,12 +542,13 @@ function copyHookScripts(wolfDir: string): void {
 
 /**
  * Replace all OpenWolf hook entries in settings.json with the current version.
- * Removes old-style relative-path hooks and inserts the new $CLAUDE_PROJECT_DIR hooks.
- * Preserves any non-OpenWolf hooks the user may have added.
+ * Removes old-style relative-path and $CLAUDE_PROJECT_DIR hooks, inserting
+ * absolute-path commands in their place. Preserves any non-OpenWolf hooks the
+ * user may have added.
  */
 function replaceOpenWolfHooks(
   existing: Record<string, unknown>,
-  hookSettings: typeof HOOK_SETTINGS
+  hookSettings: HookSettings
 ): Record<string, unknown> {
   const merged = { ...existing };
   if (!merged.hooks) {
@@ -557,10 +561,13 @@ function replaceOpenWolfHooks(
       hooks[event] = [];
     }
 
-    // Remove any existing OpenWolf hook entries (match by .wolf/hooks/ in command)
+    // Remove existing OpenWolf hook entries. Backslashes are normalised first:
+    // Windows users who hand-patched settings.json around the broken
+    // %CLAUDE_PROJECT_DIR% commands wrote native paths, and those would
+    // otherwise survive the filter and run twice alongside the new entries.
     hooks[event] = hooks[event].filter((entry) => {
       const isOpenWolfHook = entry.hooks?.some(
-        (h) => h.command && h.command.includes(".wolf/hooks/")
+        (h) => h.command && h.command.replace(/\\/g, "/").includes(".wolf/hooks/")
       );
       return !isOpenWolfHook;
     });
@@ -612,3 +619,40 @@ function detectProjectDescription(projectRoot: string): string {
   }
   return "";
 }
+
+
+/**
+ * The banner is the one place OpenWolf gets to introduce itself, so it states
+ * what the tool is and where it is operating before any work happens.
+ */
+function printBanner(version: string, projectRoot: string, isUpgrade: boolean): void {
+  const art = [
+    "  ██████ ██████ ██████ ██   ██ ██     ██ ██████ ██     ██████",
+    "  ██  ██ ██  ██ ██     ███  ██ ██     ██ ██  ██ ██     ██    ",
+    "  ██  ██ ██████ █████  ██ █ ██ ██  █  ██ ██  ██ ██     █████ ",
+    "  ██  ██ ██     ██     ██  ███ ██ ███ ██ ██  ██ ██     ██    ",
+    "  ██████ ██     ██████ ██   ██  ███ ███  ██████ ██████ ██    ",
+  ];
+  console.log("");
+  for (const line of art) console.log(line);
+  console.log("");
+  console.log(`  ${isUpgrade ? "upgrading to" : "v"}${version}  ·  one project memory across your coding agents`);
+  console.log(`  ${projectRoot}`);
+  console.log("");
+}
+
+/**
+ * Aligned "label  value  note" line, so the summary scans as a table.
+ * A value too wide for the column takes the whole line rather than being
+ * truncated: a half-printed daemon error helps nobody.
+ */
+const ROW_VALUE_WIDTH = 28;
+function row(label: string, value: string, note: string): void {
+  const l = label.padEnd(9);
+  if (value.length > ROW_VALUE_WIDTH) {
+    console.log(`  ✓ ${l} ${value}`);
+    return;
+  }
+  console.log(`  ✓ ${l} ${value.padEnd(ROW_VALUE_WIDTH)} ${note}`);
+}
+

@@ -1,7 +1,7 @@
 {
   "name": "openwolf",
-  "version": "2.4.1",
-  "description": "The second brain for Claude Code, now for every AI coding assistant: context management, architecture scaffolding, and smarter token utilization through lifecycle hooks.",
+  "version": "2.5.0",
+  "description": "One project memory across Claude Code, Codex and OpenCode. Token usage measured, not estimated. Zero API calls.",
   "type": "module",
   "bin": {
     "openwolf": "dist/bin/openwolf.js"
@@ -62,13 +62,17 @@
     "url": "https://github.com/cytostack/openwolf/issues"
   },
   "keywords": [
-    "claude",
-    "ai",
+    "claude-code",
+    "codex",
+    "opencode",
+    "agent-memory",
+    "context-engineering",
+    "observability",
     "context",
     "token",
     "openwolf",
-    "claude-code",
-    "developer-tools"
+    "developer-tools",
+    "ai"
   ],
   "files": [
     "dist/",
