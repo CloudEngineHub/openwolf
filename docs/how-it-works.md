@@ -28,7 +28,7 @@ stay machine-local.
 
 ## Hooks
 
-OpenWolf registers 10 lifecycle hooks through the agent's own hook system
+OpenWolf registers 12 lifecycle hooks through the agent's own hook system
 (`.claude/settings.json` for Claude Code, `.codex/hooks.json` for Codex, a
 native plugin for OpenCode):
 
@@ -173,8 +173,8 @@ dashboard:
 - **Stale-gated rescans**: the anatomy index is rescanned only when the stat
   sweep or a git HEAD move says it is actually stale.
 - **Measured-usage refresh**: scans all project transcripts into the ledger.
-- **Memory consolidation** and optional AI tasks (cerebrum reflection,
-  project suggestions) via `claude -p` on your subscription.
+- **Memory consolidation**: compresses session blocks older than the
+  configured window. Pure file rewriting, no model involved.
 - **Dashboard server** with WebSocket live updates, bound to localhost with
   per-project token auth.
 

@@ -117,12 +117,17 @@ const archFiles = [
           <!-- Left -->
           <div class="ow-hero__copy">
             <h1 class="ow-hero__title">
-              A second brain for Claude Code.
-              <span class="ow-hero__title-accent">Now for every AI coding assistant.</span>
+              Your agents change.
+              <span class="ow-hero__title-accent">Your project memory shouldn't.</span>
             </h1>
 
             <p class="ow-hero__desc">
-              Coding agents flood their own context with grep dumps and re-read files, then forget your conventions between sessions. OpenWolf gives Claude Code, Codex, OpenCode, and other agents one persistent project brain: verbose output governed before it enters context, a durable project index, memory that survives compaction, and every saving measured from your agent's own transcripts. No workflow changes.
+              openwolf keeps one project memory across Claude Code, Codex and OpenCode, intercepts the reads and command output that quietly fill your context, and reports what each session actually cost, read from the harness transcript. Pure local file I/O: no API calls, no telemetry, no added latency.
+            </p>
+
+            <p class="ow-hero__agents">
+              <span class="ow-hero__agents-row"><span class="ow-hero__agents-key">Full lifecycle hooks</span> Claude Code, Codex CLI, OpenCode</span>
+              <span class="ow-hero__agents-row"><span class="ow-hero__agents-key">Context integration</span> Cursor, Gemini CLI, Antigravity</span>
             </p>
 
             <div class="ow-hero__actions">
@@ -157,14 +162,14 @@ const archFiles = [
               </div>
               <div class="ow-terminal__body">
                 <div class="ow-terminal__line"><span class="ow-terminal__ps">$</span> <span class="ow-terminal__cmd">openwolf init</span></div>
-                <div class="ow-terminal__line ow-terminal__line--out"><span class="ow-terminal__ok">✓</span> Agents detected: codex, gemini (auto-wiring)</div>
+                <div class="ow-terminal__line ow-terminal__line--out"><span class="ow-terminal__ok">✓</span> Agents detected: codex, gemini (wiring all)</div>
                 <div class="ow-terminal__line ow-terminal__line--out"><span class="ow-terminal__ok">✓</span> Codex hooks registered (.codex/hooks.json)</div>
                 <div class="ow-terminal__line ow-terminal__line--out"><span class="ow-terminal__ok">✓</span> Skills installed: /handoff, /security-audit, /reframe</div>
-                <div class="ow-terminal__line ow-terminal__line--out"><span class="ow-terminal__ok">✓</span> OpenWolf v2.4 initialized</div>
-                <div class="ow-terminal__line ow-terminal__line--out"><span class="ow-terminal__ok">✓</span> Claude Code hooks registered (10 hooks)</div>
-                <div class="ow-terminal__line ow-terminal__line--out"><span class="ow-terminal__ok">✓</span> Hook install verified (selfcheck passed)</div>
-                <div class="ow-terminal__line ow-terminal__line--out"><span class="ow-terminal__ok">✓</span> Anatomy scan: 24 files indexed</div>
-                <div class="ow-terminal__line ow-terminal__line--hint">You're ready. Use your agents as normal. OpenWolf is watching.</div>
+                <div class="ow-terminal__line ow-terminal__line--out"><span class="ow-terminal__ok">✓</span> created &nbsp; .wolf/ · 10 files</div>
+                <div class="ow-terminal__line ow-terminal__line--out"><span class="ow-terminal__ok">✓</span> hooks &nbsp; &nbsp; 12 registered</div>
+                <div class="ow-terminal__line ow-terminal__line--out"><span class="ow-terminal__ok">✓</span> index &nbsp; &nbsp; 247 files indexed</div>
+                <div class="ow-terminal__line ow-terminal__line--out"><span class="ow-terminal__ok">✓</span> agents &nbsp; &nbsp;claude, codex, gemini</div>
+                <div class="ow-terminal__line ow-terminal__line--hint">Work as before. Whichever agent you start, OpenWolf runs underneath.</div>
               </div>
             </div>
           </div>
@@ -183,25 +188,25 @@ const archFiles = [
     <section class="ow-section ow-section--alt ow-why">
       <div class="ow-container ow-container--narrow">
         <div class="ow-why__content reveal">
-          <h2 class="ow-why__title">The waste is not where you think it is.</h2>
+          <h2 class="ow-why__title">The cost of a byte is not its size.<br /><span class="ow-why__title-em">It is its size times every call that follows.</span></h2>
           <p class="ow-why__text">
-            Before building 2.x we audited 16 live projects: 6,869 real API calls of transcripts. Nearly half of all tool-result tokens arrived through Bash: grep floods, git show dumps, test logs, whole files printed with cat. And every one of those tokens is re-read from cache on every later API call for the rest of the session. The cost of a byte is not its size. It is its size times every call that follows.
+            The obvious suspects are your prompts and your codebase. Before building 2.x we audited 16 live projects, 6,869 real API calls of transcripts, and <strong>neither was the problem</strong>. Nearly half of all tool-result tokens arrived through Bash: grep floods, <code>git show</code> dumps, test logs, whole files printed with <code>cat</code>. None of that is in your prompt. All of it is re-read from cache on every later call for the rest of the session.
           </p>
-          <p class="ow-why__text">
-            So OpenWolf governs the Bash channel at the source, keeps context healthy across long sessions, and measures everything it claims from your agent's own transcripts. Including its own overhead.
+          <p class="ow-why__text ow-why__text--muted">
+            Coding agents flood their own context with grep dumps and re-read files, then forget your conventions between sessions. OpenWolf governs the Bash channel at the source, keeps context healthy across long sessions, and measures everything it claims from your agent's own transcripts.
           </p>
           <div class="ow-why__stats">
             <div class="ow-why__stat">
               <span class="ow-why__stat-num">48%</span>
-              <span class="ow-why__stat-label">of tool-result tokens flow through Bash (measured, 16-project audit)</span>
+              <span class="ow-why__stat-label">of tool-result tokens flow through Bash. Measured, 16 projects, 6,869 API calls.</span>
             </div>
             <div class="ow-why__stat">
               <span class="ow-why__stat-num">10x</span>
-              <span class="ow-why__stat-label">value of keeping bytes out of context vs trimming prompts (cache economics)</span>
+              <span class="ow-why__stat-label">A token kept out of context is worth roughly ten trimmed from a prompt, because it is never re-read on any call that follows.</span>
             </div>
             <div class="ow-why__stat">
               <span class="ow-why__stat-num">0</span>
-              <span class="ow-why__stat-label">unverifiable claims: every number traces to a transcript</span>
+              <span class="ow-why__stat-label">unverifiable claims. Every number traces back to a transcript.</span>
             </div>
           </div>
 
@@ -224,8 +229,12 @@ const archFiles = [
                 <span class="ow-why__bar-val">1,850</span>
               </div>
             </div>
-            <p class="ow-why__bar-note">The full output stays on disk with a pointer, so nothing is lost. Your own deltas: run openwolf report.</p>
+            <p class="ow-why__bar-note">Full output preserved on disk with a pointer, so nothing is lost. Run <code>openwolf report</code> for your own deltas.</p>
           </div>
+
+          <p class="ow-why__footnote">
+            OpenWolf subtracts its own overhead from every figure it reports. Every digest, hint and reminder it injects is counted against the savings it claims.
+          </p>
         </div>
       </div>
     </section>
@@ -290,8 +299,8 @@ const archFiles = [
             <div class="ow-step__num">02</div>
             <div class="ow-step__content">
               <h3 class="ow-step__title">Work Normally</h3>
-              <p class="ow-step__desc">Just use <code>claude</code> as you always do. Hooks fire invisibly, tracking, learning, enforcing. You don't interact with any of it.</p>
-              <div class="ow-step__cmd"><span class="ow-step__ps">$</span> claude</div>
+              <p class="ow-step__desc">Start whichever agent you were going to start anyway. Hooks fire invisibly, tracking, learning, enforcing. You never interact with any of it, and switching agents changes nothing.</p>
+              <div class="ow-step__cmd"><span class="ow-step__ps">$</span> claude &nbsp;<span class="ow-step__alt">or</span>&nbsp; codex &nbsp;<span class="ow-step__alt">or</span>&nbsp; opencode</div>
             </div>
           </div>
 
@@ -384,7 +393,7 @@ const archFiles = [
               <img src="/wolf.svg" alt="OpenWolf" width="24" height="24" />
               <span class="ow-footer__name">OpenWolf</span>
             </div>
-            <p class="ow-footer__tagline">A second brain for AI coding agents.<br />Created by Dr. Farhan Palathinkal at <a href="https://github.com/cytostack" target="_blank" class="ow-footer__link">Cytostack</a>.</p>
+            <p class="ow-footer__tagline">One project memory across Claude Code, Codex and OpenCode.<br />Created by Dr. Farhan Palathinkal at <a href="https://github.com/cytostack" target="_blank" class="ow-footer__link">Cytostack</a>.</p>
           </div>
 
           <div class="ow-footer__col">
@@ -650,6 +659,30 @@ const archFiles = [
   font-weight: 600;
 }
 
+/* Agent support: full hooks vs context-only, stated plainly under the subhead */
+.ow-hero__agents {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin-top: 20px;
+  max-width: 480px;
+  font-size: 13px;
+  line-height: 1.5;
+  color: var(--ow-text-secondary);
+}
+.ow-hero__agents-key {
+  display: inline-block;
+  min-width: 148px;
+  font-family: "JetBrains Mono", monospace;
+  font-size: 11px;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--ow-text-faint);
+}
+@media (max-width: 480px) {
+  .ow-hero__agents-key { display: block; min-width: 0; }
+}
+
 /* Buttons */
 .ow-hero__actions {
   display: flex;
@@ -831,11 +864,36 @@ const archFiles = [
   margin-bottom: 24px !important;
   text-align: left !important;
 }
+.ow-why__title-em {
+  color: var(--ow-accent);
+}
 .ow-why__text {
   font-size: 1.05rem !important;
   line-height: 1.7 !important;
   color: var(--ow-text-secondary) !important;
   margin-bottom: 16px !important;
+  text-align: left !important;
+}
+.ow-why__text strong {
+  color: var(--ow-text-primary);
+  font-weight: 700;
+}
+.ow-why__text code {
+  font-family: "JetBrains Mono", monospace;
+  font-size: 0.92em;
+  color: var(--ow-text-primary);
+}
+.ow-why__text--muted {
+  font-size: 0.97rem !important;
+  color: var(--ow-text-faint) !important;
+}
+.ow-why__footnote {
+  margin-top: 28px !important;
+  padding-top: 20px;
+  border-top: 1px solid var(--ow-border);
+  font-size: 13px !important;
+  line-height: 1.6 !important;
+  color: var(--ow-text-faint) !important;
   text-align: left !important;
 }
 .ow-why__stats {
@@ -1035,6 +1093,10 @@ const archFiles = [
   background: var(--ow-bg-deep);
   padding: 8px 16px;
   border-radius: 10px;
+}
+.ow-step__alt {
+  color: var(--ow-text-faint);
+  font-size: 11px;
 }
 .ow-step__ps {
   color: var(--ow-accent);

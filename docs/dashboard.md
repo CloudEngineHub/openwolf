@@ -12,12 +12,6 @@ openwolf dashboard
 Starts the daemon if needed and opens your browser with a per-project token.
 Each project gets its own port, so multiple dashboards never collide.
 
-## Design
-
-A monochrome dot-matrix system with a single signal-red accent reserved for
-live, measured, and attention states. Dark and light modes via the top-nav
-pill. Panels are deep-linkable (`#tokens`).
-
 ## Overview
 
 The home screen leads with what can be proven:
@@ -31,16 +25,30 @@ The home screen leads with what can be proven:
 - **Context health**: index freshness, duplicate-read mode, always-on
   context estimate, and audit findings (oversized instruction files, missing
   config)
-- **Stat row**: sessions, files tracked, reads and writes, re-read warnings,
-  anatomy hit rate, bugs on file
+- **Stat row**: what the usage is worth at list price, files tracked, edits
+  per file read, re-read warnings, anatomy hit rate, bugs on file. A hit rate
+  under 30% turns red: it means the agent is reading files the index cannot
+  describe instead of calling `openwolf find`.
 - **Next phase** from STATUS.md and a weekly sessions chart
 
 ## Tokens
 
 Measured, verified, and estimated usage side by side:
 
-- Headline tiles: measured lifetime, cache reads, OpenWolf's own injection
-  overhead, and tokens kept out of context
+- Headline tiles: measured lifetime, cache reads, OpenWolf's own overhead as
+  a percentage of what it kept out, and what the usage is worth
+- **Where the cost is**: the same measured tokens priced at Anthropic's
+  published rates, split into cache reads, output, cache writes and fresh
+  input, then broken down per model. Cache reads dominate on every real
+  project and almost nobody expects it. On a subscription you are not billed
+  per token, so the figure sizes the work rather than reporting an invoice.
+- **In plain language**: one paragraph, no jargon, saying how many tokens
+  were kept out, what that would have cost at the ceiling, what OpenWolf's
+  own overhead was, and what the net saving is
+- **Governor by command family**: tokens kept out per family with the share
+  of that family's output condensed. A family at 0% is either set to
+  `suggest` or rarely crosses the threshold, which is the fastest way to see
+  where the governor earns its keep
 - **Measured across all project transcripts**: totals per model, subagent
   share, scan timestamp (written by the daemon)
 - Usage over time per session, with the measured line overlaid where

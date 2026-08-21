@@ -24,15 +24,34 @@ openwolf init
 ```
 
 ```
-  ✓ Agents detected on this machine: codex, gemini (auto-wiring)
-  ✓ Codex hooks registered (.codex/hooks.json)
-  ✓ Skills installed for claude: /security-audit, /reframe, /designqc, /handoff
-  ✓ Claude skills installed: openwolf (.claude/skills/)
-  ✓ OpenWolf v2.4 initialized
-  ✓ Claude Code hooks registered (10 hooks)
-  ✓ Anatomy scan: 47 files indexed
+  ██████ ██████ ██████ ██   ██ ██     ██ ██████ ██     ██████
+  ██  ██ ██  ██ ██     ███  ██ ██     ██ ██  ██ ██     ██
+  ██  ██ ██████ █████  ██ █ ██ ██  █  ██ ██  ██ ██     █████
+  ██  ██ ██     ██     ██  ███ ██ ███ ██ ██  ██ ██     ██
+  ██████ ██     ██████ ██   ██  ███ ███  ██████ ██████ ██
 
-  You're ready. Use your agents as normal. OpenWolf is watching.
+  v2.5.0  ·  one project memory across your coding agents
+  ~/your-project
+
+  ✓ Agents detected: codex, gemini (wiring all; --agent claude to skip)
+  ✓ Codex hooks registered (.codex/hooks.json)
+  ✓ Skills installed: /security-audit, /reframe, /designqc, /handoff (claude, codex)
+  ✓ Claude skills installed: openwolf (.claude/skills/)
+
+  ✓ created   .wolf/ · 10 files            memory every agent shares
+  ✓ hooks     12 registered                fire on their own, invisibly
+  ✓ index     47 files                     query with openwolf find <name>
+  ✓ rules     CLAUDE.md + .claude/rules    protocol every session reads
+  ✓ agents    claude, codex, gemini
+  ✓ daemon    running (pm2)                openwolf dashboard for live view
+
+  Next
+    Work as before. Whichever agent you start, OpenWolf runs underneath.
+    openwolf dashboard       measured token usage, hook health, bug memory
+    openwolf find <name>     locate a symbol without reading whole files
+    openwolf report          what was governed, saved, and attributed
+
+  Everything stays on this machine. No API calls, no telemetry.
 ```
 
 No configuration needed. To wire specific agents instead of auto-detecting,
@@ -97,20 +116,6 @@ openwolf map --focus auth          # budgeted overview of the important files
 
 `map` ranks files by personalized PageRank over the import graph, seeded by
 what your sessions have touched and your focus terms.
-
-## Optional AI maintenance tasks
-
-Two weekly tasks use the Claude CLI with your subscription (not API
-credits): cerebrum reflection (reviews and prunes `cerebrum.md`) and project
-suggestions. They run on the daemon's schedule or manually:
-
-```bash
-openwolf cron run cerebrum-reflection
-openwolf cron run project-suggestions
-```
-
-If `ANTHROPIC_API_KEY` is set, OpenWolf strips it when spawning `claude -p`
-so your subscription credentials are used.
 
 ## Team usage
 

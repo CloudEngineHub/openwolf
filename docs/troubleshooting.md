@@ -65,14 +65,14 @@ of re-running. If a command family is condensed too aggressively for your
 workflow, set it to `"suggest"` or `"off"` in `openwolf.bash.governor.families`.
 Test and build output is suggest-only by default for exactly this reason.
 
-## AI tasks fail with "Credit balance is too low"
+## A cron task fails with "ai_task is no longer supported"
 
-**Cause:** `ANTHROPIC_API_KEY` is set and points to a key without credits;
-the Claude CLI prefers it over your subscription.
+**Cause:** A `.wolf/cron-manifest.json` written before 2.5 still lists the
+weekly cerebrum-reflection or project-suggestions task. Those were the only
+things in OpenWolf that ever called a model, and they are gone.
 
-**Fix:** OpenWolf strips `ANTHROPIC_API_KEY` automatically when spawning
-`claude -p`. If you still see the error, update OpenWolf and restart the
-daemon.
+**Fix:** Run `openwolf update`, or delete the `ai_task` entries from
+`.wolf/cron-manifest.json` by hand. Nothing else depends on them.
 
 ## Dashboard shows the wrong project, or a 401
 

@@ -1,12 +1,18 @@
 <h1 align="center">OpenWolf</h1>
 
 <p align="center">
-  <strong>The second brain for Claude Code. Now for every AI coding assistant.</strong>
+  <strong>Your agents change. Your project memory shouldn't.</strong>
 </p>
 
 <p align="center">
-  Persistent project memory, token waste stopped at the source,<br />
-  and every claim measured from your agent's own transcripts.
+  openwolf keeps one project memory across Claude Code, Codex and OpenCode,<br />
+  intercepts the reads and command output that quietly fill your context,<br />
+  and reports what each session actually cost, read from the harness transcript.<br />
+  Pure local file I/O: no API calls, no telemetry, no added latency.
+</p>
+
+<p align="center">
+  <sub><b>Full lifecycle hooks:</b> Claude Code, Codex CLI, OpenCode &nbsp;·&nbsp; <b>Context integration:</b> Cursor, Gemini CLI, Antigravity</sub>
 </p>
 
 <p align="center">
@@ -20,6 +26,14 @@
 <p align="center">
   <img src="assets/openwolf-dashboard.png" alt="" width="900" />
 </p>
+
+| Without OpenWolf | With OpenWolf |
+|------------------|---------------|
+| Each agent starts cold and learns your project separately | One `.wolf/` brain, shared across Claude Code, Codex and OpenCode |
+| Switching agents means losing everything the last one learned | Corrections, bug fixes and project map follow you across tools |
+| Your token usage is a monthly invoice with no line items | Real usage read from the transcript, per session, per agent |
+| Nobody can tell you what broke the prompt cache | Attributed: model switch, compaction, version change, expiry |
+| The agent rereads a file it already saw | Repeated reads caught; oversized Bash output condensed before it enters context |
 
 ## What it does
 
@@ -60,7 +74,7 @@ Then use your agents as normal.
 
 | Agent | Integration |
 |-------|-------------|
-| Claude Code | Full: 10 hooks, output governor, skills, verified measurement |
+| Claude Code | Full: 12 hooks, output governor, skills, verified measurement |
 | Codex CLI | Lifecycle hooks via `.codex/hooks.json` + `AGENTS.md` |
 | OpenCode | Native plugin + `AGENTS.md` |
 | Cursor | Rules file (context only) |
@@ -85,7 +99,7 @@ hooks are plain Node.js scripts: no network, no AI calls, no dependencies.
 | `buglog.json` | Searchable memory of bugs and their fixes |
 | `memory.md` | Action log per session |
 | `token-ledger.json` | Measured, estimated, and verified usage |
-| `hooks/` | The 10 lifecycle hooks, with health heartbeats |
+| `hooks/` | The 12 lifecycle hooks, with health heartbeats |
 | `cache/bash/` | Verbatim copies of every condensed Bash output |
 
 During a session:
@@ -238,7 +252,7 @@ OpenWolf is better because people fixed it. Every merged contribution is credite
 | [<img src="https://github.com/WeathermanTony.png" width="60"/>](https://github.com/WeathermanTony)<br/>**WeathermanTony** | [<img src="https://github.com/goashem.png" width="60"/>](https://github.com/goashem)<br/>**goashem** | [<img src="https://github.com/bryandent.png" width="60"/>](https://github.com/bryandent)<br/>**bryandent** | [<img src="https://github.com/levnikmyskin.png" width="60"/>](https://github.com/levnikmyskin)<br/>**levnikmyskin** | [<img src="https://github.com/svanack404.png" width="60"/>](https://github.com/svanack404)<br/>**svanack404** |
 | [<img src="https://github.com/riverwolf67.png" width="60"/>](https://github.com/riverwolf67)<br/>**riverwolf67** | [<img src="https://github.com/nottyjay.png" width="60"/>](https://github.com/nottyjay)<br/>**nottyjay** | [<img src="https://github.com/alfasin.png" width="60"/>](https://github.com/alfasin)<br/>**alfasin** | [<img src="https://github.com/ChasLui.png" width="60"/>](https://github.com/ChasLui)<br/>**ChasLui** | [<img src="https://github.com/JarrodAI.png" width="60"/>](https://github.com/JarrodAI)<br/>**JarrodAI** |
 | [<img src="https://github.com/meketreve.png" width="60"/>](https://github.com/meketreve)<br/>**meketreve** | [<img src="https://github.com/Laptopcorei7.png" width="60"/>](https://github.com/Laptopcorei7)<br/>**Laptopcorei7** | [<img src="https://github.com/statik1.png" width="60"/>](https://github.com/statik1)<br/>**statik1** | [<img src="https://github.com/spignataro.png" width="60"/>](https://github.com/spignataro)<br/>**spignataro** | [<img src="https://github.com/Esturban.png" width="60"/>](https://github.com/Esturban)<br/>**Esturban** |
-| [<img src="https://github.com/prghbla.png" width="60"/>](https://github.com/prghbla)<br/>**prghbla** | [<img src="https://github.com/1re2turn1.png" width="60"/>](https://github.com/1re2turn1)<br/>**1re2turn1** | | | |
+| [<img src="https://github.com/prghbla.png" width="60"/>](https://github.com/prghbla)<br/>**prghbla** | [<img src="https://github.com/1re2turn1.png" width="60"/>](https://github.com/1re2turn1)<br/>**1re2turn1** | [<img src="https://github.com/aevnar.png" width="60"/>](https://github.com/aevnar)<br/>**aevnar** | | |
 
 ## License
 

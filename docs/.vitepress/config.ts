@@ -4,7 +4,7 @@ import tailwindcss from "@tailwindcss/vite";
 export default defineConfig({
   title: "OpenWolf",
   description:
-    "The second brain for AI coding agents. Verbose output governed before it enters context, a durable project index, memory that survives compaction, and every saving measured from your agent's own transcripts. Works with Claude Code, Codex, OpenCode, and more.",
+    "openwolf keeps one project memory across Claude Code, Codex and OpenCode, and measures what each session actually cost. Local, open source, no API calls.",
   head: [
     ["link", { rel: "icon", type: "image/svg+xml", href: "/wolf.svg" }],
     ["link", { rel: "canonical", href: "https://openwolf.com" }],
@@ -38,7 +38,7 @@ export default defineConfig({
       "meta",
       {
         property: "og:title",
-        content: "OpenWolf: A Second Brain for AI Coding Agents",
+        content: "OpenWolf: portable project memory and measured token usage for coding agents",
       },
     ],
     [
@@ -46,7 +46,7 @@ export default defineConfig({
       {
         property: "og:description",
         content:
-          "Open-source hooks that govern token waste at the source, give agents a durable project index and persistent memory, and measure every claim from the harness's own transcripts. Works with Claude Code, Codex, OpenCode, and more.",
+          "openwolf keeps one project memory across Claude Code, Codex and OpenCode, and measures what each session actually cost. Local, open source, no API calls.",
       },
     ],
     // Twitter Card
@@ -55,7 +55,7 @@ export default defineConfig({
       "meta",
       {
         name: "twitter:title",
-        content: "OpenWolf: A Second Brain for AI Coding Agents",
+        content: "OpenWolf: portable project memory and measured token usage for coding agents",
       },
     ],
     [
@@ -63,7 +63,7 @@ export default defineConfig({
       {
         name: "twitter:description",
         content:
-          "Open-source hooks that govern token waste at the source, give agents a durable project index and persistent memory, and measure every claim from the harness's own transcripts. Works with Claude Code, Codex, OpenCode, and more.",
+          "openwolf keeps one project memory across Claude Code, Codex and OpenCode, and measures what each session actually cost. Local, open source, no API calls.",
       },
     ],
     // Additional SEO
@@ -73,7 +73,7 @@ export default defineConfig({
       {
         name: "keywords",
         content:
-          "ai coding agents, codex, opencode, claude code, cursor, antigravity, context management, token tracking, agent memory, token optimization, open source, developer tools",
+          "project memory, agent memory, context engineering, claude code, codex, opencode, cursor, gemini cli, antigravity, token usage, token tracking, context management, open source, developer tools",
       },
     ],
   ],

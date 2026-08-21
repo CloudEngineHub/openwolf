@@ -1,6 +1,6 @@
 # Hooks
 
-OpenWolf registers 10 lifecycle hooks. The same scripts serve Claude Code
+OpenWolf registers 12 lifecycle hooks. The same scripts serve Claude Code
 and Codex (OpenCode uses a native plugin with equivalent behavior). They run
 automatically; you never interact with them.
 

@@ -18,7 +18,7 @@ What it does:
 1. Detects the project root (`.git`, `package.json`, `Cargo.toml`, and so on)
 2. Creates `.wolf/` with the state files, the durable index, and a
    `.gitignore` splitting committed state from machine-local runtime
-3. Copies the hook scripts to `.wolf/hooks/` and registers 10 hooks in
+3. Copies the hook scripts to `.wolf/hooks/` and registers 12 hooks in
    `.claude/settings.json`
 4. Auto-detects other installed agents (Codex, OpenCode, Gemini CLI, Cursor)
    and wires each one
@@ -167,7 +167,7 @@ openwolf daemon logs      # last 50 lines
 ```
 
 The daemon handles stale-gated anatomy rescans, measured-usage refresh,
-memory consolidation, optional AI tasks, and the dashboard server.
+memory consolidation, and the dashboard server. It makes no network calls.
 
 ---
 

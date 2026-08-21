@@ -107,7 +107,6 @@ transcripts and are unaffected by these ratios.
 |-----|---------|-------------|
 | `enabled` | `true` | Scheduled tasks |
 | `max_retry_attempts` | `3` | Retries before dead-lettering |
-| `use_claude_p` | `true` | Use `claude -p` (subscription) for AI tasks |
 
 ## `memory` and `cerebrum`
 
@@ -115,7 +114,6 @@ transcripts and are unaffected by these ratios.
 |-----|---------|-------------|
 | `memory.consolidation_after_days` | `7` | Compress session blocks older than this |
 | `cerebrum.max_tokens` | `2000` | Target size for cerebrum.md |
-| `cerebrum.reflection_frequency` | `"weekly"` | AI review cadence |
 
 ## `daemon` and `dashboard`
 
