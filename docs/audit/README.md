@@ -74,7 +74,7 @@ Additional reproduction and analysis credits: laihenyi (#61), elifarley (#41), c
 
 ## Remaining verification boundaries
 
-Native Claude, Codex and OpenCode UI counters can only be certified against the source records each installed version exposes. Missing telemetry remains unavailable/partial. Pricing is a current API list-price equivalent, not a subscription invoice. Enforced durable-memory approval requires a separately protected runtime, authority store and managed harness deployment. Live Windows/alternate-agent validation and the explicitly deferred features above remain follow-up work.
+Native Claude, Codex and OpenCode UI counters can only be certified against the source records each installed version exposes. Missing telemetry remains unavailable/partial. Pricing is a current API list-price equivalent, not a subscription invoice. Enforced durable-memory approval requires a separately protected runtime, authority store and managed harness deployment. Current platform/native-session results and remaining checks are recorded in the [2.5.2 release verification](../release-2.5.2.md). The explicitly deferred features above remain follow-up work.
 
 ## Explicit coauthor trailers
 

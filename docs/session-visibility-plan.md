@@ -35,7 +35,7 @@ Final local verification on macOS / Node 24.15.0 (2026-09-14): production build 
 
 These measurements meet the 2 ms added-bookkeeping target in this fixture. They are not a guarantee of zero overhead on every machine or under a large boundary backlog, and do not measure native rendering or model calls. The receipt implementation starts no model calls.
 
-Run `pnpm build`, `node --test tests/visibility.test.ts`, and `node scripts/benchmark-visibility.mjs --hooks`. The benchmark compares 1,000 invocations per mode after warmup, alternating modes for the full pre-write hook. It measures local runtime cost, not model-token savings. The 2.5.2 checks include Bun plugin execution and native Codex/OpenCode displays. Windows CI, Claude status-line rendering and user-attention evaluation remain outstanding.
+Run `pnpm build`, `node --test tests/visibility.test.ts`, and `node scripts/benchmark-visibility.mjs --hooks`. The benchmark compares 1,000 invocations per mode after warmup, alternating modes for the full pre-write hook. It measures local runtime cost, not model-token savings. The 2.5.2 checks passed Linux/macOS/Windows CI and include Bun plugin execution and native Codex/OpenCode displays. Claude status-line rendering and user-attention evaluation remain outstanding.
 
 ## Experience
 

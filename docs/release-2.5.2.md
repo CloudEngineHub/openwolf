@@ -1,6 +1,6 @@
 # OpenWolf 2.5.2 release verification
 
-The 2.5.2 release candidate is prepared locally. Cross-platform CI and the full live Claude/Codex round trip remain unverified; this is not a claim that every release gate passed.
+The 2.5.2 release candidate passed automated build, regression, package-install, upgrade and daemon checks across Linux, macOS and Windows. Native Codex recovery and OpenCode notifications were also verified. The full live Claude/Codex round trip remains unavailable because the owner's Claude subscription expired.
 
 Scope: context handover and recovery, recorded usage/pricing, durable journals and archival, safe anatomy refresh, compatible runtime updates, quiet activity receipts and synchronized dashboard content. Contributor roles and original commit attribution are retained in CREDITS.md and docs/audit/.
 
@@ -21,7 +21,9 @@ Existing 2.5.1 installations require a package refresh and `openwolf update` onc
 
 ## Outstanding verification and activation
 
-The Linux/macOS/Windows Node 24 matrix and Linux Node 20 runtime job are defined in `.github/workflows/validate.yml`. Each job builds and exercises the packed package; Node 24 jobs also run the regression suite. The validation branch is `release/openwolf-2.5.2`. The first run passed Linux/macOS and Node 20, and exposed Windows failures now under repair. Windows ordinary-file owner ID zero must not be treated as POSIX root ownership when selecting updated runtimes. File URL imports, shell-path fixtures, line endings and transcript-path expectations also need platform-correct handling. Final cross-platform results will be recorded after rerun.
+The Linux/macOS/Windows Node 24 matrix and Linux Node 20 runtime job are defined in `.github/workflows/validate.yml`. All four jobs passed in [validation run 34894539164](https://github.com/cytostack/openwolf/actions/runs/34894539164) at runtime commit `87a59c5` on `release/openwolf-2.5.2`. Each job built and exercised the packed package; Node 24 jobs also passed all 322 regression tests. Subsequent documentation updates do not change the validated runtime.
+
+Windows validation found and verified fixes for ordinary-file owner ID zero incorrectly disabling runtime updates, and a native watcher crash when using abbreviated project paths. The daemon now resolves the native project path before starting watchers. ESM file URLs and platform-correct shell-path, line-ending and transcript-path fixtures also passed. The package smoke test checks the daemon's canonical project identity as well as authenticated activity and restart persistence.
 
 The live Claude → Codex → Claude coding round trip, Claude status-line rendering, compaction/restart checks for the other native harnesses, and paired long-session quality/token-efficiency evaluation remain outstanding. The owner confirmed that the Claude subscription is over; no additional credential or subscription setup is assumed. Deterministic handover/recovery tests and a native Codex resume/compaction check do not substitute for those evaluations. Automatic handover import stays off.
 
