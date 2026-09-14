@@ -1,3 +1,4 @@
+import { pathToFileURL } from "node:url";
 import { test, describe } from "node:test";
 import * as assert from "node:assert";
 import * as fs from "node:fs";
@@ -77,7 +78,7 @@ describe("#92 scan file I/O (compiled)", { skip: !haveDist ? "dist not built" : 
       fs.writeFileSync(path.join(root, n), `// ${n} does a thing\nexport const x = 1;\n`);
     }
 
-    const { scanProject } = await import(path.join(stage, "src", "scanner", "anatomy-scanner.js"));
+    const { scanProject } = await import(pathToFileURL(path.join(stage, "src", "scanner", "anatomy-scanner.js")).href);
     await scanProject(wolfDir, root);
 
     const store = JSON.parse(fs.readFileSync(path.join(wolfDir, "anatomy-index.json"), "utf-8"));

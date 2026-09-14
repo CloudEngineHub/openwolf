@@ -1,3 +1,4 @@
+import { pathToFileURL } from "node:url";
 import { test, describe } from "node:test";
 import * as assert from "node:assert";
 import * as fs from "node:fs";
@@ -18,7 +19,7 @@ const DIST_AGENTS = path.resolve(import.meta.dirname ?? ".", "..", "dist", "src"
 const haveDist = fs.existsSync(DIST_AGENTS);
 
 async function loadCodexAdapter(): Promise<{ install: (ctx: unknown) => { actions: string[]; warnings: string[] } }> {
-  const { resolveAgents } = await import(DIST_AGENTS);
+  const { resolveAgents } = await import(pathToFileURL(DIST_AGENTS).href);
   const [adapter] = resolveAgents(["codex"]);
   return adapter;
 }

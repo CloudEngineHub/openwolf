@@ -1,5 +1,7 @@
 # Repair operation and verification
 
+For the package upgrade smoke tests, native harness results and outstanding activation checks, see the [2.5.2 release verification record](release-2.5.2.md).
+
 ## Recorded usage and API pricing
 
 `openwolf usage report --json` reads project-attributed Claude transcripts, Codex rollouts and OpenCode usage records. `--agent claude|codex|opencode` narrows the report. `openwolf usage reconcile` also drains recoverable observations and persists the shared dashboard report. No model calls are made.

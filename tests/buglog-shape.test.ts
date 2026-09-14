@@ -1,3 +1,4 @@
+import { pathToFileURL } from "node:url";
 import { test, describe } from "node:test";
 import * as assert from "node:assert";
 import * as fs from "node:fs";
@@ -12,7 +13,7 @@ import { buildHookSettings, HOOK_COUNT } from "../src/cli/hook-manifest.ts";
 // through the build output the way hook-health.test.ts does with dist/hooks.
 const DIST = path.resolve(import.meta.dirname ?? ".", "..", "dist", "src", "buglog", "bug-tracker.js");
 const tracker: { readBugLog: (d: string) => { bugs: any[] }; searchBugs: (d: string, t: string) => any[] } | null =
-  fs.existsSync(DIST) ? await import(DIST) : null;
+  fs.existsSync(DIST) ? await import(pathToFileURL(DIST).href) : null;
 
 function tmpWolf(contents: string | null): string {
   const root = fs.mkdtempSync(path.join(os.tmpdir(), "wolf-bl-"));

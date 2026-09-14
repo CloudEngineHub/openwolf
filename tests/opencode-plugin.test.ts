@@ -1,3 +1,4 @@
+import { pathToFileURL } from "node:url";
 import { test, describe, before } from "node:test";
 import * as assert from "node:assert";
 import * as fs from "node:fs";
@@ -40,7 +41,7 @@ before(async () => {
     // emits; only a missing output file is fatal for this suite.
   }
   fs.writeFileSync(path.join(outDir, "package.json"), JSON.stringify({ type: "module" }));
-  ({sessionFilePath} = await import(path.join(outDir,"fs.js")));
+  ({sessionFilePath} = await import(pathToFileURL(path.join(outDir,"fs.js")).href));
   compiled = fs.existsSync(path.join(outDir, "session.js")) && fs.existsSync(path.join(outDir, "post-read.js"));
 });
 
@@ -70,8 +71,8 @@ describe("sessionFilePath", () => {
 describe("two concurrent OpenCode sessions", () => {
   test("#89: session B does not overwrite session A's state", async (t) => {
     if (!compiled) return t.skip("plugin could not be compiled");
-    const { handleSessionStart } = await import(path.join(outDir, "session.js"));
-    const { handlePostRead } = await import(path.join(outDir, "post-read.js"));
+    const { handleSessionStart } = await import(pathToFileURL(path.join(outDir, "session.js")).href);
+    const { handlePostRead } = await import(pathToFileURL(path.join(outDir, "post-read.js")).href);
 
     const project = fs.mkdtempSync(path.join(os.tmpdir(), "ow-oc-"));
     fs.mkdirSync(path.join(project, ".wolf"), { recursive: true });
@@ -112,7 +113,7 @@ describe("two concurrent OpenCode sessions", () => {
 
   test("#89: an agent with no usable session id still works via the legacy file", async (t) => {
     if (!compiled) return t.skip("plugin could not be compiled");
-    const { handleSessionStart } = await import(path.join(outDir, "session.js"));
+    const { handleSessionStart } = await import(pathToFileURL(path.join(outDir, "session.js")).href);
     const project = fs.mkdtempSync(path.join(os.tmpdir(), "ow-oc-legacy-"));
     fs.mkdirSync(path.join(project, ".wolf"), { recursive: true });
 

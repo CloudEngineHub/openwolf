@@ -1,3 +1,4 @@
+import { pathToFileURL } from "node:url";
 import { test, describe } from "node:test";
 import * as assert from "node:assert";
 import * as fs from "node:fs";
@@ -143,7 +144,7 @@ describe("concurrent registry (compiled)", { skip: !haveDist ? "dist not built" 
         runProcess(
           [
             "-e",
-            `import(${JSON.stringify(DIST_REGISTRY)}).then(m => m.registerProject(${JSON.stringify(r)}, "p${i}", "2.5.0"))`,
+            `import(${JSON.stringify(pathToFileURL(DIST_REGISTRY).href)}).then(m => m.registerProject(${JSON.stringify(r)}, "p${i}", "2.5.0"))`,
           ],
           { env: { ...process.env, HOME: home, USERPROFILE: home } },
         ),
@@ -164,7 +165,7 @@ describe("concurrent registry (compiled)", { skip: !haveDist ? "dist not built" 
     const roots = Array.from({ length: 20 }, (_, i) => path.join(home, "projects", `p${i}`));
     for (const [i, r] of roots.entries()) {
       await runProcess(
-        ["-e", `import(${JSON.stringify(DIST_REGISTRY)}).then(m => m.registerProject(${JSON.stringify(r)}, "p${i}", "2.5.0"))`],
+        ["-e", `import(${JSON.stringify(pathToFileURL(DIST_REGISTRY).href)}).then(m => m.registerProject(${JSON.stringify(r)}, "p${i}", "2.5.0"))`],
         { env: { ...process.env, HOME: home, USERPROFILE: home } },
       );
     }
@@ -172,12 +173,12 @@ describe("concurrent registry (compiled)", { skip: !haveDist ? "dist not built" 
     // Unregister the first 10 while registering 10 more, all at once.
     await Promise.all([
       ...roots.slice(0, 10).map((r) =>
-        runProcess(["-e", `import(${JSON.stringify(DIST_REGISTRY)}).then(m => m.unregisterProject(${JSON.stringify(r)}))`],
+        runProcess(["-e", `import(${JSON.stringify(pathToFileURL(DIST_REGISTRY).href)}).then(m => m.unregisterProject(${JSON.stringify(r)}))`],
           { env: { ...process.env, HOME: home, USERPROFILE: home } }),
       ),
       ...Array.from({ length: 10 }, (_, i) =>
         runProcess(
-          ["-e", `import(${JSON.stringify(DIST_REGISTRY)}).then(m => m.registerProject(${JSON.stringify(path.join(home, "projects", `late${i}`))}, "late${i}", "2.5.0"))`],
+          ["-e", `import(${JSON.stringify(pathToFileURL(DIST_REGISTRY).href)}).then(m => m.registerProject(${JSON.stringify(path.join(home, "projects", `late${i}`))}, "late${i}", "2.5.0"))`],
           { env: { ...process.env, HOME: home, USERPROFILE: home } },
         ),
       ),
@@ -211,7 +212,7 @@ describe("cron state lock (compiled)", { skip: !haveDist ? "dist not built" : fa
     await new Promise<void>((resolve) => {
       const child = execFile(
         process.execPath,
-        ["-e", `import(${JSON.stringify(DIST_CRON_CMD)}).then(m=>m.cronRetry("nightly-scan")).then(()=>process.exit(process.exitCode ?? 0))`],
+        ["-e", `import(${JSON.stringify(pathToFileURL(DIST_CRON_CMD).href)}).then(m=>m.cronRetry("nightly-scan")).then(()=>process.exit(process.exitCode ?? 0))`],
         { cwd: root, timeout: 30000 },
         (err, _out, errOut) => { stderr = errOut ?? ""; code = err ? (err as NodeJS.ErrnoException & { code?: number }).code ?? 1 : 0; resolve(); },
       );
@@ -240,7 +241,7 @@ describe("cron state lock (compiled)", { skip: !haveDist ? "dist not built" : fa
       }),
     );
 
-    await runProcess(["-e", `import(${JSON.stringify(DIST_CRON_CMD)}).then(m=>m.cronRetry("nightly-scan"))`], { cwd: root });
+    await runProcess(["-e", `import(${JSON.stringify(pathToFileURL(DIST_CRON_CMD).href)}).then(m=>m.cronRetry("nightly-scan"))`], { cwd: root });
 
     const after = JSON.parse(fs.readFileSync(statePath, "utf-8"));
     assert.strictEqual(after.dead_letter_queue.length, 0);

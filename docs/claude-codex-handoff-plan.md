@@ -1,6 +1,6 @@
 # Claude ↔ Codex handover and long-session memory
 
-Status: implemented in the working tree. Local Claude/Codex readers, read-only Codex app-server inspection, explicit immutable handover packets, active checkpoints/recovery, passive evidence search and the Handover dashboard are available after installing this build. Automatic import remains off. Protected administrator deployment and full native Claude→Codex→Claude interactive validation remain release prerequisites; neither is claimed complete here.
+Status: implemented in the working tree. Local Claude/Codex readers, read-only Codex app-server inspection, explicit immutable handover packets, active checkpoints/recovery, passive evidence search and the Handover dashboard are available after installing this build. Automatic import remains off. A native Codex turn recovered a saved checkpoint without file reads during 2.5.2 validation. The full native Claude→Codex→Claude coding round trip remains blocked by the owner's expired Claude subscription. Independent administrator deployment is still required to activate protected durable instruction authority. See the [release verification record](release-2.5.2.md) for the remaining checks; neither full native validation nor protected deployment is claimed complete.
 
 ## Implemented workflow
 

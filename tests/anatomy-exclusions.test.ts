@@ -1,3 +1,4 @@
+import { pathToFileURL } from "node:url";
 import { test, describe } from "node:test";
 import * as assert from "node:assert";
 import * as fs from "node:fs";
@@ -133,7 +134,7 @@ describe("scan of a polluted project (compiled)", { skip: !haveDist ? "dist not 
     // An `env/` that is real source, not a virtualenv.
     write("env/settings.py", "DEBUG = True\n");
 
-    const { scanProject } = await import(DIST_SCANNER);
+    const { scanProject } = await import(pathToFileURL(DIST_SCANNER).href);
     await scanProject(wolfDir, root);
 
     const store = JSON.parse(fs.readFileSync(path.join(wolfDir, "anatomy-index.json"), "utf-8"));
@@ -176,7 +177,7 @@ describe("scan of a polluted project (compiled)", { skip: !haveDist ? "dist not 
     fs.writeFileSync(path.join(root, "debug.log"), "noise\n");
     fs.writeFileSync(path.join(root, "real.ts"), "export const real = 1;\n");
 
-    const { scanProject } = await import(DIST_SCANNER);
+    const { scanProject } = await import(pathToFileURL(DIST_SCANNER).href);
     await scanProject(wolfDir, root);
 
     const store = JSON.parse(fs.readFileSync(path.join(wolfDir, "anatomy-index.json"), "utf-8"));

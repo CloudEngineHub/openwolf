@@ -1,3 +1,4 @@
+import { pathToFileURL } from "node:url";
 import { test, describe } from "node:test";
 import * as assert from "node:assert";
 import * as fs from "node:fs";
@@ -127,7 +128,7 @@ describe("daemon stop signal safety (compiled)", { skip: !haveDist ? "dist not b
     try {
       const out = execFileSync(
         process.execPath,
-        ["-e", `import(${JSON.stringify(DIST_DAEMON_CMD)}).then(m=>m.daemonStop())`],
+        ["-e", `import(${JSON.stringify(pathToFileURL(DIST_DAEMON_CMD).href)}).then(m=>m.daemonStop())`],
         { cwd: root, encoding: "utf-8" },
       );
       await new Promise((r) => setTimeout(r, 300));

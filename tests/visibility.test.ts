@@ -1,3 +1,4 @@
+import { pathToFileURL } from "node:url";
 import {test} from 'node:test';
 import assert from 'node:assert/strict';
 import * as fs from 'node:fs';
@@ -5,8 +6,8 @@ import * as os from 'node:os';
 import * as path from 'node:path';
 import {spawn,execFileSync} from 'node:child_process';
 const base=path.resolve(import.meta.dirname,'../dist');
-const v=await import(path.join(base,'hooks/visibility.js'));
-const h=await import(path.join(base,'hooks/handoff-state.js'));
+const v=await import(pathToFileURL(path.join(base,'hooks/visibility.js')).href);
+const h=await import(pathToFileURL(path.join(base,'hooks/handoff-state.js')).href);
 const fixture=(t:any)=>{const root=fs.mkdtempSync(path.join(os.tmpdir(),'ow-visibility-'));fs.mkdirSync(path.join(root,'.wolf'));t.after(()=>fs.rmSync(root,{recursive:true,force:true}));return root};
 const config=(root:string,mode:string)=>fs.writeFileSync(path.join(root,'.wolf/config.json'),JSON.stringify({openwolf:{visibility:{mode},updates:{mode:'off'}}}));
 const record=(root:string,evidence:string,operation='checkpoint-saved',at=1_000_000,session='test-session')=>v.recordReceipt(root,{operation,evidence,at,session,agent:'claude'});
@@ -46,7 +47,7 @@ test('a busy reducer never waits, claims nothing and preserves queued evidence',
 });
 test('concurrent processes claim a receipt only once',async t=>{
  const root=fixture(t);record(root,'concurrent','context-restored',Date.now());
- const code=`import {activityState} from ${JSON.stringify('file://'+path.join(base,'hooks/visibility.js'))}; console.log(activityState(process.argv[1],${JSON.stringify(delivery())}).message??'')`;
+ const code=`import {activityState} from ${JSON.stringify(pathToFileURL(path.join(base,'hooks/visibility.js')).href)}; console.log(activityState(process.argv[1],${JSON.stringify(delivery())}).message??'')`;
  const results=await Promise.all(Array.from({length:8},()=>new Promise<string>((resolve,reject)=>{const p=spawn(process.execPath,['--input-type=module','-e',code,root]);let out='';p.stdout.on('data',b=>out+=b);p.on('error',reject);p.on('exit',c=>c?reject(Error(String(c))):resolve(out.trim()))})));
  assert.equal(results.filter(Boolean).length,1);
 });
@@ -74,9 +75,9 @@ test('status line is session scoped and contains no model-context output',t=>{
  assert.match(run('test-session'),/^OpenWolf · Saved context/);assert.equal(run('other-session'),'');assert.doesNotMatch(run('test-session'),/additionalContext|\u001b/);
 });
 test('custom status lines survive installation; Grok adds no duplicate hooks',async t=>{
- const root=fixture(t);const {withVisibilityStatusline}=await import(path.join(base,'src/cli/visibility-settings.js'));
+ const root=fixture(t);const {withVisibilityStatusline}=await import(pathToFileURL(path.join(base,'src/cli/visibility-settings.js')).href);
  const custom={statusLine:{type:'command',command:'my-custom-status'}};assert.deepEqual(withVisibilityStatusline(root,custom),custom);
- const {resolveAgents}=await import(path.join(base,'src/agents/index.js'));const [grok]=resolveAgents(['grok']);grok.install({projectRoot:root,wolfDir:path.join(root,'.wolf'),templatesDir:''});assert.ok(!fs.existsSync(path.join(root,'.grok')));
+ const {resolveAgents}=await import(pathToFileURL(path.join(base,'src/agents/index.js')).href);const [grok]=resolveAgents(['grok']);grok.install({projectRoot:root,wolfDir:path.join(root,'.wolf'),templatesDir:''});assert.ok(!fs.existsSync(path.join(root,'.grok')));
 });
 test('denial receipts never duplicate functional protection messages',t=>{
  const root=fixture(t);record(root,'denied','read-denied');assert.equal(v.activityState(root,delivery(),1_000_000).message,undefined);assert.equal(v.activityState(root,undefined,1_000_000).state.counts['read-denied'],1);
@@ -86,7 +87,7 @@ test('failed receipt state commits preserve the queue and produce no display',t=
  assert.equal(v.activityState(root,delivery()).message,undefined);assert.equal(fs.readdirSync(path.join(root,'.wolf/activity/queue')).filter(n=>n.endsWith('.json')).length,1);
 });
 test('archival previews produce no receipts; committed archives produce real counts',async t=>{
- const root=fixture(t),wolf=path.join(root,'.wolf');const {archiveMemory}=await import(path.join(base,'hooks/memory-archive.js'));
+ const root=fixture(t),wolf=path.join(root,'.wolf');const {archiveMemory}=await import(pathToFileURL(path.join(base,'hooks/memory-archive.js')).href);
  fs.writeFileSync(path.join(wolf,'memory.md'),'# Memory\n\n## Session: 2020-01-01\n\nold one\n\n## Session: 2020-02-01\n\nold two\n\n## Session: 2026-09-14\n\nlatest\n');
  archiveMemory(wolf,7,true);assert.equal(v.activityState(root).state.history.length,0);
  const result=archiveMemory(wolf,7,false);assert.equal(result.archived.length,2);assert.equal(v.activityState(root).state.counts['memory-archived'],2);

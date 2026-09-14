@@ -1,6 +1,6 @@
 # Useful, quiet OpenWolf visibility
 
-Status: implemented in the source checkout and packaged runtime, with automated contract tests and Chrome dashboard verification. Native interactive terminal captures for Claude, Codex, OpenCode and Grok remain release validation; the tests below do not certify their UI rendering. Updating this checkout does not activate copied hooks in other projects.
+Status: implemented in the source checkout and packaged runtime, with automated contract tests and Chrome dashboard verification. Native Codex recovery receipts and OpenCode archive toasts were verified for 2.5.2; Grok's compatible SessionStart also ran successfully. Claude inference is unavailable because the owner's subscription expired. See the [release verification record](release-2.5.2.md) for versions and outstanding checks. Updating this checkout does not activate copied hooks in other projects.
 
 ## Implemented behavior
 
@@ -35,7 +35,7 @@ Final local verification on macOS / Node 24.15.0 (2026-09-14): production build 
 
 These measurements meet the 2 ms added-bookkeeping target in this fixture. They are not a guarantee of zero overhead on every machine or under a large boundary backlog, and do not measure native rendering or model calls. The receipt implementation starts no model calls.
 
-Run `pnpm build`, `node --test tests/visibility.test.ts`, and `node scripts/benchmark-visibility.mjs --hooks`. The benchmark compares 1,000 invocations per mode after warmup, alternating modes for the full pre-write hook. It measures local runtime cost, not model-token savings. Native terminal captures, Windows/Bun runtime checks and user-attention evaluation remain release checks.
+Run `pnpm build`, `node --test tests/visibility.test.ts`, and `node scripts/benchmark-visibility.mjs --hooks`. The benchmark compares 1,000 invocations per mode after warmup, alternating modes for the full pre-write hook. It measures local runtime cost, not model-token savings. The 2.5.2 checks include Bun plugin execution and native Codex/OpenCode displays. Windows CI, Claude status-line rendering and user-attention evaluation remain outstanding.
 
 ## Experience
 
