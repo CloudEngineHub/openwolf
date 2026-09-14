@@ -1,8 +1,19 @@
+import {dashboardFetch} from "../../lib/wolf-client.js";
 import React, { useState } from "react";
 import type { WolfData } from "../../hooks/useWolfData.js";
 
 export function MemoryViewer({ data }: { data: WolfData }) {
   const { memory } = data;
+  const [archiveContent,setArchiveContent]=useState("");
+  const [archiveMessage,setArchiveMessage]=useState("");
+  const archiveAction=async(id:string,restore=false)=>{
+    try {
+      const response=await dashboardFetch(`/api/memory/${restore?"restore":"archive"}/${id}`,restore?{method:"POST"}:undefined);
+      const result=await response.json();if (!response.ok) throw new Error(result.error);
+      if (restore) setArchiveMessage("Restored. Session list refreshes within 15 seconds.");
+      else setArchiveContent(result.content);
+    } catch(error) {setArchiveMessage(String(error));}
+  };
   const [expandedIdx, setExpandedIdx] = useState<number>(0);
   const [search, setSearch] = useState("");
 
@@ -17,6 +28,15 @@ export function MemoryViewer({ data }: { data: WolfData }) {
 
   return (
     <div>
+      <div className="wd-card p-4 mb-4 text-sm">
+        <strong>Archived history · retained indefinitely</strong>
+        <p>Older completed sessions are archived automatically. Pinned and active sessions stay in memory.</p>
+        <details><summary>{data.recordedUsage?.memory?.archives.length ?? 0} archived sessions</summary>
+          {data.recordedUsage?.memory?.archives.map(a=><div key={a.id} className="flex gap-3 py-1 items-center"><span className="flex-1">{a.title} · {a.bytes.toLocaleString()} bytes</span><button className="underline" onClick={()=>void archiveAction(a.id)}>Read</button>{a.restorable && <button className="underline" onClick={()=>void archiveAction(a.id,true)}>Restore</button>}</div>)}
+        </details>
+        {archiveMessage && <p role="status">{archiveMessage}</p>}
+        {archiveContent && <pre className="whitespace-pre-wrap text-xs mt-3 max-h-80 overflow-auto">{archiveContent}</pre>}
+      </div>
       <div className="flex items-center gap-3 mb-4">
         <input type="text" placeholder="Search memory..." value={search} onChange={(e) => setSearch(e.target.value)}
           className="flex-1 rounded-lg px-3 py-2 text-sm focus:outline-none"

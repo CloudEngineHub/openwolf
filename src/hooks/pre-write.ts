@@ -1,3 +1,7 @@
+import {recordReceipt} from './visibility.js';
+import {getProjectDir,detectAgent} from './shared.js';
+import { sharedWolfDir } from "./knowledge-root.js";
+import { approvedMemory } from "./trusted-memory.js";
 import * as fs from "node:fs";
 import * as path from "node:path";
 import { getWolfDir, ensureWolfDir, readJSON, readBugLogFile, readMarkdown, readStdin, emitHookJSON, recordInjectionToSessionFile, hookMain, getSessionFilePath } from "./shared.js";
@@ -49,7 +53,10 @@ async function main(): Promise<void> {
   // This fires when Claude is about to edit a file — if the edit looks like a fix
   // (changing error handling, modifying catch blocks, etc.), check the bug log
   if (filePath && (oldStr || content)) {
-    notes.push(...checkBugLog(wolfDir, filePath, oldStr, newStr, content));
+    const fixes=checkBugLog(wolfDir, filePath, oldStr, newStr, content);
+    notes.push(...fixes);
+    const fixCount=fixes.slice(1).filter(line=>line.split("| Fix: ")[1]?.trim()).length;
+    if(fixCount)recordReceipt(getProjectDir(),{agent:detectAgent(),session:input.session_id,operation:"fix-retrieved",evidence:fixes.join("\n"),count:fixCount});
   }
 
   if (notes.length > 0) {
@@ -59,7 +66,7 @@ async function main(): Promise<void> {
 }
 
 function checkCerebrum(wolfDir: string, content: string): string[] {
-  const cerebrumContent = readMarkdown(path.join(wolfDir, "cerebrum.md"));
+  const cerebrumContent = approvedMemory(wolfDir, "cerebrum.md");
   const doNotRepeatSection = cerebrumContent.split("## Do-Not-Repeat")[1];
   if (!doNotRepeatSection) return [];
 
@@ -107,7 +114,7 @@ const STOP_WORDS = new Set([
 ]);
 
 function checkBugLog(wolfDir: string, filePath: string, oldStr: string, newStr: string, content: string): string[] {
-  const bugLogPath = path.join(wolfDir, "buglog.json");
+  const bugLogPath = path.join(sharedWolfDir(wolfDir), "buglog.json");
   if (!fs.existsSync(bugLogPath)) return [];
 
   const bugLog = readBugLogFile(wolfDir) as BugLog;
@@ -120,7 +127,7 @@ function checkBugLog(wolfDir: string, filePath: string, oldStr: string, newStr: 
   // files, ranked by relevance, not just same-basename matches. Falls back to
   // the legacy basename + overlap filter when node:sqlite is unavailable.
   let relevant: BugEntry[] | null = null;
-  const ftsHits = searchBugsFTS(wolfDir, `${basename} ${editText.slice(0, 600)}`, 4);
+  const ftsHits = searchBugsFTS(sharedWolfDir(wolfDir), `${basename} ${editText.slice(0, 600)}`, 4);
   if (ftsHits !== null) {
     // Precision gate on the recall-oriented OR-query: keep same-file hits, and
     // cross-file hits only with a tag or 3-word overlap with the edit.
@@ -137,14 +144,14 @@ function checkBugLog(wolfDir: string, filePath: string, oldStr: string, newStr: 
   if (relevant === null) {
     // Legacy path: ONLY surface bugs recorded against the SAME file.
     const fileMatches = bugLog.bugs.filter(b => {
-      const bugBasename = path.basename(b.file);
+      const bugBasename = path.basename(typeof b.file === "string" ? b.file : "");
       return bugBasename === basename;
     });
     if (fileMatches.length === 0) return [];
 
     const editTokens = tokenize(editText);
     relevant = fileMatches.filter(bug => {
-      const tagHit = bug.tags.some(t => editText.includes(t.toLowerCase()));
+      const tagHit = (Array.isArray(bug.tags) ? bug.tags : []).some(t => editText.includes(t.toLowerCase()));
       if (tagHit) return true;
       const bugTokens = tokenize(bug.error_message + " " + bug.root_cause);
       const overlap = [...editTokens].filter(t => bugTokens.has(t));

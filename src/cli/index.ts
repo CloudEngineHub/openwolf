@@ -1,3 +1,9 @@
+import {addHandoffCommands} from "./handoff.js";
+import { logSessionMemory } from "../hooks/session-memory.js";
+import { reviewMemory, approveMemory, revokeMemory } from "./memory-review.js";
+import { usageReport, reconcileUsage } from "../tracker/usage-report.js";
+import { findProjectRoot } from "../scanner/project-root.js";
+import { archiveMemory, restoreMemory } from "../hooks/memory-archive.js";
 import * as fs from "node:fs";
 import * as path from "node:path";
 import { fileURLToPath } from "node:url";
@@ -26,6 +32,7 @@ function getVersion(): string {
 
 export function createProgram(): Command {
   const program = new Command();
+  addHandoffCommands(program);
 
   program
     .name("openwolf")
@@ -37,13 +44,15 @@ export function createProgram(): Command {
     .description("Initialize .wolf/ in current project")
     .option(
       "--agent <agents...>",
-      "agents to wire up alongside Claude Code: codex, opencode, gemini, cursor, all. Default: auto-detect what's installed; pass 'claude' to wire Claude Code only"
+      "agents to wire up alongside Claude Code: codex, opencode, grok, gemini, cursor, all. Default: auto-detect what's installed; pass 'claude' to wire Claude Code only"
     )
     .action((opts: { agent?: string[] }) => initCommand(opts));
 
   program
     .command("status")
     .description("Show daemon health, last session stats, file integrity")
+    .option("--all", "show all registered projects")
+    .option("--json", "machine-readable status")
     .action(statusCommand);
 
   program
@@ -93,7 +102,7 @@ export function createProgram(): Command {
     .description("Start daemon via pm2")
     .action(async () => {
       const { daemonStart } = await import("./daemon-cmd.js");
-      daemonStart();
+      await daemonStart();
     });
 
   daemon
@@ -109,7 +118,7 @@ export function createProgram(): Command {
     .description("Restart daemon")
     .action(async () => {
       const { daemonRestart } = await import("./daemon-cmd.js");
-      daemonRestart();
+      await daemonRestart();
     });
 
   daemon
@@ -175,7 +184,7 @@ export function createProgram(): Command {
   // --- Update command ---
   program
     .command("update")
-    .description("Update all registered OpenWolf projects to latest version")
+    .description("Refresh registered projects from this installed OpenWolf package")
     .option("--dry-run", "Show what would be updated without making changes")
     .option("--project <name>", "Update only a specific project (partial name match)")
     .option("--list", "List all registered projects")
@@ -186,6 +195,18 @@ export function createProgram(): Command {
       } else {
         await updateCommand(opts);
       }
+    });
+
+  program.command("self-update")
+    .description("Check npm and prepare a session-pinned runtime for this project")
+    .option("--status", "Show cached update status without network access")
+    .action(async (opts: {status?:boolean}) => {
+      const {findProjectRoot} = await import("../scanner/project-root.js");
+      const root = findProjectRoot(process.cwd());
+      const {updateState,installedVersion,updatePolicy} = await import("../hooks/runtime-updates.js");
+      const {checkForUpdate} = await import("../hooks/update-worker.js");
+      const state = opts.status ? updateState(root) : await checkForUpdate(root,true);
+      console.log(JSON.stringify({installed:installedVersion(root),policy:updatePolicy(root),...state},null,2));
     });
 
   // --- Restore command ---
@@ -210,5 +231,22 @@ export function createProgram(): Command {
       bugSearch(term);
     });
 
+  const usage = program.command("usage").description("Recorded project usage across Claude, Codex and OpenCode");
+  usage.command("report").option("--json").option("--agent <agent>").action((opts) => {
+    if (opts.agent && !["claude", "codex", "opencode"].includes(opts.agent)) throw new Error("Unknown usage agent");
+    console.log(JSON.stringify(usageReport(findProjectRoot(), opts.agent), null, 2));
+  });
+  usage.command("reconcile").option("--json").action(() => console.log(JSON.stringify(reconcileUsage(findProjectRoot()), null, 2)));
+  const memory = program.command("memory").description("Archive and restore session memory without deleting history");
+  memory.command("log").requiredOption("--session <id>").requiredOption("--summary <text>").option("--files <paths>", "files involved", "").option("--outcome <text>", "validation or unresolved outcome", "").action(opts => logSessionMemory(path.join(findProjectRoot(),".wolf"),opts.session,opts.summary,opts.files,opts.outcome));
+  memory.command("review").option("--json").action(() => console.log(JSON.stringify(reviewMemory(findProjectRoot()),null,2)));
+  memory.command("approve <candidate>").requiredOption("--reviewer <name>").requiredOption("--store <directory>").description("Administrator-only: approve the exact reviewed snapshot for a managed harness").action((candidate,opts) => approveMemory(candidate,opts.reviewer,opts.store));
+  memory.command("revoke").requiredOption("--reviewer <name>").requiredOption("--store <directory>").description("Administrator-only: revoke durable instruction approval").action(opts => console.log(JSON.stringify(revokeMemory(findProjectRoot(),opts.reviewer,opts.store),null,2)));
+  memory.command("archive").option("--days <days>", "retention days", "7").option("--dry-run").action(opts => console.log(JSON.stringify(archiveMemory(path.join(findProjectRoot(), ".wolf"), Number(opts.days), opts.dryRun === true), null, 2)));
+  memory.command("restore <id>").action(id => restoreMemory(path.join(findProjectRoot(), ".wolf"), id));
+  program.command("maintenance").option("--dry-run").action(opts => {
+    const root = findProjectRoot();
+    console.log(JSON.stringify({memory: archiveMemory(path.join(root, ".wolf"), 7, opts.dryRun === true), usage: opts.dryRun ? usageReport(root) : reconcileUsage(root)}, null, 2));
+  });
   return program;
 }

@@ -1,3 +1,4 @@
+import {recordReceipt} from '../hooks/visibility.js';
 import * as fs from "node:fs";
 import * as path from "node:path";
 import { findProjectRoot } from "../scanner/project-root.js";
@@ -24,6 +25,8 @@ export function bugSearch(term: string): void {
     return;
   }
 
+  const fixes=results.filter(b=>typeof b.fix==="string"&&b.fix.trim());
+  if(fixes.length)recordReceipt(projectRoot,{operation:"fix-retrieved",evidence:JSON.stringify(fixes.map(b=>[b.id,b.fix])),count:fixes.length});
   console.log(`Found ${results.length} matching bug(s)${ftsResults !== null && ftsResults.length > 0 ? " (relevance ranked)" : ""}:\n`);
 
   for (const bug of results) {

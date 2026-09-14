@@ -1,3 +1,4 @@
+import {grokAdapter} from './grok.js';
 import * as fs from "node:fs";
 import * as os from "node:os";
 import * as path from "node:path";
@@ -15,6 +16,7 @@ export type { AgentAdapter, AgentInstallContext, AgentInstallResult } from "./ty
 // native install path in cli/init.ts. This registry holds the additional
 // agents wired up via `openwolf init --agent <name>`.
 const ADAPTERS: Record<string, AgentAdapter> = {
+  [grokAdapter.name]: grokAdapter,
   [codexAdapter.name]: codexAdapter,
   [opencodeAdapter.name]: opencodeAdapter,
   [geminiAdapter.name]: geminiAdapter,

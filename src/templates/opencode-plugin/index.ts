@@ -1,3 +1,9 @@
+import {activityState,showActivityToast} from './visibility.js'
+import {scheduleUpdate, updateNotice} from "./runtime-updates.js"
+import { mutateJSON, HOOK_LOCK_BUDGET_MS } from "./anatomy-lock.js"
+import {readJSON,sessionFilePath} from "./fs.js"
+import { approvedMemory } from "./trusted-memory.js"
+import { recordUsage, reconcileOpenCode } from "./usage.js"
 import type { Plugin } from "@opencode-ai/plugin"
 import * as fs from "node:fs"
 import * as path from "node:path"
@@ -35,19 +41,43 @@ function extractSessionId(source: unknown): string {
   return ""
 }
 
-export const OpenWolf: Plugin = async ({ directory }: { directory: string }) => {
+export const OpenWolf: Plugin = async ({ directory, client }) => {
+  let reconciliation: Promise<void> = Promise.resolve()
+  const refreshUsage = (id?: string) => {
+    reconciliation = reconciliation.then(() => reconcileOpenCode(directory,client,id)).catch(error => console.warn(`OpenWolf usage reconciliation: ${error}`))
+    return reconciliation
+  }
+  if (wolfDirExists(directory)) void refreshUsage()
+
   return {
     event: async ({ event }: { event: { type: string; [key: string]: unknown } }) => {
       if (event.type === "session.created" && !wolfDirExists(directory)) return
 
+      if (!wolfDirExists(directory)) return
+      if (event.type === "message.updated") {
+        try {recordUsage(directory, (event as any).properties?.info)} catch(error) {console.warn(String(error))}
+      }
       const sessionId = extractSessionId(event)
       if (!sessionId) return
 
       if (event.type === "session.created") {
         handleSessionStart(directory, sessionId)
+        scheduleUpdate(directory)
+        const notice=updateNotice(directory,sessionId)
+        if(notice)showActivityToast(client,notice)
       }
 
+      if (event.type === "session.idle" || event.type === "session.error" || event.type === "session.deleted") {
+        scheduleUpdate(directory)
+        const update=updateNotice(directory,sessionId)
+        const activity=update??activityState(directory,{agent:"opencode",session:sessionId,turn:String(readJSON<Record<string,unknown>>(sessionFilePath(path.join(getWolfDir(directory),"hooks"),sessionId),{}).stop_count??0),surface:"opencode-toast"}).message
+        if(activity)showActivityToast(client,activity)
+        await refreshUsage(sessionId)
+        handleStop(directory, sessionId)
+      }
       if (event.type === "session.deleted") {
+        const file=sessionFilePath(path.join(getWolfDir(directory),"hooks"),sessionId)
+        mutateJSON<Record<string,unknown>>(file,{},HOOK_LOCK_BUDGET_MS,state=>{state.ended=new Date().toISOString()})
         deleteSession(sessionId)
       }
     },
@@ -76,7 +106,7 @@ export const OpenWolf: Plugin = async ({ directory }: { directory: string }) => 
       }
     },
 
-    "tool.execute.after": async (input: { tool: string; sessionID: string; args: Record<string, unknown> }, output: Record<string, unknown>) => {
+    "tool.execute.after": async (input: { tool: string; sessionID: string; args: Record<string, unknown>; callID?: string }, output: Record<string, unknown>) => {
       if (!wolfDirExists(directory)) return
 
       const sessionId = extractSessionId(input)
@@ -88,7 +118,7 @@ export const OpenWolf: Plugin = async ({ directory }: { directory: string }) => 
       if (tool === "read") {
         const filePath = String(args.filePath || args.file_path || "")
         const content = String((output as any).output || "")
-        if (filePath) handlePostRead(directory, sessionId, filePath, content)
+        if (filePath) handlePostRead(directory, sessionId, filePath, content, args.offset !== undefined || args.limit !== undefined, input.callID)
       }
 
       if (tool === "write" || tool === "edit") {
@@ -116,7 +146,7 @@ export const OpenWolf: Plugin = async ({ directory }: { directory: string }) => 
       const openwolfPath = path.join(wolfDir, "OPENWOLF.md")
       if (fs.existsSync(openwolfPath)) {
         try {
-          const openwolfContent = fs.readFileSync(openwolfPath, "utf-8")
+          const openwolfContent = approvedMemory(wolfDir, "OPENWOLF.md")
           output.system.push(`\n<openwolf-protocol>\n${openwolfContent}\n</openwolf-protocol>`)
         } catch {}
       }

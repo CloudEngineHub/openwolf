@@ -1,3 +1,5 @@
+import {withVisibilityStatusline} from './visibility-settings.js';
+import { claudePaths } from "./claude-paths.js";
 /**
  * openwolf update — Update all registered OpenWolf projects.
  *
@@ -227,19 +229,21 @@ async function updateProject(
     // 4. Update .claude/settings.json hooks
     const claudeDir = path.join(root, ".claude");
     ensureDir(claudeDir);
-    const settingsPath = path.join(claudeDir, "settings.json");
+    const settingsPath = claudePaths(root).settings;
+    ensureDir(path.dirname(settingsPath));
     const hookSettings = buildHookSettings(root);
     if (fs.existsSync(settingsPath)) {
-      const existing = readJSON<Record<string, unknown>>(settingsPath, {});
+      const existing = JSON.parse(fs.readFileSync(settingsPath,"utf8"));
+      if (!existing || typeof existing !== "object" || Array.isArray(existing)) throw new Error(`Invalid settings object: ${settingsPath}; file preserved`);
       const merged = replaceOpenWolfHooks(existing, hookSettings);
-      writeJSON(settingsPath, merged);
+      writeJSON(settingsPath, withVisibilityStatusline(root, merged));
     } else {
-      writeJSON(settingsPath, hookSettings);
+      writeJSON(settingsPath, withVisibilityStatusline(root, hookSettings));
     }
     console.log(`    ✓ Claude settings updated`);
 
     // 5. Update .claude/rules/openwolf.md
-    const rulesDir = path.join(claudeDir, "rules");
+    const rulesDir = claudePaths(root).rules;
     ensureDir(rulesDir);
     const rulesContent = readTemplateContent("claude-rules-openwolf.md", templatesDir);
     writeText(path.join(rulesDir, "openwolf.md"), rulesContent);
@@ -365,7 +369,8 @@ async function updateProject(
     // byte-identically, so user customizations are never touched) is replaced
     // with the current stub; the old snippet @-inlined the whole protocol
     // into every session, which the stub + skill now cover on demand.
-    const claudeMdPath = path.join(root, "CLAUDE.md");
+    const claudeMdPath = claudePaths(root).instructions;
+    ensureDir(path.dirname(claudeMdPath));
     const snippetContent = readTemplateContent("claude-md-snippet.md", templatesDir);
     if (fs.existsSync(claudeMdPath)) {
       const existing = readText(claudeMdPath);
@@ -584,6 +589,17 @@ daemon.log
 daemon.pid
 dashboard-token
 token-ledger.json
+usage-report.json
+updates/
+handoff/
+activity/
+usage/
+archive/
+session-memory/
+ledger-pending/
+ledger-sessions/
+bug-pending/
+*.pending/
 suggestions.json
 cron-state.json
 _scan-state.json
@@ -594,8 +610,15 @@ _*.json
 
 export function ensureWolfGitignore(wolfDir: string): boolean {
   const p = path.join(wolfDir, ".gitignore");
-  if (fs.existsSync(p)) return false;
   try {
+    if (fs.existsSync(p)) {
+      const existing=fs.readFileSync(p,"utf8");
+      const additions=["usage-report.json", "updates/","handoff/","activity/","usage/","archive/","session-memory/","ledger-pending/","ledger-sessions/","bug-pending/","*.pending/"].filter(line=>!existing.split(/\r?\n/).includes(line));
+      if (!additions.length) return false;
+      // Prepend so explicit user negations later in the file still win.
+      writeText(p,"# OpenWolf recovery and usage artifacts\n"+additions.join("\n")+"\n"+existing);
+      return true;
+    }
     fs.writeFileSync(p, WOLF_GITIGNORE, "utf-8");
     return true;
   } catch {
@@ -708,7 +731,7 @@ function copyHookScripts(wolfDir: string): void {
     }
   }
 
-  const hookFiles = HOOK_FILES;
+  const hookFiles = sourceDir ? fs.readdirSync(sourceDir).filter(f => f.endsWith(".js")) : HOOK_FILES;
 
   if (sourceDir) {
     for (const file of hookFiles) {
@@ -720,6 +743,7 @@ function copyHookScripts(wolfDir: string): void {
   }
 
   // Always ensure package.json with type:module
+  fs.writeFileSync(path.join(hooksDir, "runtime.json"), JSON.stringify({version: getVersion(), protocol: 1}) + "\n");
   const hooksPkgPath = path.join(hooksDir, "package.json");
   fs.writeFileSync(hooksPkgPath, JSON.stringify({ type: "module" }, null, 2) + "\n", "utf-8");
 }

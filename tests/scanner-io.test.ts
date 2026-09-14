@@ -55,6 +55,7 @@ describe("#92 scan file I/O (compiled)", { skip: !haveDist ? "dist not built" : 
     fs.cpSync(path.join(ROOT, "dist", "hooks"), path.join(stage, "hooks"), { recursive: true });
     fs.writeFileSync(path.join(stage, "package.json"), JSON.stringify({ type: "module" }));
 
+    fs.symlinkSync(path.join(ROOT, "node_modules"), path.join(stage, "node_modules"), "junction");
     const tallyPath = path.join(stage, "opens.log");
     const extractorPath = path.join(stage, "src", "scanner", "description-extractor.js");
     const extractorSrc = fs.readFileSync(extractorPath, "utf-8");

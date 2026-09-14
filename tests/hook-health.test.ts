@@ -5,7 +5,7 @@ import * as os from "node:os";
 import * as path from "node:path";
 import { execFileSync, execFile } from "node:child_process";
 
-import { recordHeartbeat, getSessionFilePath, gcSessionFiles } from "../src/hooks/shared.ts";
+import { recordHeartbeat, getSessionFilePath, gcSessionFiles } from "../dist/hooks/shared.js";
 
 const DIST_HOOKS = path.resolve(import.meta.dirname ?? ".", "..", "dist", "hooks");
 const haveDist = fs.existsSync(path.join(DIST_HOOKS, "pre-read.js"));
@@ -63,14 +63,14 @@ describe("session keying", () => {
     });
   });
 
-  test("gc removes only old session files", () => {
+  test("gc removes only old ended session files", () => {
     const root = tmpProject();
     withProjectEnv(root, () => {
       const dir = path.join(root, ".wolf", "hooks", "sessions");
       fs.mkdirSync(dir, { recursive: true });
       const oldFile = path.join(dir, "old.json");
       const newFile = path.join(dir, "new.json");
-      fs.writeFileSync(oldFile, "{}");
+      fs.writeFileSync(oldFile, JSON.stringify({ ended: "2026-01-01T00:00:00Z" }));
       fs.writeFileSync(newFile, "{}");
       const past = Date.now() / 1000 - 10 * 24 * 3600;
       fs.utimesSync(oldFile, past, past);

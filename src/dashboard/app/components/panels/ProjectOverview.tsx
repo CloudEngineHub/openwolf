@@ -1,3 +1,4 @@
+import {OpenWolfActivity} from './OpenWolfActivity.js';
 import React from "react";
 import { StatusBadge } from "../shared/StatusBadge.js";
 import { StatTile } from "../shared/StatTile.js";
@@ -53,7 +54,7 @@ export function ProjectOverview({ data }: { data: WolfData }) {
   const hookCount = Object.keys(hookHealth).length;
   const lt = tokenLedger.lifetime;
   const projectName = project.name || identity.name;
-  const measured = (lt.real_api_calls ?? 0) > 0;
+  const measured = data.recordedUsage !== null && data.recordedUsage.record_count > 0;
   const dupMode = config.reads?.duplicate_mode ?? "warn";
   const denyOn = dupMode === "deny";
   const anatomyTotal = lt.anatomy_hits + lt.anatomy_misses;
@@ -67,10 +68,17 @@ export function ProjectOverview({ data }: { data: WolfData }) {
   // daemon's whole-project scan; the per-session rollup is there from day one.
   const perModel = (tokenLedger.measured_project?.by_model ??
     tokenLedger.lifetime_maps?.real_by_model) as Record<string, ModelUsage> | undefined;
-  const cost = costOfProject(perModel);
+  const cost = data.recordedUsage?.costs ?? costOfProject(perModel);
 
   return (
     <div className="space-y-4">
+      <OpenWolfActivity/>
+      {data.recordedUsage?.memory && <div className="wd-card p-4 text-sm">
+        <strong>Memory approval: {data.recordedUsage.memory.trust.status}</strong>
+        <p>{data.recordedUsage.memory.trust.reason}</p>
+        <p>{data.recordedUsage.memory.archive_preview.archived.length} sessions eligible for archival · archived history is retained.</p>
+      </div>}
+
       {/* Header row */}
       <div className="flex items-end justify-between flex-wrap gap-3">
         <div>
@@ -138,6 +146,15 @@ export function ProjectOverview({ data }: { data: WolfData }) {
           })()}
         </div>
 
+        {data.recordedUsage?.updates && <div className="wd-card p-4 space-y-1">
+          <div className="wd-label">OpenWolf updates</div>
+          <div>Installed {data.recordedUsage.updates.installed} · {data.recordedUsage.updates.policy}</div>
+          <div>{data.recordedUsage.updates.selected ? `Ready for new sessions: ${data.recordedUsage.updates.selected}` : data.recordedUsage.updates.status ?? "Check pending"}</div>
+          {data.recordedUsage.updates.latest && <div>Latest npm release: {data.recordedUsage.updates.latest}</div>}
+          {data.recordedUsage.updates.detail && <div>{data.recordedUsage.updates.detail}</div>}
+          <div className="wd-label">Running sessions retain their pinned runtime.</div>
+        </div>}
+
         {/* Measured usage */}
         <div className="wd-card p-5 flex flex-col justify-between gap-3 min-h-[132px]">
           <div className="flex items-start justify-between">
@@ -146,14 +163,14 @@ export function ProjectOverview({ data }: { data: WolfData }) {
           </div>
           {measured ? (
             <div className="space-y-1.5 font-mono text-sm" style={{ color: "var(--text-secondary)" }}>
-              <div className="flex justify-between"><span>in</span><span className="dot-display text-base" style={{ color: "var(--text-primary)" }}>{fmt(lt.real_input_tokens)}</span></div>
-              <div className="flex justify-between"><span>out</span><span className="dot-display text-base" style={{ color: "var(--text-primary)" }}>{fmt(lt.real_output_tokens)}</span></div>
-              <div className="flex justify-between"><span>cache read</span><span className="dot-display text-base" style={{ color: "var(--text-primary)" }}>{fmt(lt.real_cache_read_tokens)}</span></div>
-              <div className="flex justify-between wd-label pt-1" style={{ color: "var(--text-faint)" }}><span>api calls</span><span>{fmt(lt.real_api_calls)}</span></div>
+              <div className="flex justify-between"><span>in</span><span className="dot-display text-base" style={{ color: "var(--text-primary)" }}>{(data.recordedUsage?.totals.input_tokens?.toLocaleString() ?? "Unavailable")}</span></div>
+              <div className="flex justify-between"><span>out</span><span className="dot-display text-base" style={{ color: "var(--text-primary)" }}>{(data.recordedUsage?.totals.output_tokens?.toLocaleString() ?? "Unavailable")}</span></div>
+              <div className="flex justify-between"><span>cache read</span><span className="dot-display text-base" style={{ color: "var(--text-primary)" }}>{(data.recordedUsage?.totals.cached_input_tokens?.toLocaleString() ?? "Unavailable")}</span></div>
+              <div className="flex justify-between wd-label pt-1" style={{ color: "var(--text-faint)" }}><span>usage records</span><span>{fmt(data.recordedUsage?.record_count)}</span></div>
             </div>
           ) : (
             <p className="text-sm" style={{ color: "var(--text-muted)" }}>
-              No measured usage yet — real token counts are read from each session's transcript at Stop.
+              No recorded usage available yet. The daemon reconciles supported harness records automatically.
             </p>
           )}
         </div>

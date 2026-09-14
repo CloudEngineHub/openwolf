@@ -4,7 +4,7 @@ import * as fs from "node:fs";
 import * as os from "node:os";
 import * as path from "node:path";
 
-import { readBugLogFile } from "../src/hooks/shared.ts";
+import { readBugLogFile } from "../dist/hooks/shared.js";
 import { buildHookSettings, HOOK_COUNT } from "../src/cli/hook-manifest.ts";
 
 // bug-tracker.ts imports ../utils/fs-safe.js, and node's type stripping does

@@ -112,7 +112,7 @@ describe("path traversal", () => {
 
 describe("secret file redaction (issue #54)", () => {
   test("isSensitiveFile covers keys, stores, credentials — not normal files", async () => {
-    const { isSensitiveFile } = await import("../src/hooks/shared.ts");
+    const { isSensitiveFile } = await import("../dist/hooks/shared.js");
     for (const f of [
       ".env", ".env.local", "server.pem", "signing.key", "apns.p8",
       "release.keystore", "trust.jks", "id_rsa", "id_ed25519.pub",

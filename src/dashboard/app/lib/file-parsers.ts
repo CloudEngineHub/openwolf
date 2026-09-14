@@ -135,3 +135,14 @@ export function parseCerebrum(content: string): CerebrumData {
 
   return data;
 }
+
+// PR #95 by @davdittrich: normalize at the boundary, including live updates.
+export function parseCronState(content: string) {
+  const state = JSON.parse(content);
+  return {
+    engine_status: typeof state?.engine_status === "string" ? state.engine_status : "unknown",
+    last_heartbeat: typeof state?.last_heartbeat === "string" ? state.last_heartbeat : null,
+    execution_log: Array.isArray(state?.execution_log) ? state.execution_log : [],
+    dead_letter_queue: Array.isArray(state?.dead_letter_queue) ? state.dead_letter_queue : [],
+  };
+}

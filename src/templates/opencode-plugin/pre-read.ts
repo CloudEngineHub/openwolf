@@ -5,6 +5,9 @@ import { lookupEntry } from "./anatomy.js"
 import type { PartialSessionState } from "./types.js"
 
 export function handlePreRead(directory: string, sessionId: string, filePath: string, isRangedRead = false): void {
+  filePath=path.resolve(directory,filePath)
+  const relative=path.relative(directory,filePath)
+  if (!relative || relative === ".." || relative.startsWith(".."+path.sep) || path.isAbsolute(relative)) return
   const wolfDir = getWolfDir(directory)
   if (!fs.existsSync(wolfDir)) return
 
@@ -39,7 +42,7 @@ export function handlePreRead(directory: string, sessionId: string, filePath: st
     let modifiedSinceRead = true
     try {
       const mtime = fs.statSync(filePath).mtimeMs
-      modifiedSinceRead = prev.read_mtime === undefined || mtime > prev.read_mtime
+      modifiedSinceRead = prev.read_mtime === undefined || mtime !== prev.read_mtime
     } catch {}
     if (!modifiedSinceRead) {
       prev.count++

@@ -28,10 +28,9 @@ function writeJSONFile(filePath: string, data: unknown): void {
   try {
     fs.writeFileSync(tmp, JSON.stringify(data, null, 2), "utf-8");
     fs.renameSync(tmp, filePath);
-  } catch {
-    // On Windows, rename can fail if another process holds a handle.
-    try { fs.writeFileSync(filePath, JSON.stringify(data, null, 2), "utf-8"); } catch {}
+  } catch (error) {
     try { fs.unlinkSync(tmp); } catch {}
+    throw error;
   }
 }
 

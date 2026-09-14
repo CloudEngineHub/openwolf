@@ -18,8 +18,9 @@ export async function scanCommand(options: { check?: boolean }): Promise<void> {
     // walk MERGED with curated descriptions/preamble via the reconciled store.
     // Comparing the raw fresh render made --check a permanent false positive
     // (extractor descriptions and zeroed counters never matched disk).
-    const { store: fresh } = await buildAnatomy(wolfDir, projectRoot);
-    const newContent = renderStore(buildMergedStore(wolfDir, projectRoot, fresh));
+    const { store: fresh, complete } = await buildAnatomy(wolfDir, projectRoot);
+    if (!complete) { console.error("Cannot certify freshness: anatomy scan is incomplete."); process.exitCode = 1; return; }
+    const newContent = renderStore(buildMergedStore(wolfDir, projectRoot, fresh, complete));
 
     const anatomyPath = path.join(wolfDir, "anatomy.md");
     let existingContent = "";
@@ -49,5 +50,5 @@ export async function scanCommand(options: { check?: boolean }): Promise<void> {
   const startTime = Date.now();
   const fileCount = await scanProject(wolfDir, projectRoot);
   const elapsed = Date.now() - startTime;
-  console.log(`  ✓ Anatomy scan complete: ${fileCount} files indexed in ${elapsed}ms`);
+  console.log(`  ✓ Anatomy scan visited: ${fileCount} files indexed in ${elapsed}ms`);
 }

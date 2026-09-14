@@ -1,3 +1,5 @@
+import { mutateJSON, HOOK_LOCK_BUDGET_MS } from "./anatomy-lock.js";
+import { reconcileReads } from "./event-journal.js";
 import * as path from "node:path";
 import { getWolfDir, ensureWolfDir, readJSON, appendMarkdown, timeShort, readStdin, hookMain, getSessionFilePath } from "./shared.js";
 import { buildSessionEntry, flushSessionToLedger, type SessionData } from "./ledger.js";
@@ -19,11 +21,17 @@ async function main(): Promise<void> {
   } catch {}
   const sessionFile = getSessionFilePath(hookInput);
 
+  reconcileReads(sessionFile);
   const session = readJSON<SessionData | null>(sessionFile, null);
   if (!session || !session.session_id) {
     return;
   }
 
+  let firstEnd = false;
+  mutateJSON<Record<string, unknown>>(sessionFile, {}, HOOK_LOCK_BUDGET_MS, state => {
+    firstEnd = !state.ended;
+    state.ended = state.ended ?? new Date().toISOString();
+  });
   const readCount = Object.keys(session.files_read ?? {}).length;
   const writeCount = (session.files_written ?? []).length;
   if (readCount === 0 && writeCount === 0) {
@@ -37,7 +45,7 @@ async function main(): Promise<void> {
   }
   flushSessionToLedger(wolfDir, entry);
 
-  if (writeCount > 0) {
+  if (writeCount > 0 && firstEnd) {
     try {
       const uniqueFiles = new Set(session.files_written.map((w) => path.basename(w.file)));
       const fileList = [...uniqueFiles].slice(0, 5).join(", ");

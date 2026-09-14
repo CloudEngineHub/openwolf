@@ -1,6 +1,11 @@
+import { persistObservation, reconcileReads } from "./event-journal.js"
+import * as crypto from "node:crypto"
+import { recordBug } from "./bug-journal.js"
+import { sharedWolfDir } from "./knowledge-root.js";
+import { withFileLock, HOOK_LOCK_BUDGET_MS } from "./anatomy-lock.js"
+import { nextBugId } from "./bug-id.js"
 import * as fs from "node:fs"
 import * as path from "node:path"
-import * as crypto from "node:crypto"
 import { getWolfDir, writeJSON, readJSON, appendMarkdown, timeShort, normalizePath, estimateTokens, isSensitiveFile, sessionFilePath } from "./fs.js"
 import { extractDescription, withAnatomyLock, loadStoreReconciled, saveStore, renderToFile, sha256, LOCK_BUDGET_MS } from "./anatomy.js"
 import type { PartialSessionState, FixDetection } from "./types.js"
@@ -142,35 +147,12 @@ function trackSession(
   absolutePath: string
 ): void {
   try {
-    const session = readJSON<PartialSessionState>(sessionFile, { files_written: [], edit_counts: {} })
-    if (!session.edit_counts) session.edit_counts = {}
-
-    const normalizedFile = normalizePath(filePath)
-    const action = toolName === "Write" ? "create" : "edit"
-    const fileContent = content ?? ""
-    const tokens = estimateTokens(fileContent || newStr, "code")
-
-    session.files_written!.push({
-      file: normalizedFile,
-      action,
-      tokens,
-      at: new Date().toISOString(),
-    })
-
-    const editKey = normalizePath(path.relative(projectRoot, absolutePath))
-    session.edit_counts![editKey] = (session.edit_counts![editKey] || 0) + 1
-
-    // A write invalidates the read record: the next read of this file is
-    // legitimate, not a duplicate.
-    if (session.files_read && session.files_read[normalizedFile]) {
-      delete session.files_read[normalizedFile]
-    }
-
-    writeJSON(sessionFile, session)
-
-    if (session.edit_counts![editKey] >= 3) {
-      console.warn(`⚠️ OpenWolf: ${baseName} has been edited ${session.edit_counts![editKey]} times this session. If you're fixing a bug, remember to log it to .wolf/buglog.json.`)
-    }
+    const normalizedFile=normalizePath(absolutePath)
+    const action=toolName.toLowerCase()==="write"?"create":"edit"
+    const tokens=estimateTokens(content || newStr,"code")
+    const editKey=normalizePath(path.relative(projectRoot,absolutePath))
+    persistObservation(sessionFile,{id:crypto.randomUUID(),kind:"write",file:normalizedFile,action,tokens,editKey,at:new Date().toISOString()})
+    reconcileReads(sessionFile)
   } catch {}
 }
 
@@ -230,53 +212,17 @@ export function autoDetectBugFix(wolfDir: string, absolutePath: string, projectR
   // Respect an explicit opt-out in .wolf/config.json (default: enabled).
   if (!bugAutoDetectEnabled(wolfDir)) return
 
-  const bugLogPath = path.join(wolfDir, "buglog.json")
-  const bugLog = readJSON<{ version: number; bugs: Array<{ id: string; timestamp: string; error_message: string; file: string; root_cause: string; fix: string; tags: string[]; related_bugs: string[]; occurrences: number; last_seen: string }> }>(bugLogPath, { version: 1, bugs: [] })
-  const relFile = normalizePath(path.relative(projectRoot, absolutePath))
-
-  const detection = detectFixPattern(oldStr, newStr, ext, basename)
+  const detection=detectFixPattern(oldStr,newStr,ext,basename)
   if (!detection) return
-
-  const recentDupe = bugLog.bugs.find(b => {
-    if (path.basename(b.file) !== basename) return false
-    if (!b.tags.includes("auto-detected")) return false
-    if (!b.tags.includes(detection.category)) return false
-    const bugTime = new Date(b.last_seen).getTime()
-    return (Date.now() - bugTime) < 5 * 60 * 1000
-  })
-
-  if (recentDupe) {
-    recentDupe.occurrences++
-    recentDupe.last_seen = new Date().toISOString()
-    if (detection.context && !recentDupe.fix.includes(detection.context)) {
-      recentDupe.fix += ` | Also: ${detection.context}`
-    }
-    writeJSON(bugLogPath, bugLog)
-    return
-  }
-
-  const nextId = `bug-${String(bugLog.bugs.length + 1).padStart(3, "0")}`
-  bugLog.bugs.push({
-    id: nextId,
-    timestamp: new Date().toISOString(),
-    error_message: detection.summary,
-    file: relFile,
-    root_cause: detection.rootCause,
-    fix: detection.fix,
-    tags: ["auto-detected", detection.category, ext.replace(".", "") || "unknown"],
-    related_bugs: [],
-    occurrences: 1,
-    last_seen: new Date().toISOString(),
-  })
-  writeJSON(bugLogPath, bugLog)
+  recordBug(wolfDir,{error_message:detection.summary,file:normalizePath(path.relative(projectRoot,absolutePath)),root_cause:detection.rootCause,fix:detection.fix,tags:["auto-detected",detection.category,ext.slice(1)||"unknown"],status:"candidate",observed_worktree:projectRoot})
 }
 
 export function detectFixPattern(oldStr: string, newStr: string, ext: string, basename: string): FixDetection | null {
   const oldLines = oldStr.split("\n")
   const newLines = newStr.split("\n")
 
-  if (newStr.includes("catch") && !oldStr.includes("catch")) {
-    const fn = newStr.match(/(?:function|def|async)\s+(\w+)/)?.[1] || "unknown"
+  if (!/(?:Test|IT|Spec)\.\w+$|(?:[._](?:test|spec))\.\w+$|^test_/.test(basename) && /\bcatch\s*\(/.test(newStr) && !/\bcatch\s*\(/.test(oldStr)) {
+    const fn = newStr.match(/(?:function|def|async)\s+(\w+)/)?.[1] || basename
     return { category: "error-handling", summary: `Missing error handling in ${fn}`, rootCause: "Code path had no error handling", fix: "Added try/catch block", context: extractChangedLines(oldStr, newStr) }
   }
 

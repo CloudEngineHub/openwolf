@@ -1,3 +1,4 @@
+import { approvedMemory } from "../hooks/trusted-memory.js";
 import * as fs from "node:fs";
 import * as os from "node:os";
 import * as path from "node:path";
@@ -95,7 +96,7 @@ export function syncCerebrumToClaudeMemory(
 
   let cerebrum: string;
   try {
-    cerebrum = fs.readFileSync(path.join(wolfDir, "cerebrum.md"), "utf-8");
+    cerebrum = approvedMemory(wolfDir, "cerebrum.md");
   } catch {
     return { synced: [], skippedReason: "no cerebrum.md" };
   }

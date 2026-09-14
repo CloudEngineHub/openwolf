@@ -1,0 +1,483 @@
+{
+  "repository": "cytostack/openwolf",
+  "audited_at": "2026-09-14",
+  "upstream_head": "06ed8813efb27ced3523467ef594d64c9caf45a8",
+  "local_base": "a7625af4df494cafc00c197bff26fa3af4d0f649",
+  "issues": [
+    {
+      "number": 119,
+      "reporter": "andig",
+      "url": "https://github.com/cytostack/openwolf/issues/119",
+      "analysis": "Verify packaged --agent opencode help; source already supports the flag."
+    },
+    {
+      "number": 116,
+      "reporter": "pereirajo",
+      "url": "https://github.com/cytostack/openwolf/issues/116",
+      "analysis": "Guard missing bug file and bound reinjection bytes."
+    },
+    {
+      "number": 114,
+      "reporter": "Noboxer",
+      "url": "https://github.com/cytostack/openwolf/issues/114",
+      "analysis": "Preserve incomplete scans; watch editor/Git changes; isolate worktree anatomy."
+    },
+    {
+      "number": 97,
+      "reporter": "cytostack",
+      "url": "https://github.com/cytostack/openwolf/issues/97",
+      "analysis": "Protected review snapshots; attribute original proposal to kantorcodes (Michael Kantor)."
+    },
+    {
+      "number": 75,
+      "reporter": "Esturban",
+      "url": "https://github.com/cytostack/openwolf/issues/75",
+      "analysis": "Report disabled scheduler correctly; validate cron state."
+    },
+    {
+      "number": 73,
+      "reporter": "spignataro",
+      "url": "https://github.com/cytostack/openwolf/issues/73",
+      "analysis": "Harden malformed bug fields and reduce OpenCode false detections."
+    },
+    {
+      "number": 68,
+      "reporter": "Laptopcorei7",
+      "url": "https://github.com/cytostack/openwolf/issues/68",
+      "analysis": "Ship every compiled hook dependency; preserve stdin and native path handling."
+    },
+    {
+      "number": 62,
+      "reporter": "statik1",
+      "url": "https://github.com/cytostack/openwolf/issues/62",
+      "analysis": "Explicit session-keyed semantic memory, independent of the latest global heading."
+    },
+    {
+      "number": 61,
+      "reporter": "prghbla",
+      "url": "https://github.com/cytostack/openwolf/issues/61",
+      "analysis": "Preserve curated preambles and unvisited anatomy entries; laihenyi supplied a preamble reproduction."
+    },
+    {
+      "number": 49,
+      "reporter": "bluesky8318",
+      "url": "https://github.com/cytostack/openwolf/issues/49",
+      "analysis": "Duplicate of #47; multi-project switcher deferred."
+    },
+    {
+      "number": 48,
+      "reporter": "bluesky8318",
+      "url": "https://github.com/cytostack/openwolf/issues/48",
+      "analysis": "Duplicate of #47; multi-project switcher deferred."
+    },
+    {
+      "number": 47,
+      "reporter": "bluesky8318",
+      "url": "https://github.com/cytostack/openwolf/issues/47",
+      "analysis": "Deferred dashboard project switcher; retain per-project dashboards and add status --all."
+    },
+    {
+      "number": 45,
+      "reporter": "victor-luyunning",
+      "url": "https://github.com/cytostack/openwolf/issues/45",
+      "analysis": "Relevant bug retrieval and shared worktree bug knowledge; avoid full-log injection."
+    },
+    {
+      "number": 41,
+      "reporter": "1re2turn1",
+      "url": "https://github.com/cytostack/openwolf/issues/41",
+      "analysis": "Content fingerprints and repeat-read invalidation; credit elifarley for gist versus exact-content analysis."
+    },
+    {
+      "number": 25,
+      "reporter": "briansumma",
+      "url": "https://github.com/cytostack/openwolf/issues/25",
+      "analysis": "Distinct worktree runtime identity; share bug knowledge and explicitly approved memory snapshots."
+    },
+    {
+      "number": 23,
+      "reporter": "nathanlong85",
+      "url": "https://github.com/cytostack/openwolf/issues/23",
+      "analysis": "Configurable Claude settings/rules/instructions paths and malformed-file preservation."
+    },
+    {
+      "number": 22,
+      "reporter": "Mantene",
+      "url": "https://github.com/cytostack/openwolf/issues/22",
+      "analysis": "Existing Gemini adapter retained; native harness validation deferred."
+    },
+    {
+      "number": 21,
+      "reporter": "rickb-bs",
+      "url": "https://github.com/cytostack/openwolf/issues/21",
+      "analysis": "Explicit memory log with session, summary, files and outcome."
+    },
+    {
+      "number": 20,
+      "reporter": "shikyo13",
+      "url": "https://github.com/cytostack/openwolf/issues/20",
+      "analysis": "Home/root safeguards and hashed daemon names; readiness and collision checks."
+    },
+    {
+      "number": 19,
+      "reporter": "jpmorby",
+      "url": "https://github.com/cytostack/openwolf/issues/19",
+      "analysis": "Not proven caused by OpenWolf; requires enabled/disabled Claude transcript reproduction."
+    },
+    {
+      "number": 15,
+      "reporter": "VimCommando",
+      "url": "https://github.com/cytostack/openwolf/issues/15",
+      "analysis": "Nested gitignore matching via maintained ignore library; cdgriffith corroborated."
+    },
+    {
+      "number": 14,
+      "reporter": "somofola",
+      "url": "https://github.com/cytostack/openwolf/issues/14",
+      "analysis": "Build dashboard into the published artifact; verify npm package contents."
+    },
+    {
+      "number": 13,
+      "reporter": "a-schild",
+      "url": "https://github.com/cytostack/openwolf/issues/13",
+      "analysis": "Document commit policy; runtime, usage and transcript-derived artifacts remain local."
+    },
+    {
+      "number": 12,
+      "reporter": "fmancardi",
+      "url": "https://github.com/cytostack/openwolf/issues/12",
+      "analysis": "Existing Cursor adapter retained; native harness validation deferred."
+    },
+    {
+      "number": 8,
+      "reporter": "neo-wanderer",
+      "url": "https://github.com/cytostack/openwolf/issues/8",
+      "analysis": "Project identity in API/status and root-specific daemon names."
+    },
+    {
+      "number": 7,
+      "reporter": "eswarsubra",
+      "url": "https://github.com/cytostack/openwolf/issues/7",
+      "analysis": "Bundle completeness and root handling; adalfa provided root diagnosis."
+    },
+    {
+      "number": 6,
+      "reporter": "fabiopolimeni",
+      "url": "https://github.com/cytostack/openwolf/issues/6",
+      "analysis": "OpenCode lifecycle and recorded usage integration."
+    },
+    {
+      "number": 5,
+      "reporter": "mdnmdn",
+      "url": "https://github.com/cytostack/openwolf/issues/5",
+      "analysis": "OpenCode lifecycle and recorded usage integration."
+    }
+  ],
+  "pull_requests": [
+    {
+      "number": 118,
+      "submitter": "pereirajo",
+      "url": "https://github.com/cytostack/openwolf/pull/118",
+      "head": "d08b4c8ca734bc4da79ab187c51cf2224dcd51b5",
+      "commit_authors": [
+        "lojasmm-jonathan"
+      ],
+      "disposition": "Adapted bounded whole-rule reinjection.",
+      "coauthor_names": []
+    },
+    {
+      "number": 117,
+      "submitter": "pereirajo",
+      "url": "https://github.com/cytostack/openwolf/pull/117",
+      "head": "8caba25e292dd7fb9c2cf771937f87f43da32b86",
+      "commit_authors": [
+        "lojasmm-jonathan"
+      ],
+      "disposition": "Adapted guards for missing legacy bug paths.",
+      "coauthor_names": []
+    },
+    {
+      "number": 104,
+      "submitter": "smasoftware",
+      "url": "https://github.com/cytostack/openwolf/pull/104",
+      "head": "d1444b532175fe94d073a8e7890c397d51d701ff",
+      "commit_authors": [
+        "smasoftware"
+      ],
+      "disposition": "Adapted bug locking; extra_roots deferred.",
+      "coauthor_names": [
+        "Claude Fable 5"
+      ]
+    },
+    {
+      "number": 96,
+      "submitter": "davdittrich",
+      "url": "https://github.com/cytostack/openwolf/pull/96",
+      "head": "7d8d4a8b73c77153ca55a3422fb759569b0c2fa2",
+      "commit_authors": [
+        "davdittrich"
+      ],
+      "disposition": "Adapted hook loading, Codex shell mapping and build-before-test.",
+      "coauthor_names": []
+    },
+    {
+      "number": 95,
+      "submitter": "davdittrich",
+      "url": "https://github.com/cytostack/openwolf/pull/95",
+      "head": "b3447f2dd05a468e895b8f2d78e93af41fef3916",
+      "commit_authors": [
+        "davdittrich"
+      ],
+      "disposition": "Adapted nullable cron-state parsing.",
+      "coauthor_names": []
+    },
+    {
+      "number": 74,
+      "submitter": "goashem",
+      "url": "https://github.com/cytostack/openwolf/pull/74",
+      "head": "8c2d51a48d3105e2aea1232deff2843a158d3357",
+      "commit_authors": [
+        "goashem"
+      ],
+      "disposition": "Adapted complete compiled hook enumeration.",
+      "coauthor_names": [
+        "Claude Opus 5"
+      ]
+    },
+    {
+      "number": 72,
+      "submitter": "liveoakwag",
+      "url": "https://github.com/cytostack/openwolf/pull/72",
+      "head": "6da3b7e20e538fbc952ee3014a325dccb38e4565",
+      "commit_authors": [
+        "liveoakwag"
+      ],
+      "disposition": "Adapted complete compiled hook enumeration; overlaps #74.",
+      "coauthor_names": [
+        "Claude Opus 5 (1M context)"
+      ]
+    },
+    {
+      "number": 71,
+      "submitter": "liveoakwag",
+      "url": "https://github.com/cytostack/openwolf/pull/71",
+      "head": "75f2b022bf599919ca3f27ab4631a57ef13e5eeb",
+      "commit_authors": [
+        "liveoakwag"
+      ],
+      "disposition": "Superseded session isolation approach; regression intent retained.",
+      "coauthor_names": [
+        "Claude Opus 5 (1M context)"
+      ]
+    },
+    {
+      "number": 70,
+      "submitter": "liveoakwag",
+      "url": "https://github.com/cytostack/openwolf/pull/70",
+      "head": "785604172e5f1f6d10fbc46376d2e5d13efe63e0",
+      "commit_authors": [
+        "liveoakwag"
+      ],
+      "disposition": "Adapted non-destructive partial scan merging.",
+      "coauthor_names": [
+        "Claude Opus 5 (1M context)"
+      ]
+    },
+    {
+      "number": 69,
+      "submitter": "liveoakwag",
+      "url": "https://github.com/cytostack/openwolf/pull/69",
+      "head": "8b6e51b228b82634ec945933f9e9224718415231",
+      "commit_authors": [
+        "liveoakwag"
+      ],
+      "disposition": "Adapted monotonic bug ID allocation.",
+      "coauthor_names": [
+        "Claude Opus 5 (1M context)"
+      ]
+    },
+    {
+      "number": 67,
+      "submitter": "OlgaCheraneva",
+      "url": "https://github.com/cytostack/openwolf/pull/67",
+      "head": "ce3e0808fbf09bff35d83a3ab53d333539806c4a",
+      "commit_authors": [
+        "Olga Cheraneva (unmapped)"
+      ],
+      "disposition": "Updated compatible dependencies and CI validation; verify individual advisories before asserting vulnerability fixes.",
+      "coauthor_names": []
+    },
+    {
+      "number": 66,
+      "submitter": "liveoakwag",
+      "url": "https://github.com/cytostack/openwolf/pull/66",
+      "head": "cdf394713334eb59ab4638d72736ff129498d354",
+      "commit_authors": [
+        "liveoakwag"
+      ],
+      "disposition": "Retain tolerant anatomy parsing and curate scanner regressions.",
+      "coauthor_names": []
+    },
+    {
+      "number": 65,
+      "submitter": "octo-patch",
+      "url": "https://github.com/cytostack/openwolf/pull/65",
+      "head": "06271b83e123c2c46e623d9570159820afd3b8fc",
+      "commit_authors": [
+        "octo-patch"
+      ],
+      "disposition": "Deferred: AI-provider cron conflicts with zero-model-call architecture.",
+      "coauthor_names": []
+    },
+    {
+      "number": 60,
+      "submitter": "AdarshJ173",
+      "url": "https://github.com/cytostack/openwolf/pull/60",
+      "head": "4c5b289d322570b2904d068dc7d34aa4d25939c6",
+      "commit_authors": [
+        "AdarshJ173"
+      ],
+      "disposition": "Adapted content-aware repeat-read invalidation.",
+      "coauthor_names": []
+    },
+    {
+      "number": 59,
+      "submitter": "lshgdut",
+      "url": "https://github.com/cytostack/openwolf/pull/59",
+      "head": "c62aff56d3f12dace4f53083b1f14b7bd17018c4",
+      "commit_authors": [
+        "lshgdut"
+      ],
+      "disposition": "Retain portable paths; project and worktree identity now explicit.",
+      "coauthor_names": []
+    },
+    {
+      "number": 58,
+      "submitter": "oiahoon",
+      "url": "https://github.com/cytostack/openwolf/pull/58",
+      "head": "1ba9e591840c7823037c8035c7c084b09989058d",
+      "commit_authors": [
+        "oiahoon"
+      ],
+      "disposition": "Overlaps #60; repeat-read behavior checked together.",
+      "coauthor_names": []
+    },
+    {
+      "number": 51,
+      "submitter": "albertomenache",
+      "url": "https://github.com/cytostack/openwolf/pull/51",
+      "head": "f6e75725a72cfddfba3260ac2ead2fae70ac9ca1",
+      "commit_authors": [
+        "albertomenache"
+      ],
+      "disposition": "CRLF parsing already present; retain compatibility.",
+      "coauthor_names": []
+    },
+    {
+      "number": 42,
+      "submitter": "mann1x",
+      "url": "https://github.com/cytostack/openwolf/pull/42",
+      "head": "3feebf7fce8fdb111f262b1527b7c8e7a0518cbd",
+      "commit_authors": [
+        "Mizuho0329"
+      ],
+      "disposition": "Windows wrapper proposal reviewed; native Windows execution still requires CI.",
+      "coauthor_names": []
+    },
+    {
+      "number": 39,
+      "submitter": "ChasLui",
+      "url": "https://github.com/cytostack/openwolf/pull/39",
+      "head": "7a6bd7a71801ee0718b9d221c4e3dbc2d28b11fb",
+      "commit_authors": [
+        "ChasLui"
+      ],
+      "disposition": "Adapter architecture already adopted; extra agents deferred.",
+      "coauthor_names": []
+    },
+    {
+      "number": 36,
+      "submitter": "nottyjay",
+      "url": "https://github.com/cytostack/openwolf/pull/36",
+      "head": "de0f2aadf10b9b0deae0521e4e04d71d50e387cf",
+      "commit_authors": [
+        "Nottyjay (unmapped)",
+        "nottyjay (unmapped)"
+      ],
+      "disposition": "Codex architecture partly incorporated; shell and lifecycle wiring extended.",
+      "coauthor_names": []
+    },
+    {
+      "number": 35,
+      "submitter": "yhyu13",
+      "url": "https://github.com/cytostack/openwolf/pull/35",
+      "head": "c4889d6bc058cecdefe64c195c9e45b5b6118920",
+      "commit_authors": [
+        "yhxd123",
+        "yhyu13"
+      ],
+      "disposition": "Deferred large Hippocampus/spec subsystem; do not merge as a correctness repair.",
+      "coauthor_names": [
+        "Claude",
+        "Claude Opus 4.7"
+      ]
+    },
+    {
+      "number": 34,
+      "submitter": "riverwolf67",
+      "url": "https://github.com/cytostack/openwolf/pull/34",
+      "head": "8a1f509317d5d2801cecefa2187a74ba50761d42",
+      "commit_authors": [
+        "riverwolf67"
+      ],
+      "disposition": "Earlier security changes partly incorporated; retain auth/containment checks.",
+      "coauthor_names": []
+    },
+    {
+      "number": 32,
+      "submitter": "mann1x",
+      "url": "https://github.com/cytostack/openwolf/pull/32",
+      "head": "5a0880bf3550b3eeef7777e3abb59f11678d989c",
+      "commit_authors": [
+        "mann1x"
+      ],
+      "disposition": "Managed hook merging retained; no blanket settings replacement.",
+      "coauthor_names": []
+    },
+    {
+      "number": 26,
+      "submitter": "whydoyouwork",
+      "url": "https://github.com/cytostack/openwolf/pull/26",
+      "head": "87b718467fcfc5445a5076aed9b82da3d83a8cb4",
+      "commit_authors": [
+        "pixelbacon"
+      ],
+      "disposition": "Partial configuration merge already incorporated; preserve malformed settings.",
+      "coauthor_names": [
+        "Claude Opus 4.7 (1M context)"
+      ]
+    },
+    {
+      "number": 9,
+      "submitter": "alfasin",
+      "url": "https://github.com/cytostack/openwolf/pull/9",
+      "head": "e34d844692f7cc6eae2ed237ebc58869387a181d",
+      "commit_authors": [
+        "alfasin"
+      ],
+      "disposition": "OpenCode adapter already incorporated; current lifecycle/usage repaired.",
+      "coauthor_names": []
+    },
+    {
+      "number": 4,
+      "submitter": "MyEditHub",
+      "url": "https://github.com/cytostack/openwolf/pull/4",
+      "head": "d1166548bf207e471523bf643b3f7abb0a4075c8",
+      "commit_authors": [
+        "MyEditHub"
+      ],
+      "disposition": "Dashboard packaging/cron ideas reviewed; removed AI and DesignQC features excluded.",
+      "coauthor_names": []
+    }
+  ]
+}

@@ -23,7 +23,7 @@ async function main(): Promise<void> {
 
   try {
     const session = readJSON<Record<string, unknown>>(getSessionFilePath(input), {});
-    writeJSON(path.join(hooksDir, "_precompact-snapshot.json"), {
+    writeJSON(getSessionFilePath(input).replace(/\.json$/, ".precompact.json"), {
       at: timestamp(),
       trigger: input.trigger ?? "unknown",
       session,

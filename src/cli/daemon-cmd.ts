@@ -1,3 +1,5 @@
+import { waitDaemonReady } from "../utils/daemon-ready.js";
+import { daemonName } from "../utils/project-identity.js";
 import { execFileSync, execSync } from "node:child_process";
 import * as fs from "node:fs";
 import * as net from "node:net";
@@ -24,7 +26,7 @@ function getDashboardPort(): number {
 
 function getPm2Name(): string {
   const projectRoot = findProjectRoot();
-  return `openwolf-${path.basename(projectRoot).replace(/[^a-zA-Z0-9._-]/g, "-")}`;
+  return daemonName(projectRoot);
 }
 
 function pm2Bin(): string {
@@ -81,7 +83,7 @@ function killPid(pid: number): boolean {
   }
 }
 
-export function daemonStart(): void {
+export async function daemonStart(): Promise<void> {
   const projectRoot = findProjectRoot();
   const wolfDir = path.join(projectRoot, ".wolf");
 
@@ -104,6 +106,7 @@ export function daemonStart(): void {
       env: { ...process.env, OPENWOLF_PROJECT_ROOT: projectRoot },
     });
     execFileSync(pm2Bin(), ["save"], { stdio: "ignore" });
+    if (!await waitDaemonReady(projectRoot)) throw new Error("Daemon did not become ready for this project; inspect .wolf/daemon.log");
     console.log(`\n  ✓ Daemon started: ${name}`);
     if (isWindows()) {
       console.log("  Tip: Run 'pm2-windows-startup' for boot persistence.");
@@ -178,7 +181,7 @@ function stopOwnDaemon(wolfDir: string, projectRoot: string): void {
   }
 }
 
-export function daemonRestart(): void {
+export async function daemonRestart(): Promise<void> {
   const projectRoot = findProjectRoot();
   const wolfDir = path.join(projectRoot, ".wolf");
 
@@ -192,6 +195,7 @@ export function daemonRestart(): void {
     const name = getPm2Name();
     try {
       execFileSync(pm2Bin(), ["restart", name], { stdio: "ignore" });
+      if (!await waitDaemonReady(projectRoot)) throw new Error("Restarted daemon did not become ready");
       console.log(`  ✓ Daemon restarted (PM2): ${name}`);
       return;
     } catch {

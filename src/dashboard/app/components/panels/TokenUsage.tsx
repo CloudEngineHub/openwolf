@@ -60,8 +60,8 @@ export function TokenUsage({ data }: { data: WolfData }) {
   // hook maintains, which is present from the very first session.
   const perModel = (tokenLedger.measured_project?.by_model ??
     tokenLedger.lifetime_maps?.real_by_model) as Record<string, ModelUsage> | undefined;
-  const cost = costOfProject(perModel);
-  const costSource = tokenLedger.measured_project?.by_model ? "all transcripts" : "session ledger";
+  const cost = data.recordedUsage?.costs ?? costOfProject(perModel);
+  const costSource = data.recordedUsage ? "recorded project usage" : tokenLedger.measured_project?.by_model ? "all transcripts" : "session ledger";
 
   // What the governor kept out, and what OpenWolf charged for keeping it out.
   const governedOriginal = lt.bash_governed_original_tokens ?? 0;
@@ -95,25 +95,42 @@ export function TokenUsage({ data }: { data: WolfData }) {
   // A cache read is roughly a tenth of an input token, so the tokens the
   // governor kept out are worth that much on every call that followed. Priced
   // at the blended input rate actually observed on this project.
-  const blendedInputPerMTok = cost.priced && cost.byModel.length > 0
-    ? cost.byModel.reduce((sum, r) => sum + r.cost.cacheRead, 0) /
-      Math.max(1, cost.byModel.reduce((sum, r) => sum + (r.usage.cache_read_input_tokens ?? 0), 0)) * 1_000_000 /
-      CACHE_READ_MULTIPLIER
+  const blendedInputPerMTok = cost.priced
+    ? cost.input / Math.max(1, cost.byModel.reduce((sum, r) => sum + r.usage.input_tokens, 0)) * 1e6
     : null;
 
   return (
     <div className="space-y-4">
+      {data.recordedUsage && <div className="wd-card p-5 space-y-3">
+        <h2 className="font-semibold">Recorded usage across agents</h2>
+        <p className="text-sm">Input includes cached tokens. Output includes reasoning. Unknown counters remain unavailable.</p>
+        <div className="overflow-x-auto"><table className="w-full text-sm text-left"><thead><tr><th>Agent</th><th>Coverage</th><th>Input</th><th>Output</th><th>Cached input</th><th>Total</th></tr></thead><tbody>
+          {Object.entries(data.recordedUsage.coverage).map(([agent, c]) => {
+            const t = data.recordedUsage!.by_agent[agent];
+            const number = (v: number | null | undefined) => v == null ? "Unavailable" : v.toLocaleString();
+            return <tr key={agent}><td>{agent}</td><td>{c.status} · {c.records} records</td><td>{number(t?.input_tokens)}</td><td>{number(t?.output_tokens)}</td><td>{number(t?.cached_input_tokens)}</td><td>{number(t?.total_tokens)}</td></tr>;
+          })}
+        </tbody></table></div>
+        <p className="text-xs">Reconciled {new Date(data.recordedUsage.scanned_at).toLocaleString()} · refreshes every 15 seconds</p>
+        <details><summary>Coverage and pricing assumptions</summary>
+          {data.recordedUsage.maintenance?.errors.map(e => <p key={e} className="text-xs">Recovery: {e}</p>)}
+          {Object.entries(data.recordedUsage.coverage).map(([agent,c]) => <div key={agent}>{c.diagnostics.map((d,i) => <p key={i} className="text-xs break-all">{agent}: {d}</p>)}</div>)}
+          {data.recordedUsage.costs.assumptions.map(a => <p key={a} className="text-xs">{a}</p>)}
+          <p className="text-xs">Unpriced: {data.recordedUsage.costs.unpriced.join(", ") || "none"}</p>
+          <p className="text-xs"><a href="https://platform.claude.com/docs/en/about-claude/pricing" target="_blank" rel="noreferrer">Anthropic rates</a> · <a href="https://developers.openai.com/api/docs/pricing" target="_blank" rel="noreferrer">OpenAI rates</a></p>
+        </details>
+      </div>}
       {/* Headline tiles — measured numbers lead, estimates are demoted */}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
         <StatTile
-          label="measured · lifetime"
-          value={measured ? formatTokens((lt.real_input_tokens ?? 0) + (lt.real_output_tokens ?? 0)) : "—"}
-          sub={measured ? `${fmt(lt.real_api_calls)} api calls` : "fills in as sessions end"}
+          label="recorded project tokens"
+          value={data.recordedUsage?.totals.total_tokens != null ? formatTokens(data.recordedUsage.totals.total_tokens) : "—"}
+          sub={data.recordedUsage ? `${data.recordedUsage.record_count} usage records` : "waiting for reconciliation"}
           size="md"
         />
         <StatTile
           label="cache read · measured"
-          value={measured ? formatTokens(lt.real_cache_read_tokens ?? 0) : "—"}
+          value={data.recordedUsage?.totals.cached_input_tokens != null ? formatTokens(data.recordedUsage.totals.cached_input_tokens) : "—"}
           sub={measured ? "prompt cache working for you" : undefined}
           size="md"
         />
@@ -145,9 +162,7 @@ export function TokenUsage({ data }: { data: WolfData }) {
             <span className="wd-label" style={{ color: "var(--text-faint)" }}>list price · {costSource}</span>
           </div>
           <p className="text-sm mb-4" style={{ color: "var(--text-muted)" }}>
-            What this project's measured token usage is worth at Anthropic's published rates.
-            On a Claude subscription you are not billed per token, so read this as the size of
-            the work, not an invoice.
+            Current API list-price estimate based on each recorded model and provider. Subscription charges, historical price changes and tool fees are excluded. See coverage and pricing assumptions above.
           </p>
 
           <div className="flex h-3 rounded-full overflow-hidden mb-3" style={{ background: "var(--bg-surface-hover)" }}>
@@ -282,7 +297,7 @@ export function TokenUsage({ data }: { data: WolfData }) {
       )}
 
       {/* Project-wide ground truth: every transcript, incl. subagents */}
-      {tokenLedger.measured_project && (
+      {!data.recordedUsage && tokenLedger.measured_project && (
         <div className="wd-card p-5">
           <div className="flex items-center justify-between mb-3">
             <span className="wd-label" style={{ color: "var(--text-muted)" }}>measured · all project transcripts</span>

@@ -1,5 +1,8 @@
+import {hookReceipt} from './visibility.js';
+import {activeContext} from "./handoff-state.js";
+import {updateNotice} from "./runtime-updates.js";
 import * as path from "node:path";
-import { ensureWolfDir, readJSON, writeJSON, emitHookJSON, recordInjection, readStdin, hookMain, getSessionFilePath } from "./shared.js";
+import { detectAgent, getProjectDir, ensureWolfDir, readJSON, writeJSON, emitHookJSON, recordInjection, readStdin, hookMain, getSessionFilePath } from "./shared.js";
 import { mutateJSON, HOOK_LOCK_BUDGET_MS } from "./anatomy-lock.js";
 
 // UserPromptSubmit hook: drains reminders the Stop hook queued last turn.
@@ -31,8 +34,11 @@ async function main(): Promise<void> {
     recordInjection(session, "reminders", drained.join("\n\n"));
   });
 
-  if (drained.length === 0) return;
-  emitHookJSON("UserPromptSubmit", { additionalContext: drained.join("\n\n") });
+  const active=activeContext(getProjectDir(),detectAgent(),input.session_id ?? "");
+  if(active)drained.push(active);
+  const notice=(detectAgent()==="claude"||detectAgent()==="codex" ? updateNotice(getProjectDir(),input.session_id ?? "") : undefined) ?? hookReceipt(getProjectDir(),detectAgent(),{...input,prompt_id:String(readJSON<Record<string,unknown>>(sessionFile,{}).stop_count??0)});
+  if (!drained.length && !notice) return;
+  process.stdout.write(JSON.stringify({...(notice?{systemMessage:notice}:{}),...(drained.length?{hookSpecificOutput:{hookEventName:"UserPromptSubmit",additionalContext:drained.join("\n\n")}}:{})}));
 }
 
 hookMain("user-prompt-submit", main);

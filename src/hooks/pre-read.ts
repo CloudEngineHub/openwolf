@@ -1,3 +1,6 @@
+import {recordReceipt} from './visibility.js';
+import {detectAgent} from './shared.js';
+import * as crypto from "node:crypto";
 import * as fs from "node:fs";
 import * as path from "node:path";
 import {
@@ -13,6 +16,7 @@ interface FileRead {
   tokens: number;
   first_read: string;
   read_mtime?: number;
+  read_hash?: string;
   anatomy_hit?: boolean;
   /** True when only ranged (offset/limit) reads have touched this file — a
    * later full read is legitimate, never a duplicate. */
@@ -69,7 +73,8 @@ async function main(): Promise<void> {
   }
   const sessionFile = getSessionFilePath(input);
 
-  const filePath = input.tool_input?.file_path ?? input.tool_input?.path ?? "";
+  const rawPath = input.tool_input?.file_path ?? input.tool_input?.path ?? "";
+  const filePath = rawPath ? path.resolve(getProjectDir(), rawPath.replace(/^(["'])(.*)\1$/, "$2")) : "";
   if (!filePath) { return; }
 
   // Ranged reads (offset/limit) are exactly what the symbol hints steer the
@@ -165,7 +170,9 @@ async function main(): Promise<void> {
       let modifiedSinceRead = true;
       try {
         const mtime = fs.statSync(filePath).mtimeMs;
-        modifiedSinceRead = prev.read_mtime === undefined || mtime > prev.read_mtime;
+        modifiedSinceRead = prev.read_hash
+          ? crypto.createHash("sha256").update(fs.readFileSync(filePath)).digest("hex") !== prev.read_hash
+          : prev.read_mtime === undefined || mtime !== prev.read_mtime;
       } catch {}
       if (!modifiedSinceRead) {
         const mode = duplicateMode(wolfDir);
@@ -237,11 +244,11 @@ async function main(): Promise<void> {
       }
     }
 
-    if (found) {
-      session.anatomy_hits++;
-    } else {
-      session.anatomy_misses++;
-    }
+    const indexable = !/^(?:\.claude\/worktrees|\.opencode\/plugin|node_modules|\.venv|venv|dist|build)(?:\/|$)/.test(relToProject) && !/\.(?:png|jpe?g|gif|pdf|zip|log)$/.test(relToProject);
+    if (indexable) {
+      if (found) session.anatomy_hits++;
+      else session.anatomy_misses++;
+    } else session.excluded_reads = Number(session.excluded_reads ?? 0) + 1;
 
     // Record initial read entry (tokens will be updated in post-read)
     let readMtime: number | undefined;
@@ -253,6 +260,7 @@ async function main(): Promise<void> {
       tokens: 0,
       first_read: new Date().toISOString(),
       read_mtime: readMtime,
+      read_hash: (() => { try { return crypto.createHash("sha256").update(fs.readFileSync(filePath)).digest("hex"); } catch { return undefined; } })(),
       anatomy_hit: found,
     };
 
@@ -264,6 +272,7 @@ async function main(): Promise<void> {
       permissionDecision: "deny",
       permissionDecisionReason: denyReason,
     });
+    recordReceipt(getProjectDir(),{agent:detectAgent(),session:input.session_id,operation:"read-denied",evidence:(input.session_id??"")+":"+normalizedFile+":"+denyReason});
     return;
   }
   if (notes.length > 0) {

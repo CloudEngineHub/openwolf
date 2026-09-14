@@ -1,3 +1,7 @@
+import {hookReceipt} from './visibility.js';
+import {activeContext} from "./handoff-state.js";
+import {updateNotice} from "./runtime-updates.js";
+import { approvedMemory } from "./trusted-memory.js";
 import * as fs from "node:fs";
 import * as path from "node:path";
 import { getWolfDir, ensureWolfDir, writeJSON, appendMarkdown, readJSON, readBugLogFile, timestamp, timeShort, estimateTokens, readStdin, detectAgent, recordInjectionToSessionFile, getProjectDir, hookMain, getSessionFilePath, gcSessionFiles } from "./shared.js";
@@ -108,7 +112,7 @@ function buildSessionDigest(wolfDir: string, budget: number): string {
   // 2. Top Do-Not-Repeat rules (skipped when native auto-memory carries them).
   if (!claudeMemoryHasSync()) {
     try {
-      const cerebrum = readFrontmatter(fs.readFileSync(path.join(wolfDir, "cerebrum.md"), "utf-8")).body;
+      const cerebrum = readFrontmatter(approvedMemory(wolfDir, "cerebrum.md")).body;
       const dnr = extractSection(cerebrum, /^## Do-Not-Repeat/);
       const entries = dnr.split("\n").filter((l) => l.startsWith("- ") && !isPlaceholder(l));
       if (entries.length > 0) {
@@ -121,7 +125,7 @@ function buildSessionDigest(wolfDir: string, budget: number): string {
   try {
     for (const f of fs.readdirSync(wolfDir)) {
       if (!f.endsWith(".md") || f === "STATUS.md" || f === "OPENWOLF.md" || f === "anatomy.md") continue;
-      const raw = fs.readFileSync(path.join(wolfDir, f), "utf-8");
+      const raw = approvedMemory(wolfDir, f);
       const fm = readFrontmatter(raw);
       if (fm.always) {
         tryAdd(`## .wolf/${f} (always)\n` + fm.body.trim().split("\n").slice(0, 40).join("\n"));
@@ -170,15 +174,7 @@ async function main(): Promise<void> {
   ensureWolfDir();
   const wolfDir = getWolfDir();
 
-  // Clean up stale .tmp files left from failed atomic writes
-  try {
-    const files = fs.readdirSync(wolfDir);
-    for (const f of files) {
-      if (f.endsWith(".tmp")) {
-        try { fs.unlinkSync(path.join(wolfDir, f)); } catch {}
-      }
-    }
-  } catch {}
+  // Atomic-write temporaries belong to their writer; never unlink them here.
   const hooksDir = path.join(wolfDir, "hooks");
   const now = new Date();
 
@@ -224,6 +220,7 @@ async function main(): Promise<void> {
   if (!continuing) {
     writeJSON(sessionFile, {
       session_id: sessionId,
+      agent:detectAgent(),
       started: timestamp(),
       files_read: {},
       files_written: [],
@@ -324,7 +321,7 @@ async function main(): Promise<void> {
       }
 
       try {
-        const rules = topRules(fs.readFileSync(path.join(wolfDir, "cerebrum.md"), "utf-8"), 3);
+        const rules = topRules(approvedMemory(wolfDir, "cerebrum.md"), 3);
         if (rules.length > 0) {
           restoreParts.push(`Project rules still in effect (from .wolf/cerebrum.md Do-Not-Repeat):\n${rules.join("\n")}`);
         }
@@ -350,9 +347,14 @@ async function main(): Promise<void> {
         : startupNotes.map((n) => `- ${n}`).join("\n");
     }
 
-    if (digest) {
+    const startInput=JSON.parse(await readStdin());
+    const active=activeContext(getProjectDir(),detectAgent(),startInput.session_id ?? "",startInput.source === "compact");
+    if(active)digest += "\n\n"+active;
+    const notice = (detectAgent()==="claude"||detectAgent()==="codex" ? updateNotice(getProjectDir(), startInput.session_id ?? "") : undefined) ?? hookReceipt(getProjectDir(),detectAgent(),startInput,true);
+    if (digest || notice) {
       recordInjectionToSessionFile(sessionFile, "digest", digest, mutateJSON);
       process.stdout.write(JSON.stringify({
+        ...(notice ? {systemMessage: notice} : {}),
         hookSpecificOutput: { hookEventName: "SessionStart", additionalContext: digest },
       }));
     }

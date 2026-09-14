@@ -12,6 +12,8 @@ export function CerebrumViewer({ data }: { data: WolfData }) {
 
   return (
     <div>
+      <div className="wd-card p-4 mb-4 text-sm"><strong>Candidate knowledge</strong><p>Repository entries require review before automatic durable-memory injection.</p><p>{data.recordedUsage?.memory?.trust.reason ?? "Checking approval status…"}</p></div>
+
       <div className="flex items-center justify-between mb-4">
         <div className="text-sm" style={{ color: "var(--text-faint)" }}>
           Last updated: {cerebrum.lastUpdated || "—"} ·

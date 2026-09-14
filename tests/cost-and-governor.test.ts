@@ -21,7 +21,7 @@ describe("model pricing", () => {
     assert.equal(priceFor("claude-opus-5")?.input, 5);
     assert.equal(priceFor("claude-opus-5-20260101")?.input, 5);
     assert.equal(priceFor("claude-fable-5")?.output, 50);
-    assert.equal(priceFor("claude-sonnet-5")?.input, 3);
+    assert.equal(priceFor("claude-sonnet-5")?.input, 2);
     assert.equal(priceFor("claude-haiku-4-5")?.output, 5);
     assert.equal(priceFor("some-other-model"), null);
   });

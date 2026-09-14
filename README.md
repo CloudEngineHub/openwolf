@@ -7,8 +7,8 @@
 <p align="center">
   openwolf keeps one project memory across Claude Code, Codex and OpenCode,<br />
   intercepts the reads and command output that quietly fill your context,<br />
-  and reports what each session actually cost, read from the harness transcript.<br />
-  Pure local file I/O: no API calls, no telemetry, no added latency.
+  and reports recorded token usage with per-model API price estimates.<br />
+  Local processing: no model calls or external telemetry.
 </p>
 
 <p align="center">
@@ -26,6 +26,12 @@
 <p align="center">
   <img src="assets/openwolf-dashboard.png" alt="" width="900" />
 </p>
+
+The current repair work adds recoverable session observations, automatic memory archival with restore, safer anatomy refreshes, and a shared dashboard report for Claude Code, Codex and OpenCode. Missing usage counters remain unavailable; costs use current model-specific API rates. Durable instruction injection requires a protected, reviewed deployment.
+
+Session hooks now check npm in the background and prepare compatible stable runtime updates for new sessions. Running sessions retain their version. See [automatic updates](docs/automatic-updates.md) and [quiet session visibility](docs/session-visibility-plan.md).
+
+See the [issue and PR audit](docs/audit/README.md), [contributor credits](CREDITS.md), [operation and deployment guide](docs/repair-operations.md), and [Claude–Codex handover workflow](docs/claude-codex-handoff-plan.md).
 
 | Without OpenWolf | With OpenWolf |
 |------------------|---------------|

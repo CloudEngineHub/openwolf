@@ -5,7 +5,7 @@ import * as os from "node:os";
 import * as path from "node:path";
 import { execFile } from "node:child_process";
 
-import { mutateJSON, HOOK_LOCK_BUDGET_MS } from "../src/hooks/anatomy-lock.ts";
+import { mutateJSON, HOOK_LOCK_BUDGET_MS } from "../dist/hooks/anatomy-lock.js";
 
 // P1 (davdittrich): atomic writes prevent torn files, never lost updates.
 // #83 parallel hooks lose session-state updates
@@ -40,6 +40,7 @@ function runProcess(args: string[], opts: { cwd?: string; env?: NodeJS.ProcessEn
     const child = execFile(process.execPath, args, { cwd: opts.cwd, env: opts.env, timeout: 30000 }, (err) =>
       err ? reject(err) : resolve(),
     );
+    child.stdin!.on("error", err => { if ((err as NodeJS.ErrnoException).code !== "EPIPE") reject(err); });
     child.stdin!.end(opts.stdin ?? "");
   });
 }

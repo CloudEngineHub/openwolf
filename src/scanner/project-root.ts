@@ -1,3 +1,4 @@
+import * as os from "node:os";
 import * as path from "node:path";
 import * as fs from "node:fs";
 
@@ -24,6 +25,7 @@ export function findProjectRoot(from?: string): string {
   let depth = 0;
 
   while (depth < 10) {
+    if (dir === os.homedir() || dir === root) break;
     for (const marker of MARKERS) {
       if (fs.existsSync(path.join(dir, marker))) {
         return dir;

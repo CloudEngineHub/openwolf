@@ -26,7 +26,7 @@ export function startFileWatcher(
       "**/*.lock",
       // Bash output cache: single files up to the 50 MB cache cap, and the
       // 1 MB broadcast guard rejects them only AFTER stat and read.
-      "**/cache/**",
+      "**/cache/**", "**/activity/**", "**/archive/**", "**/usage/**", "**/*.pending/**",
       "**/*.tmp",
       "**/daemon.log",
       "**/daemon.pid",
@@ -38,7 +38,7 @@ export function startFileWatcher(
     },
   });
 
-  watcher.on("change", (filePath) => {
+  const publish = (filePath: string) => {
     const relativePath = path.relative(wolfDir, filePath as string);
     const fileName = path.basename(filePath as string);
     logger.debug(`File changed: ${relativePath}`);
@@ -71,16 +71,13 @@ export function startFileWatcher(
     if (fileName === "cron-manifest.json") {
       logger.info("Cron manifest changed — restart daemon to apply");
     }
-  });
-
-  watcher.on("add", (filePath) => {
-    const relativePath = path.relative(wolfDir, filePath as string);
-    logger.debug(`File added: ${relativePath}`);
-  });
-
+  };
+  watcher.on("change", publish);
+  watcher.on("add", publish);
   watcher.on("unlink", (filePath) => {
     const relativePath = path.relative(wolfDir, filePath as string);
     logger.debug(`File removed: ${relativePath}`);
+    broadcast({type:"file_changed", file:relativePath, content:"", timestamp:new Date().toISOString()});
   });
 
   logger.info("File watcher started on .wolf/");

@@ -24,18 +24,11 @@ export function handleSessionStart(directory: string, sessionId: string): void {
   const hooksDir = path.join(wolfDir, "hooks")
   fs.mkdirSync(hooksDir, { recursive: true })
 
-  try {
-    const files = fs.readdirSync(wolfDir)
-    for (const f of files) {
-      if (f.endsWith(".tmp")) {
-        try { fs.unlinkSync(path.join(wolfDir, f)) } catch {}
-      }
-    }
-  } catch {}
-
   gcSessionFiles(hooksDir)
 
   const sessionFile = sessionFilePath(hooksDir, sessionId)
+  const existing = readJSON<SessionState | null>(sessionFile, null)
+  if (existing?.session_id === sessionId) { sessions.set(sessionId, existing); return }
   const state: SessionState = {
     session_id: sessionId,
     started: timestamp(),

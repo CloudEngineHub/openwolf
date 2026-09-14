@@ -111,3 +111,17 @@ export function scopedRulesForFiles(projectRoot: string, relFiles: string[], max
   }
   return out;
 }
+
+/** Whole-rule budget, including framing. Credit: @pereirajo / @lojasmm-jonathan (#118).
+ * Counts here are estimates; byte limits are exact. Never cut a rule mid-instruction.
+ */
+export function boundedRuleNote(rules: string[], maxBytes = 1024): string | null {
+  const header = "Project rules still in effect (from .wolf/cerebrum.md Do-Not-Repeat):";
+  if (!Number.isSafeInteger(maxBytes) || maxBytes <= 0) return null;
+  const parts = [header];
+  for (const rule of rules) {
+    if (Buffer.byteLength([...parts, rule].join("\n"), "utf8") <= maxBytes) parts.push(rule);
+  }
+  if (parts.length === 1) return null;
+  return parts.join("\n");
+}

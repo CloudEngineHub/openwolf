@@ -1,3 +1,5 @@
+import {recordReceipt} from '../hooks/visibility.js';
+import { createIgnoreMatcher } from "./exclusions.js";
 import * as fs from "node:fs";
 import * as path from "node:path";
 import { execFileSync } from "node:child_process";
@@ -138,15 +140,17 @@ function walkDir(
   maxFiles: number,
   files: Record<string, StoreFileEntry>,
   contents?: Record<string, string>,
-  gitignore: ReturnType<typeof loadGitignore> = []
+  gitignore: ReturnType<typeof loadGitignore> = [],
+  scan: { complete: boolean; errors: string[]; ignored?: (p: string, dir: boolean) => boolean } = { complete: true, errors: [] }
 ): void {
   let totalFiles = Object.keys(files).length;
-  if (totalFiles >= maxFiles) return;
+  if (totalFiles >= maxFiles) { scan.complete = false; return; }
 
   let items: fs.Dirent[];
   try {
     items = fs.readdirSync(dir, { withFileTypes: true });
   } catch {
+    scan.complete = false; scan.errors.push(normalizePath(path.relative(rootDir, dir)));
     return;
   }
 
@@ -159,13 +163,14 @@ function walkDir(
     if (shouldExclude(relPath, excludePatterns)) continue;
     // The project's own .gitignore is the list its author already wrote of
     // what is not source (#93). Cheaper than any name list and always in sync.
-    if (gitignore.length > 0 && isGitIgnored(gitignore, relPath, item.isDirectory())) continue;
+    if (scan.ignored?.(relPath, item.isDirectory())) continue;
+    if (/^(?:\.claude\/worktrees|\.opencode\/plugin\/openwolf)(?:\/|$)/.test(relPath)) continue;
 
     if (item.isDirectory()) {
       // Virtualenvs under any name, including `env/`, which is too plausible a
       // source directory to put in the default exclusion list.
       if (isVirtualenvDir(fullPath)) continue;
-      walkDir(fullPath, rootDir, excludePatterns, maxFiles, files, contents, gitignore);
+      walkDir(fullPath, rootDir, excludePatterns, maxFiles, files, contents, gitignore, scan);
     } else if (item.isFile()) {
       const ext = path.extname(item.name).toLowerCase();
       if (BINARY_EXTENSIONS.has(ext)) continue;
@@ -176,6 +181,7 @@ function walkDir(
         stat = fs.statSync(fullPath);
         if (stat.size > 1024 * 1024) continue;
       } catch {
+        scan.complete = false; scan.errors.push(relPath);
         continue;
       }
 
@@ -184,6 +190,7 @@ function walkDir(
       try {
         content = fs.readFileSync(fullPath, "utf-8");
       } catch {
+        scan.complete = false; scan.errors.push(relPath);
         continue;
       }
 
@@ -209,7 +216,7 @@ function walkDir(
       if (contents) contents[relPath] = content;
 
       totalFiles++;
-      if (totalFiles >= maxFiles) return;
+      if (totalFiles >= maxFiles) { scan.complete = false; return; }
     }
   }
 }
@@ -218,7 +225,7 @@ function walkDir(
 /**
  * Scan the project and return the anatomy content and file count WITHOUT writing to disk.
  */
-export async function buildAnatomy(wolfDir: string, projectRoot: string): Promise<{ content: string; fileCount: number; store: AnatomyStoreData }> {
+export async function buildAnatomy(wolfDir: string, projectRoot: string): Promise<{ content: string; fileCount: number; store: AnatomyStoreData; complete: boolean; errors: string[] }> {
   const configPath = path.join(wolfDir, "config.json");
   const config = readJSON<WolfConfig>(configPath, {
     version: 1,
@@ -234,6 +241,7 @@ export async function buildAnatomy(wolfDir: string, projectRoot: string): Promis
 
   const store = newStore();
   const contents: Record<string, string> = {};
+  const scan = { complete: true, errors: [] as string[], ignored: config.openwolf.anatomy.respect_gitignore === false ? undefined : createIgnoreMatcher(projectRoot) };
   const gitignore = config.openwolf.anatomy.respect_gitignore === false ? [] : loadGitignore(projectRoot);
   walkDir(
     projectRoot,
@@ -242,7 +250,8 @@ export async function buildAnatomy(wolfDir: string, projectRoot: string): Promis
     config.openwolf.anatomy.max_files,
     store.files,
     contents,
-    gitignore
+    gitignore,
+    scan
   );
 
   // J2: upgrade regex symbols to exact tree-sitter results where a grammar is
@@ -275,7 +284,7 @@ export async function buildAnatomy(wolfDir: string, projectRoot: string): Promis
     }
   } catch {}
 
-  return { content: renderStore(store), fileCount: Object.keys(store.files).length, store };
+  return { content: renderStore(store), fileCount: Object.keys(store.files).length, store, complete: scan.complete, errors: scan.errors };
 }
 
 /**
@@ -288,7 +297,8 @@ export async function buildAnatomy(wolfDir: string, projectRoot: string): Promis
 export function buildMergedStore(
   wolfDir: string,
   projectRoot: string,
-  fresh: AnatomyStoreData
+  fresh: AnatomyStoreData,
+  complete = true
 ): AnatomyStoreData {
   const existing = loadStoreReconciled(wolfDir, projectRoot);
   for (const [relPath, entry] of Object.entries(fresh.files)) {
@@ -306,49 +316,37 @@ export function buildMergedStore(
       }
     }
   }
-  existing.files = fresh.files;
+  // PR #70 by @liveoakwag: unvisited is not deleted.
+  existing.files = complete ? fresh.files : { ...existing.files, ...fresh.files };
   return existing;
 }
 
+function currentHead(root: string): string | null {
+  try { return execFileSync("git", ["rev-parse", "HEAD"], {cwd:root,encoding:"utf8",stdio:["ignore","pipe","ignore"],timeout:3000}).trim(); } catch {return null;}
+}
 export async function scanProject(wolfDir: string, projectRoot: string): Promise<number> {
-  const { fileCount, store: fresh } = await buildAnatomy(wolfDir, projectRoot);
-
+  const initialHead = currentHead(projectRoot);
+  const { fileCount, store: fresh, complete, errors } = await buildAnatomy(wolfDir, projectRoot);
   const result = withAnatomyLock(wolfDir, CLI_LOCK_BUDGET_MS, () => {
-    const existing = buildMergedStore(wolfDir, projectRoot, fresh);
-    existing.meta.lastScanned = new Date().toISOString();
+    const stable = initialHead === currentHead(projectRoot) && Object.entries(fresh.files).every(([file,e]) => {
+      try {const stat=fs.statSync(path.join(projectRoot,file));return stat.size===e.size && stat.mtimeMs===e.mtimeMs;} catch {return false;}
+    });
+    const certified = complete && stable;
+    const existing = buildMergedStore(wolfDir, projectRoot, fresh, certified);
+    if (certified) existing.meta.lastScanned = new Date().toISOString();
     renderToFile(wolfDir, existing);
     saveStore(wolfDir, existing);
-    return true;
-  });
-  if (result === null) {
-    // Lock contention: skip the write entirely. The old fallback wrote the
-    // fresh render straight to anatomy.md, and the next locked writer's
-    // "md wins" reconcile then permanently overwrote curated descriptions.
-    //
-    // Freshness state is NOT advanced here. Issue #85, PR #101 by @davdittrich. _scan-state.json is what tells the
-    // hooks "anatomy matches this commit"; writing it after a skipped write
-    // claimed the index was current when nothing had been indexed, which
-    // suppressed the very rescan that would have fixed it (#85). Staying stale
-    // is correct: the next trigger rescans and converges.
-    console.warn("  ! anatomy is being updated by another process; scan results not written (re-run to converge)");
-    return fileCount;
-  }
-
-  // Record scan state so hooks can detect staleness (git switches, editor
-  // edits outside an agent) without rescanning — Workstream F2b. Only reached
-  // when the locked anatomy write above actually committed.
-  try {
-    let gitHead: string | null = null;
-    try {
-      gitHead = execFileSync("git", ["rev-parse", "HEAD"], { cwd: projectRoot, encoding: "utf-8", stdio: ["ignore", "pipe", "ignore"] }).trim();
-    } catch {}
-    writeJSON(path.join(wolfDir, "_scan-state.json"), {
-      last_scanned: new Date().toISOString(),
-      git_head: gitHead,
-      file_count: fileCount,
+    // Commit freshness last, inside the writer lock. A crash beforehand leaves
+    // a stale marker, never a claim that an uncommitted generation is fresh.
+    if (certified) writeJSON(path.join(wolfDir,"_scan-state.json"), {
+      last_scanned:existing.meta.lastScanned,git_head:initialHead,file_count:fileCount,
+      generation:sha256(JSON.stringify(existing.files)),complete:true,
     });
-  } catch {}
-
+    else writeJSON(path.join(wolfDir,"_scan-attempt.json"),{attempted_at:new Date().toISOString(),complete:false,visited:fileCount,errors,reason:stable?"partial scan":"tree changed during scan"});
+    return certified;
+  });
+  if (result === null) console.warn("  ! Anatomy busy; no scan state was committed.");
+  else if (!result) console.warn(`  ! Partial or changing scan (${fileCount} visited); unvisited entries retained, freshness not advanced.`);
+  if(result===false)recordReceipt(projectRoot,{operation:"map-preserved",evidence:sha256(JSON.stringify(fresh.files))+":"+initialHead});
   return fileCount;
 }
-

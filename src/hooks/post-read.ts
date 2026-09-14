@@ -1,3 +1,6 @@
+import * as fs from "node:fs";
+import * as crypto from "node:crypto";
+import { persistRead, reconcileReads } from "./event-journal.js";
 import * as path from "node:path";
 import { getWolfDir, ensureWolfDir, readJSON, writeJSON, estimateTokens, readStdin, normalizePath, getProjectDir, hookMain, getSessionFilePath, projectRelativePath } from "./shared.js";
 import { lookupEntry } from "./anatomy-store.js";
@@ -41,6 +44,7 @@ async function main(): Promise<void> {
     tool_response?: unknown;
     tool_output?: { content?: string };
     session_id?: string;
+    tool_use_id?: string;
   };
   try {
     input = JSON.parse(raw);
@@ -49,7 +53,8 @@ async function main(): Promise<void> {
   }
   const sessionFile = getSessionFilePath(input);
 
-  const filePath = input.tool_input?.file_path ?? input.tool_input?.path ?? "";
+  const rawPath = input.tool_input?.file_path ?? input.tool_input?.path ?? "";
+  const filePath = rawPath ? path.resolve(getProjectDir(), rawPath.replace(/^(["'])(.*)\1$/, "$2")) : "";
   const content = extractToolResponseText(input.tool_response) || input.tool_output?.content || "";
   if (!filePath) { return; }
 
@@ -75,14 +80,8 @@ async function main(): Promise<void> {
     try {
       if (content) {
         const tok = estimateTokens(content, "prose");
-        // Locked transaction: these counters are accumulators, so a lost
-        // update is a permanently undercounted total (#83).
-        mutateJSON<SessionData>(sessionFile, { files_read: {} }, HOOK_LOCK_BUDGET_MS, (session) => {
-          session.wolf_internal_tokens = ((session.wolf_internal_tokens as number) ?? 0) + tok;
-          const perFile = (session.wolf_internal_reads ?? {}) as Record<string, number>;
-          perFile[relToProject] = (perFile[relToProject] ?? 0) + tok;
-          session.wolf_internal_reads = perFile;
-        });
+        persistRead(sessionFile, { id: input.tool_use_id ?? crypto.randomUUID(), file: relToProject, at: new Date().toISOString(), tokens: tok, internal: true });
+        reconcileReads(sessionFile);
       }
     } catch {}
     return;
@@ -101,24 +100,16 @@ async function main(): Promise<void> {
     if (entry) tokens = entry.tokens;
   }
 
-  // Parallel Read tool calls are ordinary Claude Code behavior, and each one
-  // fires its own hook process. Read-modify-write outside a lock dropped 34 of
-  // 60 concurrent updates (#83): the file was never torn, just overwritten.
-  // The read now happens inside the lock, against current on-disk state.
-  mutateJSON<SessionData>(sessionFile, { files_read: {} }, HOOK_LOCK_BUDGET_MS, (session) => {
-    if (!session.files_read) session.files_read = {};
-    const existing = session.files_read[normalizedFile];
-    if (existing && existing.ranged !== true) {
-      existing.tokens = tokens;
-    } else {
-      // Fresh full read (or an upgrade of a ranged-only contact to a full read).
-      session.files_read[normalizedFile] = {
-        count: 1,
-        tokens,
-        first_read: existing?.first_read ?? new Date().toISOString(),
-      };
-    }
-  });
+  let fingerprint: string | undefined;
+  let mtime = 0;
+  try {
+    const current = fs.readFileSync(filePath,"utf8");
+    // A post-read filesystem sample cannot certify different delivered bytes.
+    // If the harness decorated/truncated the result, allow a future reread.
+    if (content === current) {fingerprint=crypto.createHash("sha256").update(current).digest("hex");mtime=fs.statSync(filePath).mtimeMs;}
+  } catch {}
+  persistRead(sessionFile, { id: input.tool_use_id ?? crypto.randomUUID(), file: normalizedFile, at: new Date().toISOString(), tokens, fingerprint, mtime });
+  if (!reconcileReads(sessionFile)) console.error("OpenWolf: read event persisted; aggregation pending (run maintenance).");
 }
 
 hookMain("post-read", main);

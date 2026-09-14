@@ -6,12 +6,12 @@ import * as path from "node:path";
 import { spawn } from "node:child_process";
 import { pathToFileURL } from "node:url";
 
-import { withAnatomyLock } from "../src/hooks/anatomy-lock.ts";
+import { withAnatomyLock } from "../dist/hooks/anatomy-lock.js";
 import { loadStore } from "../src/hooks/anatomy-store.ts";
 
 const tmpDir = () => fs.mkdtempSync(path.join(os.tmpdir(), "wolf-lock-"));
 const storeUrl = pathToFileURL(path.resolve(import.meta.dirname, "../src/hooks/anatomy-store.ts")).href;
-const lockUrl = pathToFileURL(path.resolve(import.meta.dirname, "../src/hooks/anatomy-lock.ts")).href;
+const lockUrl = pathToFileURL(path.resolve(import.meta.dirname, "../dist/hooks/anatomy-lock.js")).href;
 
 /** One competing writer process: locked read-modify-write of a distinct key. */
 function writerScript(wolfDir: string, key: string): string {

@@ -5,7 +5,7 @@ import * as os from "node:os";
 import * as path from "node:path";
 import { execFile } from "node:child_process";
 
-import { relativeIfInside, isInsideDir, projectRelativePath } from "../src/hooks/shared.ts";
+import { relativeIfInside, isInsideDir, projectRelativePath } from "../dist/hooks/shared.js";
 
 // Issue #80 (davdittrich): read hooks used `startsWith(projectDir)` for
 // containment and the Bash read channel had no project-root check at all, so

@@ -10,6 +10,7 @@ const ActivityTimeline = lazy(() => import("./components/panels/ActivityTimeline
 const TokenUsage = lazy(() => import("./components/panels/TokenUsage.js").then(m => ({ default: m.TokenUsage })));
 const CronStatus = lazy(() => import("./components/panels/CronStatus.js").then(m => ({ default: m.CronStatus })));
 const CerebrumViewer = lazy(() => import("./components/panels/CerebrumViewer.js").then(m => ({ default: m.CerebrumViewer })));
+const Handover = lazy(() => import("./components/panels/Handover.js").then(m => ({ default: m.Handover })));
 const MemoryViewer = lazy(() => import("./components/panels/MemoryViewer.js").then(m => ({ default: m.MemoryViewer })));
 const AnatomyBrowser = lazy(() => import("./components/panels/AnatomyBrowser.js").then(m => ({ default: m.AnatomyBrowser })));
 const BugLog = lazy(() => import("./components/panels/BugLog.js").then(m => ({ default: m.BugLog })));
@@ -28,7 +29,7 @@ function Skeleton() {
   );
 }
 
-const PANELS = ["overview", "activity", "tokens", "cron", "cerebrum", "memory", "anatomy", "bugs"];
+const PANELS = ["overview", "activity", "tokens", "cron", "cerebrum", "handover", "memory", "anatomy", "bugs"];
 
 export default function App() {
   // Hash-based deep links: /#tokens opens the Tokens panel directly.
@@ -89,6 +90,7 @@ export default function App() {
           {activePanel === "tokens" && <TokenUsage data={data} />}
           {activePanel === "cron" && <CronStatus data={data} />}
           {activePanel === "cerebrum" && <CerebrumViewer data={data} />}
+          {activePanel === "handover" && <Handover />}
           {activePanel === "memory" && <MemoryViewer data={data} />}
           {activePanel === "anatomy" && <AnatomyBrowser data={data} />}
           {activePanel === "bugs" && <BugLog data={data} />}

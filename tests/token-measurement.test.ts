@@ -8,7 +8,7 @@ import * as path from "node:path";
 
 describe("readTranscriptUsage", () => {
   test("sums usage across messages, deduping streamed lines by message id", async () => {
-    const { readTranscriptUsage } = await import("../src/hooks/shared.ts");
+    const { readTranscriptUsage } = await import("../dist/hooks/shared.js");
     const f = path.join(fs.mkdtempSync(path.join(os.tmpdir(), "wolf-f1-")), "t.jsonl");
     const lines = [
       { type: "assistant", message: { id: "m1", usage: { input_tokens: 100, output_tokens: 5, cache_read_input_tokens: 800, cache_creation_input_tokens: 20 } } },
@@ -29,7 +29,7 @@ describe("readTranscriptUsage", () => {
   });
 
   test("returns null for missing or usage-free transcripts", async () => {
-    const { readTranscriptUsage } = await import("../src/hooks/shared.ts");
+    const { readTranscriptUsage } = await import("../dist/hooks/shared.js");
     assert.strictEqual(readTranscriptUsage("/nonexistent/path.jsonl"), null);
     const f = path.join(fs.mkdtempSync(path.join(os.tmpdir(), "wolf-f1-")), "empty.jsonl");
     fs.writeFileSync(f, JSON.stringify({ type: "user", message: {} }) + "\n");
