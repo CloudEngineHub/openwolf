@@ -38,13 +38,25 @@ try{
  const listen=net.createServer();await new Promise(r=>listen.listen(0,'127.0.0.1',r));const port=listen.address().port;await new Promise(r=>listen.close(r));
  const configPath=path.join(oldWolf,'config.json'),config=JSON.parse(fs.readFileSync(configPath));config.openwolf.dashboard.port=port;config.openwolf.cron.enabled=false;config.openwolf.updates={mode:'off'};fs.writeFileSync(configPath,JSON.stringify(config));
  const daemon=path.join(install,'node_modules/openwolf/dist/src/daemon/wolf-daemon.js');
- const start=async()=>{child=spawn(process.execPath,[daemon],{cwd:upgrade,env:{...env,OPENWOLF_PROJECT_ROOT:upgrade},stdio:'ignore'});for(let i=0;i<100;i++){try{const token=fs.readFileSync(path.join(oldWolf,'dashboard-token'),'utf8').trim();const res=await fetch(`http://127.0.0.1:${port}/api/activity`,{headers:{Authorization:'Bearer '+token}});if(res.ok)return {token,data:await res.json()}}catch{}await new Promise(r=>setTimeout(r,100))}throw Error('Daemon failed readiness')};
- const stop=async()=>{if(!child||child.exitCode!==null)return;const exited=new Promise(r=>child.once('exit',r));child.kill('SIGTERM');await exited;child=undefined};
+ const start=async()=>{
+  let output='',startupError,lastResponse='No HTTP response';
+  child=spawn(process.execPath,[daemon],{cwd:upgrade,env:{...env,OPENWOLF_PROJECT_ROOT:upgrade},stdio:['ignore','pipe','pipe']});
+  child.once('error',error=>{startupError=error});
+  for(const stream of [child.stdout,child.stderr])stream.on('data',chunk=>{output=(output+chunk).slice(-8192)});
+  const deadline=Date.now()+30_000;
+  while(Date.now()<deadline){
+   if(startupError||child.exitCode!==null||child.signalCode!==null)break;
+   try{const token=fs.readFileSync(path.join(oldWolf,'dashboard-token'),'utf8').trim();const res=await fetch(`http://127.0.0.1:${port}/api/activity`,{headers:{Authorization:'Bearer '+token},signal:AbortSignal.timeout(1000)});if(res.ok)return {token,data:await res.json()};lastResponse='HTTP '+res.status}catch(error){lastResponse=error.message}
+   await new Promise(r=>setTimeout(r,100));
+  }
+  throw Error(`Daemon failed readiness (exit=${child.exitCode}, signal=${child.signalCode}): ${startupError??lastResponse}\n${output}`);
+ };
+ const stop=async()=>{if(!child||child.exitCode!==null||child.signalCode!==null)return;const exited=new Promise(r=>child.once('exit',r));child.kill('SIGTERM');await exited;child=undefined};
  const first=await start();assert(first.data.counts['checkpoint-saved']>=1);assert.equal(first.data.updates.installed,'2.5.2');assert.equal((await fetch(`http://127.0.0.1:${port}/api/activity`)).status,401);await stop();
  const second=await start();assert.equal(second.data.counts['checkpoint-saved'],first.data.counts['checkpoint-saved']);await stop();log.push('Authenticated dashboard, persistent activity and daemon restart verified');
  console.log(JSON.stringify({version:packed.version,files:packed.files.length,checks:log,temp},null,2));
  if(process.env.OPENWOLF_KEEP_RELEASE_FIXTURE)fs.writeFileSync(process.env.OPENWOLF_KEEP_RELEASE_FIXTURE,JSON.stringify({temp,clean,upgrade,cli,oldCli,tarball,preload},null,2));
 }finally{
- if(child&&child.exitCode===null){const exited=new Promise(r=>child.once('exit',r));child.kill('SIGTERM');await exited}
+ if(child&&child.exitCode===null&&child.signalCode===null){const exited=new Promise(r=>child.once('exit',r));child.kill('SIGTERM');await exited}
  if(!process.env.OPENWOLF_KEEP_RELEASE_FIXTURE)fs.rmSync(temp,{recursive:true,force:true});
 }
