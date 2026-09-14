@@ -57,9 +57,12 @@ export function readyRelease(root:string,version:unknown):string|undefined {
   const ready=readObject(path.join(updatesDir(root),'releases',version,'ready.json'));
   if(meta.name==='openwolf'&&meta.version===version&&meta.openwolfRuntime?.protocol===RUNTIME_PROTOCOL&&ready.version===version)return pkg;
 }
+// Windows reports uid=0 for ordinary files; it is not POSIX root ownership.
+// Protected authority on Windows is unsupported and remains disabled by its verifier.
+const protectedRuntime=()=>process.platform!=='win32'&&fs.statSync(fileURLToPath(import.meta.url)).uid===0;
 /** Never select a new version for an existing session (including resume). */
 export function pinRuntime(root:string,session:string):string|undefined {
-  if(!session || !stableVersion(installedVersion(root)) || fs.statSync(fileURLToPath(import.meta.url)).uid===0)return; // protected runtime or no identity => installed
+  if(!session || !stableVersion(installedVersion(root)) || protectedRuntime())return; // protected runtime or no identity => installed
   const dir=path.join(updatesDir(root),'pins');
   const file=path.join(dir,crypto.createHash('sha256').update(session).digest('hex')+'.json');
   let pin=readObject(file);
@@ -76,7 +79,7 @@ export function pinRuntime(root:string,session:string):string|undefined {
 /** At most one detached, bounded worker per project/check interval. */
 export function scheduleUpdate(root:string):void {
   try {
-    if(updatePolicy(root)==='off'||fs.statSync(fileURLToPath(import.meta.url)).uid===0)return;
+    if(updatePolicy(root)==='off'||protectedRuntime())return;
     const state=updateState(root);
     if(typeof state.checkedAt==='number'&&Date.now()-state.checkedAt<CHECK_INTERVAL)return;
     const worker=path.join(root,'.wolf','hooks','update-worker.js');
@@ -95,7 +98,7 @@ export async function delegateRuntime(root:string,hook:string,input:string):Prom
   if((globalThis as any)[bridgeKey])return false;
   if(!stableVersion(installedVersion(root)))return false;
   // A protected runtime must not execute repository-selected code.
-  if(fs.statSync(fileURLToPath(import.meta.url)).uid===0)return false;
+  if(protectedRuntime())return false;
   let payload:any;try{payload=JSON.parse(input)}catch{return false}
   const pkg=pinRuntime(root,payload.session_id ?? '');
   if(!pkg || !/^[a-z-]+$/.test(hook))return false;

@@ -1,6 +1,7 @@
 // Exercise the actual packed npm CLI in disposable projects, including a real 2.5.1 upgrade.
 import fs from 'node:fs';import path from 'node:path';import os from 'node:os';import net from 'node:net';
 import {execFileSync,spawn} from 'node:child_process';import assert from 'node:assert/strict';
+import {pathToFileURL} from 'node:url';
 const source=path.resolve(import.meta.dirname,'..'),temp=fs.mkdtempSync(path.join(os.tmpdir(),'openwolf-release-'));
 const npm=(args,cwd=temp)=>execFileSync(process.platform==='win32'?'npm.cmd':'npm',args,{cwd,encoding:'utf8',shell:process.platform==='win32',env:{...process.env,npm_config_cache:path.join(temp,'npm-cache')},maxBuffer:8*1024*1024});
 const log=[];let child;
@@ -9,7 +10,7 @@ const preload=path.join(temp,'isolate.mjs');
 // Process-local test seam: never change HOME/CODEX_HOME or the user's registry/PM2 instance.
 fs.writeFileSync(preload,`import os from 'node:os';import {syncBuiltinESMExports} from 'node:module';os.homedir=()=>${JSON.stringify(fixtureHome)};syncBuiltinESMExports();`);
 if(process.platform!=='win32')fs.symlinkSync(process.execPath,path.join(bin,'node'));
-const env={...process.env,NODE_OPTIONS:`--import=${preload}`,OPENWOLF_NO_UPDATE:'1',CLAUDE_CONFIG_DIR:path.join(fixtureHome,'.claude'),PM2_HOME:path.join(fixtureHome,'.pm2')};
+const env={...process.env,NODE_OPTIONS:`--import=${pathToFileURL(preload).href}`,OPENWOLF_NO_UPDATE:'1',CLAUDE_CONFIG_DIR:path.join(fixtureHome,'.claude'),PM2_HOME:path.join(fixtureHome,'.pm2')};
 // Prevent auto-starting a globally installed PM2; daemon tests below own their exact child process.
 if(process.platform!=='win32')env.PATH=bin+':/usr/bin:/bin';
 const run=(cli,args,cwd)=>execFileSync(process.execPath,[cli,...args],{cwd,env,encoding:'utf8',maxBuffer:8*1024*1024});

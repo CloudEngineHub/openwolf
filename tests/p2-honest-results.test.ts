@@ -181,7 +181,7 @@ describe("#90 benchmark revision pinning (compiled)", { skip: !haveDist ? "dist 
       execFileSync("git", ["rev-parse", "HEAD"], { cwd: dir, encoding: "utf-8" }).trim();
     assert.strictEqual(shaOf(armA), pinned);
     assert.strictEqual(shaOf(armB), pinned, "arm B must not drift onto the newer commit");
-    assert.strictEqual(fs.readFileSync(path.join(armA, "f.txt"), "utf-8"), "first\n");
-    assert.strictEqual(fs.readFileSync(path.join(armB, "f.txt"), "utf-8"), "first\n");
+    assert.strictEqual(fs.readFileSync(path.join(armA, "f.txt"), "utf-8").replace(/\r\n/g, "\n"), "first\n");
+    assert.strictEqual(fs.readFileSync(path.join(armB, "f.txt"), "utf-8").replace(/\r\n/g, "\n"), "first\n");
   });
 });
