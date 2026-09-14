@@ -21,6 +21,7 @@ All notable changes to OpenWolf are documented here. The format follows
 - Recorded Claude, Codex and OpenCode usage is deduplicated and priced by the actual provider/model. Missing counters remain unavailable; token estimates and API list-price equivalents are labelled separately.
 - Dashboard usage, memory, handover, updates and activity reflect the same underlying state. Malformed agent settings are preserved.
 - Windows ordinary file ownership no longer disables compatible runtime selection. Generated ESM loaders use file URLs, and Codex session-end hooks respect the native timeout limit.
+- Daemons resolve abbreviated Windows project paths before starting file watchers, avoiding the native short-path watcher crash.
 
 ### Credits and upgrade notes
 

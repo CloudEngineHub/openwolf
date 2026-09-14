@@ -27,7 +27,9 @@ const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
 // Prefer explicit OPENWOLF_PROJECT_ROOT env (set by CLI commands) over cwd detection
-const projectRoot = process.env.OPENWOLF_PROJECT_ROOT || findProjectRoot();
+// Resolve Windows 8.3 aliases before fs.watch: libuv can abort on short/long
+// path mismatches (https://github.com/libuv/libuv/issues/5010).
+const projectRoot = fs.realpathSync.native(process.env.OPENWOLF_PROJECT_ROOT || findProjectRoot());
 const wolfDir = path.join(projectRoot, ".wolf");
 
 interface WolfConfig {

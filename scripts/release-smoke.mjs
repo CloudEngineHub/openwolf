@@ -52,7 +52,8 @@ try{
   throw Error(`Daemon failed readiness (exit=${child.exitCode}, signal=${child.signalCode}): ${startupError??lastResponse}\n${output}`);
  };
  const stop=async()=>{if(!child||child.exitCode!==null||child.signalCode!==null)return;const exited=new Promise(r=>child.once('exit',r));child.kill('SIGTERM');await exited;child=undefined};
- const first=await start();assert(first.data.counts['checkpoint-saved']>=1);assert.equal(first.data.updates.installed,'2.5.2');assert.equal((await fetch(`http://127.0.0.1:${port}/api/activity`)).status,401);await stop();
+ const first=await start();assert(first.data.counts['checkpoint-saved']>=1);assert.equal(first.data.updates.installed,'2.5.2');assert.equal((await fetch(`http://127.0.0.1:${port}/api/activity`)).status,401);
+ const project=await fetch(`http://127.0.0.1:${port}/api/project`,{headers:{Authorization:'Bearer '+first.token}});assert(project.ok);assert.equal((await project.json()).root,fs.realpathSync.native(upgrade));await stop();
  const second=await start();assert.equal(second.data.counts['checkpoint-saved'],first.data.counts['checkpoint-saved']);await stop();log.push('Authenticated dashboard, persistent activity and daemon restart verified');
  console.log(JSON.stringify({version:packed.version,files:packed.files.length,checks:log,temp},null,2));
  if(process.env.OPENWOLF_KEEP_RELEASE_FIXTURE)fs.writeFileSync(process.env.OPENWOLF_KEEP_RELEASE_FIXTURE,JSON.stringify({temp,clean,upgrade,cli,oldCli,tarball,preload},null,2));
