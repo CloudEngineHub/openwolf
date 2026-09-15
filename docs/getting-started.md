@@ -2,7 +2,7 @@
 
 OpenWolf adds local project memory and context tools to your coding agent. It stores notes, a project map and session data in `.wolf/`.
 
-These instructions cover the 2.5.2 release candidate. Check the [published npm version](https://www.npmjs.com/package/openwolf) and [release record](release-2.5.2.md) before using new commands.
+These instructions cover OpenWolf 2.5.2. Check the [published npm version](https://www.npmjs.com/package/openwolf) and [release record](release-2.5.2.md) before using new commands.
 
 ## Install the published package
 

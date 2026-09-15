@@ -1,6 +1,6 @@
 # OpenWolf 2.5.2 release verification
 
-The 2.5.2 release candidate passed automated build, regression, package-install, upgrade and daemon checks across Linux, macOS and Windows. Native Codex recovery and OpenCode notifications were also verified. The full live Claude/Codex round trip remains unavailable because Claude model access was unavailable.
+OpenWolf 2.5.2 passed automated build, regression, package-install, upgrade and daemon checks across Linux, macOS and Windows. Native Codex recovery and OpenCode notifications were also verified. The full live Claude/Codex round trip remains unavailable because Claude model access was unavailable.
 
 Scope: context handover and recovery, recorded usage/pricing, durable journals and archival, safe anatomy refresh, compatible runtime updates, quiet activity receipts and synchronized dashboard content. Contributor roles and original commit attribution are retained in CREDITS.md and docs/audit/.
 
@@ -29,4 +29,4 @@ The live Claude → Codex → Claude coding round trip, Claude status-line rende
 
 Protected durable instruction authority remains unavailable until independent administrator deployment and review. `openwolf operations prepare --output <new-directory>` creates a versioned deployment review manifest; it does not provision or approve the protected runtime. Ordinary handover evidence and activity features remain usable without it.
 
-No npm version was published or tagged during these checks. Reproduce the package/upgrade/daemon checks after building with `node scripts/release-smoke.mjs`; the script uses disposable projects and an isolated process-local home lookup, and cleans up its own daemon.
+The checks above ran before publication. OpenWolf 2.5.2 was published on 2026-09-15 from commit `571bd1a`. See the [npm package](https://www.npmjs.com/package/openwolf/v/2.5.2) and [GitHub release](https://github.com/cytostack/openwolf/releases/tag/v2.5.2). Reproduce the package/upgrade/daemon checks after building with `node scripts/release-smoke.mjs`; the script uses disposable projects and an isolated process-local home lookup, and cleans up its own daemon.

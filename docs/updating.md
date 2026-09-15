@@ -12,7 +12,7 @@ openwolf update --dry-run
 openwolf update
 ```
 
-This installs the version currently published on npm. The 2.5.2 candidate is available on its [release branch](https://github.com/cytostack/openwolf/tree/release/openwolf-2.5.2) until publication.
+This installs the version currently published on npm. OpenWolf 2.5.2 is available on [npm](https://www.npmjs.com/package/openwolf/v/2.5.2), with [release notes on GitHub](https://github.com/cytostack/openwolf/releases/tag/v2.5.2).
 
 `openwolf update` refreshes registered projects from the installed package. Use `--project my-app` to select a project by partial name. Review the dry run before updating several projects.
 

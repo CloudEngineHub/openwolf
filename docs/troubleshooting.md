@@ -10,7 +10,7 @@ openwolf operations doctor
 
 ## A documented command is missing
 
-These pages describe the 2.5.2 candidate. Compare your installed version with the [npm package](https://www.npmjs.com/package/openwolf) and [release record](release-2.5.2.md). A package version on a release branch is not necessarily published on npm.
+These pages describe OpenWolf 2.5.2. Compare your installed version with the [npm package](https://www.npmjs.com/package/openwolf) and [release record](release-2.5.2.md). Older installations may not include all commands described here.
 
 ## Hooks are not running
 

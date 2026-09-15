@@ -1,6 +1,6 @@
 # Useful, quiet OpenWolf visibility
 
-Status: implemented in the 2.5.2 candidate on the [release branch](https://github.com/cytostack/openwolf/tree/release/openwolf-2.5.2), with automated contract tests and Chrome dashboard verification. Native Codex recovery receipts and OpenCode archive toasts were verified for 2.5.2; Grok's compatible SessionStart also ran successfully. Claude inference is unavailable because model access was unavailable. See the [release verification record](release-2.5.2.md) for versions and outstanding checks. Updating this checkout does not activate copied hooks in other projects.
+Status: available in [OpenWolf 2.5.2](https://github.com/cytostack/openwolf/releases/tag/v2.5.2), with automated contract tests and Chrome dashboard verification. Native Codex recovery receipts and OpenCode archive toasts were verified for 2.5.2; Grok's compatible SessionStart also ran successfully. Claude inference is unavailable because model access was unavailable. See the [release verification record](release-2.5.2.md) for versions and outstanding checks. Updating this checkout does not activate copied hooks in other projects.
 
 ## Implemented behavior
 

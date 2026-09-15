@@ -230,7 +230,7 @@ const archFiles = [
             <p class="ow-why__text">Save the failing test, the files already changed and the next action in a checkpoint. In the receiving Claude or Codex session, inspect and import the handover packet. OpenWolf checks the project and source records and reports changes that may affect the saved context.</p>
             <p class="ow-why__bar-note">Handover uses saved messages and results. It does not expose private reasoning or grant permission to run commands.</p>
           </div>
-          <p class="ow-why__footnote">This site describes the 2.5.2 release candidate. Check the <a href="https://www.npmjs.com/package/openwolf">published npm version</a> before installation. See <a href="/release-2.5.2">release checks and limits</a>.</p>
+          <p class="ow-why__footnote">OpenWolf 2.5.2 is available on <a href="https://www.npmjs.com/package/openwolf/v/2.5.2">npm</a>. See <a href="/release-2.5.2">release checks and limits</a>.</p>
         </div>
       </div>
     </section>

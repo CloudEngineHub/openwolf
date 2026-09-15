@@ -1,6 +1,6 @@
 # Command reference
 
-Run commands from the project directory unless a command explicitly selects registered projects. This reference covers the 2.5.2 candidate. Use `openwolf --version` and `openwolf <command> --help` to check your installed CLI.
+Run commands from the project directory unless a command explicitly selects registered projects. This reference covers OpenWolf 2.5.2. Use `openwolf --version` and `openwolf <command> --help` to check your installed CLI.
 
 ## Installation and status
 
