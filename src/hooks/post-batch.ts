@@ -1,3 +1,4 @@
+import { approvedMemory } from "./trusted-memory.js";
 import * as fs from "node:fs";
 import * as path from "node:path";
 import {
@@ -5,7 +6,7 @@ import {
   hookMain, getSessionFilePath, recordInjection
 } from "./shared.js";
 import { mutateJSON, HOOK_LOCK_BUDGET_MS } from "./anatomy-lock.js";
-import { topRules } from "./rule-reinjection.js";
+import { topRules, boundedRuleNote } from "./rule-reinjection.js";
 
 // ─────────────────────────────────────────────────────────────────────────────
 // PostToolBatch decay countermeasure (2.4). Compliance with instructions
@@ -40,7 +41,7 @@ async function main(): Promise<void> {
 
   let rules: string[] = [];
   try {
-    rules = topRules(fs.readFileSync(path.join(wolfDir, "cerebrum.md"), "utf-8"), 3);
+    rules = topRules(approvedMemory(wolfDir, "cerebrum.md"), 3);
   } catch {}
 
   // tool_batches is a counter driving an every-Nth-batch reinjection: an
@@ -50,7 +51,9 @@ async function main(): Promise<void> {
     session.tool_batches = ((session.tool_batches as number) ?? 0) + 1;
     if (session.tool_batches % interval !== 0) return;
     if (rules.length === 0) return;
-    note = `Project rules still in effect (from .wolf/cerebrum.md Do-Not-Repeat):\n${rules.join("\n")}`;
+    const cfg = readJSON<{ openwolf?: { context?: { reinjection_max_bytes?: number } } }>(path.join(wolfDir, "config.json"), {});
+    note = boundedRuleNote(rules, cfg.openwolf?.context?.reinjection_max_bytes ?? 1024);
+    if (note === null) return;
     recordInjection(session, "decay_reinjection", note);
   });
 

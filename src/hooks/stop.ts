@@ -1,3 +1,5 @@
+import { semanticSessionEntries } from "./session-memory.js";
+import { reconcileReads } from "./event-journal.js";
 import * as fs from "node:fs";
 import * as path from "node:path";
 import { getWolfDir, ensureWolfDir, readJSON, writeJSON, countSemanticEntries, readStdin, hookMain, getSessionFilePath } from "./shared.js";
@@ -15,6 +17,7 @@ async function main(): Promise<void> {
     hookInput = JSON.parse(await readStdin());
   } catch {}
   const sessionFile = getSessionFilePath(hookInput);
+  reconcileReads(sessionFile);
 
   // All session mutation happens in ONE serialized transaction, and the ledger
   // flush below runs on its result AFTER the lock is released: reading a large
@@ -149,9 +152,9 @@ function checkSemanticSummaries(wolfDir: string, session: SessionData): string |
   const writeCount = session.files_written.length;
   if (writeCount < 2) return null;
 
-  const semanticCount = countSemanticEntries(wolfDir);
+  const semanticCount = semanticSessionEntries(wolfDir, session.session_id);
   if (semanticCount === 0) {
-    return `ACTION REQUIRED: ${writeCount} files were modified this session but no semantic summary was written to memory.md. Append a one-line summary: | HH:MM | description | file(s) | outcome | ~tokens |`;
+    return `ACTION REQUIRED: ${writeCount} files were modified this session but no semantic summary was written to memory.md. Use openwolf memory log --session ${JSON.stringify(session.session_id)} --summary "what changed and why" --files "paths" --outcome "validation result"`;
   }
   return null;
 }

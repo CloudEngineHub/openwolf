@@ -107,6 +107,10 @@
         "opencode": 1200,
         "cursor": 800
       }
+    },
+    "visibility": {"mode": "quiet"},
+    "updates": {
+      "mode": "compatible"
     }
   }
 }

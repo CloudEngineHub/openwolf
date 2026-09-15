@@ -4,6 +4,31 @@ All notable changes to OpenWolf are documented here. The format follows
 [Keep a Changelog](https://keepachangelog.com/), and OpenWolf uses
 [Semantic Versioning](https://semver.org/).
 
+## [2.5.2] - 2026-09-15
+
+### Added
+
+- Explicit Claude/Codex handover packets, saved task checkpoints, transcript recovery and bounded evidence search, with a synchronized Handover dashboard.
+- Quiet activity receipts for completed OpenWolf operations: Claude status-line support, Codex recovery notices, OpenCode informational toasts and Grok dashboard history. Existing status commands are preserved.
+- Background compatible stable hook/plugin runtime updates for new sessions; major upgrades are notification-only by default. Running sessions retain their selected runtime.
+- Protected memory review, approval revocation and deployment review tools. Independent administrator provisioning is required; ordinary npm installations keep durable instruction injection disabled.
+
+### Fixed
+
+- Concurrent session, read/write, bug-log and token-ledger updates now use recoverable journals and consistent worktree identities.
+- Stale eligible memory is archived with verified, restorable pointers; active, latest and pinned sessions are preserved.
+- Partial or changing anatomy scans retain prior entries and cannot certify a fresh complete map.
+- Recorded Claude, Codex and OpenCode usage is deduplicated and priced by the actual provider/model. Missing counters remain unavailable; token estimates and API list-price equivalents are labelled separately.
+- Dashboard usage, memory, handover, updates and activity reflect the same underlying state. Malformed agent settings are preserved.
+- Windows ordinary file ownership no longer disables compatible runtime selection. Generated ESM loaders use file URLs, and Codex session-end hooks respect the native timeout limit.
+- Daemons resolve abbreviated Windows project paths before starting file watchers, avoiding the native short-path watcher crash.
+
+### Credits and upgrade notes
+
+Community reporters, PR submitters, original authors and co-authors are listed separately in [CREDITS.md](CREDITS.md) and the [contribution audit](docs/audit/README.md). Adapted work is not represented as merged upstream PRs.
+
+Upgrade the package, run `openwolf update` to refresh initialized projects, restart their daemons, and start new agent sessions. Automatic updates cover the hook/plugin runtime; they do not replace the global CLI or an already-running daemon. Handover imports remain explicit and session-targeted. See [release verification and limitations](docs/release-2.5.2.md).
+
 ## [2.5.1] - 2026-08-30
 
 Sixteen reported defects, fixed. Fifteen were found and reported by

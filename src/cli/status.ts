@@ -1,10 +1,24 @@
+import { getRegisteredProjects } from "./registry.js";
+import { projectIdentity } from "../utils/project-identity.js";
+import { memoryTrust } from "../hooks/trusted-memory.js";
+import { lookupDaemonPid } from "../utils/daemon-pidfile.js";
 import * as fs from "node:fs";
 import * as path from "node:path";
 import { findProjectRoot } from "../scanner/project-root.js";
 import { readJSON, readText } from "../utils/fs-safe.js";
 import { HOOK_FILES } from "./hook-manifest.js";
 
-export async function statusCommand(): Promise<void> {
+export async function statusCommand(options: {all?:boolean;json?:boolean} = {}): Promise<void> {
+  if (options.all || options.json) {
+    const roots = options.all ? getRegisteredProjects(false).map(p=>p.root) : [findProjectRoot()];
+    const projects = roots.map(root => {
+      if (!fs.existsSync(root)) return {root,status:"unavailable"};
+      const wolf=path.join(root,".wolf");
+      const trust=memoryTrust(root);
+      return {...projectIdentity(root),initialized:fs.existsSync(wolf),daemon:lookupDaemonPid(wolf,root),memory_trust:{status:trust.status,reason:trust.reason},scan:readJSON(path.join(wolf,"_scan-state.json"),null)};
+    });
+    console.log(JSON.stringify({projects},null,2));return;
+  }
   const projectRoot = findProjectRoot();
   const wolfDir = path.join(projectRoot, ".wolf");
 

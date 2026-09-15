@@ -1,37 +1,39 @@
 {
   "name": "openwolf",
-  "version": "2.5.1",
+  "version": "2.5.2",
   "description": "Local project memory, context tools and recorded token usage for coding agents.",
   "type": "module",
   "bin": {
     "openwolf": "dist/bin/openwolf.js"
   },
   "scripts": {
-    "prebuild": "node -e \"const fs=require('fs');if(fs.existsSync('dist'))fs.rmSync('dist',{recursive:true})\"",
-    "build": "tsc && pnpm build:hooks && pnpm build:dashboard",
+    "prebuild": "node scripts/sync-plugin-runtime.mjs && node -e \"const fs=require('fs');if(fs.existsSync('dist'))fs.rmSync('dist',{recursive:true})\"",
+    "build": "tsc && pnpm check:plugin && pnpm check:dashboard && pnpm build:hooks && pnpm build:dashboard",
     "build:hooks": "tsc -p tsconfig.hooks.json",
     "build:dashboard": "cd src/dashboard/app && npx vite build --outDir ../../../dist/dashboard",
     "dev": "tsc --watch",
     "docs:dev": "vitepress dev docs",
     "docs:build": "vitepress build docs",
     "prepublishOnly": "pnpm build",
-    "test": "node --test tests/*.test.ts"
+    "test": "node --test tests/*.test.ts",
+    "pretest": "node scripts/sync-plugin-runtime.mjs && tsc && tsc -p tsconfig.hooks.json && pnpm check:plugin && pnpm check:dashboard",
+    "check:plugin": "tsc -p tsconfig.plugin.json",
+    "check:dashboard": "tsc -p tsconfig.dashboard.json"
   },
   "dependencies": {
     "chalk": "^5.3.0",
     "chokidar": "^4.0.0",
     "commander": "^12.0.0",
     "express": "^5.2.1",
+    "ignore": "^7.0.9",
     "node-cron": "^4.2.1",
     "open": "^10.0.0",
     "tree-sitter-wasms": "^0.1.13",
     "web-tree-sitter": "^0.24.7",
-    "ws": "^8.18.0"
-  },
-  "optionalDependencies": {
-    "puppeteer-core": "^24.42.0"
+    "ws": "^8.21.3"
   },
   "devDependencies": {
+    "@opencode-ai/plugin": "^1.18.30",
     "@tailwindcss/vite": "^4.0.0",
     "@types/express": "^5.0.0",
     "@types/node": "^22.0.0",
@@ -78,6 +80,25 @@
     "dist/",
     "src/templates/",
     "LICENSE",
-    "README.md"
-  ]
+    "README.md",
+    "CREDITS.md",
+    "docs/audit/README.md",
+    "docs/audit/contributions.json",
+    "docs/audit/pr-commits.json",
+    "docs/repair-operations.md",
+    "docs/claude-codex-handoff-plan.md",
+    "docs/automatic-updates.md",
+    "docs/session-visibility-plan.md",
+    "CHANGELOG.md",
+    "docs/release-2.5.2.md"
+  ],
+  "pnpm": {
+    "overrides": {
+      "qs": "6.16.0",
+      "body-parser": "2.3.0"
+    }
+  },
+  "openwolfRuntime": {
+    "protocol": 1
+  }
 }

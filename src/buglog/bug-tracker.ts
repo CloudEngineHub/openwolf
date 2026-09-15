@@ -1,3 +1,7 @@
+import { recordBug } from "../hooks/bug-journal.js";
+import { sharedWolfDir } from "../hooks/knowledge-root.js";
+import { withFileLock, CLI_LOCK_BUDGET_MS } from "../hooks/anatomy-lock.js";
+import { nextBugId } from "../hooks/bug-id.js";
 import * as path from "node:path";
 import { readJSON, writeJSON } from "../utils/fs-safe.js";
 
@@ -22,7 +26,7 @@ interface BugLog {
 }
 
 export function getBugLogPath(wolfDir: string): string {
-  return path.join(wolfDir, "buglog.json");
+  return path.join(sharedWolfDir(wolfDir), "buglog.json");
 }
 
 /**
@@ -51,47 +55,11 @@ export function logBug(
     tags: string[];
   }
 ): void {
-  const bugLog = readBugLog(wolfDir);
-  const now = new Date().toISOString();
-
-  // Check for near-duplicate (score > 0.8)
-  const similar = findSimilarBugs(wolfDir, bug.error_message);
-  if (similar.length > 0 && similar[0].score > 0.8) {
-    const existing = bugLog.bugs.find((b) => b.id === similar[0].bug.id);
-    if (existing) {
-      existing.occurrences++;
-      existing.last_seen = now;
-      writeJSON(getBugLogPath(wolfDir), bugLog);
-      return;
-    }
-  }
-
-  // Next id from the max existing numeric id, not the array length: agents
-  // edit buglog.json directly and deletions made length-based ids collide.
-  const maxId = bugLog.bugs.reduce((max, b) => {
-    const n = parseInt(String(b.id ?? "").replace(/^bug-/, ""), 10);
-    return Number.isFinite(n) && n > max ? n : max;
-  }, 0);
-  const id = `bug-${String(maxId + 1).padStart(3, "0")}`;
-  bugLog.bugs.push({
-    id,
-    timestamp: now,
-    error_message: bug.error_message,
-    file: bug.file,
-    line: bug.line,
-    root_cause: bug.root_cause,
-    fix: bug.fix,
-    tags: bug.tags,
-    related_bugs: [],
-    occurrences: 1,
-    last_seen: now,
-  });
-
-  writeJSON(getBugLogPath(wolfDir), bugLog);
+  recordBug(wolfDir, {...bug, observed_worktree:path.dirname(wolfDir)});
 }
 
 function normalize(text: string): string {
-  return text.toLowerCase().replace(/\d+/g, "N").replace(/[^\w\s]/g, " ").trim();
+  return String(text ?? "").toLowerCase().replace(/\d+/g, "N").replace(/[^\w\s]/g, " ").trim();
 }
 
 function tokenize(text: string): Set<string> {

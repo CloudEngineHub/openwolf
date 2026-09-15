@@ -49,8 +49,10 @@ function makeDir(): string {
 
 describe("projectTranscriptDir", () => {
   test("slugs the absolute path with dashes", () => {
-    const dir = projectTranscriptDir("/Users/x/Workspace/my_app.v2", "/home/u");
-    assert.strictEqual(dir, path.join("/home/u", ".claude", "projects", "-Users-x-Workspace-my-app-v2"));
+    const project = process.platform === "win32" ? "C:\\Users\\x\\Workspace\\my_app.v2" : "/Users/x/Workspace/my_app.v2";
+    const slug = process.platform === "win32" ? "C--Users-x-Workspace-my-app-v2" : "-Users-x-Workspace-my-app-v2";
+    const dir = projectTranscriptDir(project, "/home/u");
+    assert.strictEqual(dir, path.join("/home/u", ".claude", "projects", slug));
   });
 });
 

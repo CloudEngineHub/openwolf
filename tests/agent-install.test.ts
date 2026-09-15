@@ -1,3 +1,4 @@
+import { pathToFileURL } from "node:url";
 import { test, describe } from "node:test";
 import * as assert from "node:assert";
 import * as fs from "node:fs";
@@ -18,7 +19,7 @@ const DIST_AGENTS = path.resolve(import.meta.dirname ?? ".", "..", "dist", "src"
 const haveDist = fs.existsSync(DIST_AGENTS);
 
 async function loadCodexAdapter(): Promise<{ install: (ctx: unknown) => { actions: string[]; warnings: string[] } }> {
-  const { resolveAgents } = await import(DIST_AGENTS);
+  const { resolveAgents } = await import(pathToFileURL(DIST_AGENTS).href);
   const [adapter] = resolveAgents(["codex"]);
   return adapter;
 }
@@ -119,6 +120,7 @@ describe("codex adapter hooks.json", { skip: !haveDist ? "dist not built" : fals
     codexAdapter.install(ctx);
     const written = JSON.parse(fs.readFileSync(path.join(ctx.projectRoot, ".codex", "hooks.json"), "utf-8"));
     assert.strictEqual(written.hooks.SessionStart.length, 1);
-    assert.strictEqual(written.hooks.PostToolUse.length, 2);
+    assert.strictEqual(written.hooks.PostToolUse.length, 3);
+    assert.strictEqual(written.hooks.PostToolUse.filter((h: any) => h.matcher === "Bash").length, 1);
   });
 });

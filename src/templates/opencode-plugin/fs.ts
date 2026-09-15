@@ -1,3 +1,6 @@
+import { normalizeSession } from "./session-state.js"
+import { gcSessionFiles as canonicalGC } from "./shared.js"
+import { withFileLock, HOOK_LOCK_BUDGET_MS } from "./anatomy-lock.js"
 import * as fs from "node:fs"
 import * as path from "node:path"
 import * as crypto from "node:crypto"
@@ -53,7 +56,8 @@ export function readJSON<T>(filePath: string, fallback: T): T {
   try {
     const raw = fs.readFileSync(filePath, "utf-8")
     const parsed = JSON.parse(raw) as T
-    return deepMergeDefaults(fallback, parsed)
+    const value=deepMergeDefaults(fallback, parsed)
+    return /[\\/]hooks[\\/]sessions[\\/][^\\/]+\.json$/.test(filePath) ? normalizeSession(value,path.basename(filePath,".json")) as T : value
   } catch {
     return fallback
   }
@@ -101,16 +105,7 @@ export function sessionFilePath(hooksDir: string, sessionId: string | undefined)
  * so the directory needs the same bound the main hooks already apply.
  */
 export function gcSessionFiles(hooksDir: string, maxAgeDays = 7): void {
-  const dir = path.join(hooksDir, "sessions")
-  const cutoff = Date.now() - maxAgeDays * 24 * 3600 * 1000
-  try {
-    for (const f of fs.readdirSync(dir)) {
-      if (!f.endsWith(".json")) continue
-      try {
-        if (fs.statSync(path.join(dir, f)).mtimeMs < cutoff) fs.unlinkSync(path.join(dir, f))
-      } catch {}
-    }
-  } catch {}
+  canonicalGC(maxAgeDays,path.dirname(hooksDir))
 }
 
 export function readMarkdown(filePath: string): string {
@@ -124,7 +119,12 @@ export function readMarkdown(filePath: string): string {
 export function appendMarkdown(filePath: string, line: string): void {
   const dir = path.dirname(filePath)
   if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true })
-  fs.appendFileSync(filePath, line, "utf-8")
+  const ok = withFileLock(filePath + ".lock", HOOK_LOCK_BUDGET_MS, () => { fs.appendFileSync(filePath, line, "utf-8"); return true })
+  if (ok === null) {
+    const pending = filePath + ".pending"
+    fs.mkdirSync(pending, {recursive:true})
+    fs.writeFileSync(path.join(pending, `${Date.now()}-${crypto.randomUUID()}.json`), JSON.stringify({line}), {flag:"wx",mode:0o600})
+  }
 }
 
 export function timeShort(): string {

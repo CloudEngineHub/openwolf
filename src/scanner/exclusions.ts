@@ -1,3 +1,4 @@
+import ignore from "ignore";
 import * as fs from "node:fs";
 import * as path from "node:path";
 
@@ -163,4 +164,29 @@ export function isGitIgnored(rules: IgnoreRule[], relPath: string, isDirectory: 
     ignored = !rule.negated;
   }
   return ignored;
+}
+
+/** Full nested Git-ignore semantics (#15, @VimCommando and @cdgriffith). */
+export function createIgnoreMatcher(root: string): (relative: string, directory: boolean) => boolean {
+  const cache = new Map<string, ReturnType<typeof ignore>>();
+  const rules = (dir: string) => {
+    if (!cache.has(dir)) {
+      let text = "";
+      try { text = fs.readFileSync(path.join(root, dir, ".gitignore"), "utf8"); } catch {}
+      cache.set(dir, ignore().add(text));
+    }
+    return cache.get(dir)!;
+  };
+  return (relative, directory) => {
+    const parts = relative.replace(/\\/g, "/").split("/");
+    let excluded = false;
+    for (let depth = 0; depth < parts.length; depth++) {
+      const base = parts.slice(0, depth).join("/");
+      const target = parts.slice(depth).join("/") + (directory ? "/" : "");
+      const result = rules(base).test(target);
+      if (result.ignored) excluded = true;
+      else if (result.unignored) excluded = false;
+    }
+    return excluded;
+  };
 }

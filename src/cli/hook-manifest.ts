@@ -100,4 +100,8 @@ export const HOOK_FILES = [
   "anatomy-store.js",
   "anatomy-lock.js",
   "symbol-extractor.js",
+  "session-state.js",
+  "event-journal.js",
+  "memory-archive.js", "trusted-memory.js", "session-memory.js", "knowledge-root.js", "bug-journal.js",
+  "bug-id.js", "runtime-updates.js", "handoff-state.js", "update-worker.js", "visibility.js", "visibility-statusline.js",
 ];

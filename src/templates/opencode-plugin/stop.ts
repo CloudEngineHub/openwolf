@@ -1,3 +1,4 @@
+import { flushSessionToLedger as flushCanonicalLedger } from "./ledger.js"
 import * as fs from "node:fs"
 import * as path from "node:path"
 import { getWolfDir, writeJSON, readJSON, appendMarkdown, timeShort, sessionFilePath } from "./fs.js"
@@ -181,24 +182,7 @@ function recomputeLifetime(ledger: LedgerData): void {
 
 /** Upsert the entry, roll old sessions into the baseline, derive lifetime. */
 function flushSessionToLedger(wolfDir: string, entry: SessionEntry): void {
-  if (!entry.id) return
-  const ledgerPath = path.join(wolfDir, "token-ledger.json")
-  const ledger = readJSON<LedgerData>(ledgerPath, emptyLedger())
-  if (!Array.isArray(ledger.sessions)) ledger.sessions = []
-
-  const idx = ledger.sessions.findIndex((s) => s && s.id === entry.id)
-  if (idx >= 0) ledger.sessions[idx] = entry
-  else ledger.sessions.push(entry)
-
-  while (ledger.sessions.length > MAX_LEDGER_SESSIONS) {
-    const oldest = ledger.sessions.shift()!
-    const baseline = numericFields(ledger.lifetime_baseline)
-    foldEntry(baseline, oldest)
-    ledger.lifetime_baseline = baseline
-  }
-
-  recomputeLifetime(ledger)
-  writeJSON(ledgerPath, ledger)
+  flushCanonicalLedger(wolfDir, entry as any)
 }
 
 export function handleStop(directory: string, sessionId: string): void {

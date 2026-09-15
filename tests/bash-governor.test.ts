@@ -202,7 +202,7 @@ describe("post-bash compiled hook", { skip: !haveDist ? "dist not built" : false
     const content = fs.readFileSync(target, "utf-8");
     const payload = (id: string) => ({
       session_id: id,
-      tool_input: { command: `cat ${target}` },
+      tool_input: { command: "cat notes.md" },
       tool_response: { stdout: content, stderr: "", interrupted: false, isImage: false },
     });
     const first = await runHook(hooksDir, root, payload("dedup1"));

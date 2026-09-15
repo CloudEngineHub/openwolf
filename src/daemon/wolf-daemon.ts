@@ -1,3 +1,11 @@
+import {updateState,installedVersion} from '../hooks/runtime-updates.js';
+import {activityState,receiptText,visibilityMode} from '../hooks/visibility.js';
+import { Worker } from "node:worker_threads";
+import { sharedWolfDir } from "../hooks/knowledge-root.js";
+import { projectIdentity } from "../utils/project-identity.js";
+import { startSourceWatcher } from "./source-watcher.js";
+import { archiveMemory, restoreMemory } from "../hooks/memory-archive.js";
+import { reconcileUsage } from "../tracker/usage-report.js";
 import * as fs from "node:fs";
 import * as path from "node:path";
 import { fileURLToPath } from "node:url";
@@ -19,7 +27,9 @@ const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
 // Prefer explicit OPENWOLF_PROJECT_ROOT env (set by CLI commands) over cwd detection
-const projectRoot = process.env.OPENWOLF_PROJECT_ROOT || findProjectRoot();
+// Resolve Windows 8.3 aliases before fs.watch: libuv can abort on short/long
+// path mismatches (https://github.com/libuv/libuv/issues/5010).
+const projectRoot = fs.realpathSync.native(process.env.OPENWOLF_PROJECT_ROOT || findProjectRoot());
 const wolfDir = path.join(projectRoot, ".wolf");
 
 interface WolfConfig {
@@ -30,13 +40,12 @@ interface WolfConfig {
   };
 }
 
-const config = readJSON<WolfConfig>(path.join(wolfDir, "config.json"), {
-  openwolf: {
-    daemon: { port: 18790, log_level: "info" },
-    dashboard: { enabled: true, port: 18791 },
-    cron: { enabled: true, heartbeat_interval_minutes: 30 },
-  },
-});
+const loadedConfig = readJSON<WolfConfig | null>(path.join(wolfDir,"config.json"),null);
+const config: WolfConfig = {openwolf:{
+  daemon:{port:18790,log_level:"info",...loadedConfig?.openwolf?.daemon},
+  dashboard:{enabled:true,port:18791,...loadedConfig?.openwolf?.dashboard},
+  cron:{enabled:true,heartbeat_interval_minutes:30,...loadedConfig?.openwolf?.cron},
+}};
 
 const logger = new Logger(
   path.join(wolfDir, "daemon.log"),
@@ -83,7 +92,7 @@ function requireDashboardAuth(req: Request, res: Response, next: NextFunction): 
 // Serve dashboard static files
 // In dist: dist/src/daemon/wolf-daemon.js → ../../../dist/dashboard/
 const dashboardDir = path.resolve(__dirname, "..", "..", "..", "dist", "dashboard");
-if (fs.existsSync(dashboardDir)) {
+if (config.openwolf.dashboard.enabled && fs.existsSync(dashboardDir)) {
   app.use(express.static(dashboardDir));
 }
 
@@ -149,11 +158,17 @@ app.get("/api/health", (_req, res) => {
   res.json(getHealth(wolfDir, startTime));
 });
 
+app.get("/api/activity", (_req,res)=>{
+  const {state}=activityState(projectRoot);
+  res.json({mode:visibilityMode(projectRoot),history:state.history.map(r=>({...r,text:receiptText(r)})),counts:state.counts,updates:{...updateState(projectRoot),installed:installedVersion(projectRoot)},diagnostics:["Local receipts only; no model requests. Fixed-size spool may drop activity during bursts; operational data is unaffected.","History: latest 100 actions. Persistent bounded deduplication favors silence on hash collisions; counters cover recorded actions only.","Claude: status-line segment, custom commands preserved. Codex: recovery notices. OpenCode: informational toasts. Grok/headless: dashboard history."]});
+});
+
 app.get("/api/project", (_req, res) => {
   res.json({
     name: projectMeta.name,
     description: projectMeta.description,
     root: projectRoot,
+    identity: projectIdentity(projectRoot),
   });
 });
 
@@ -163,11 +178,11 @@ app.get("/api/files", (_req, res) => {
     "OPENWOLF.md", "identity.md", "cerebrum.md", "memory.md", "anatomy.md",
     "config.json", "token-ledger.json", "buglog.json",
     "cron-manifest.json", "cron-state.json", "STATUS.md", "_scan-state.json", "anatomy-index.json",
-    "hooks/_heartbeat.json",
+    "hooks/_heartbeat.json", "usage-report.json",
   ];
   for (const file of wolfFiles) {
     try {
-      files[file] = fs.readFileSync(path.join(wolfDir, file), "utf-8");
+      files[file] = fs.readFileSync(path.join(file === "buglog.json" ? sharedWolfDir(wolfDir) : wolfDir, file), "utf-8");
     } catch {
       files[file] = "";
     }
@@ -175,7 +190,65 @@ app.get("/api/files", (_req, res) => {
   res.json(files);
 });
 
+// Reconcile current harness records on a bounded cadence; every UI uses this report.
+let usageCache: ReturnType<typeof reconcileUsage> | null = null;
+let usageCacheAt = 0;
+let usageInFlight: Promise<ReturnType<typeof reconcileUsage>> | null = null;
+function refreshUsage() {
+  if (!usageInFlight) usageInFlight = new Promise<ReturnType<typeof reconcileUsage>>((resolve,reject)=>{
+    const worker = new Worker(new URL("../tracker/usage-worker.js",import.meta.url),{workerData:{root:projectRoot}});
+    let received=false;
+    worker.once("message",message=>{
+      received=true;
+      if (message.error) reject(new Error(message.error));
+      else {usageCache=message.report;usageCacheAt=Date.now();resolve(message.report);}
+    });
+    worker.once("error",reject);
+    worker.once("exit",code=>{if (!received) reject(new Error(`Usage worker exited ${code}`));});
+  }).finally(()=>{usageInFlight=null;});
+  return usageInFlight;
+}
+app.get("/api/usage", async (_req, res) => {
+  try {
+    if (!usageCache || Date.now() - usageCacheAt > 15000) await refreshUsage();
+    res.json(usageCache);
+  } catch (error) { res.status(500).json({error: String(error)}); }
+});
+
+app.get("/api/memory/archive/:id", (req,res)=>{
+  const id=String(req.params.id);
+  if (!/^[a-f0-9]{64}$/.test(id)) {res.status(400).json({error:"Invalid archive ID"});return;}
+  try {res.json({id,content:fs.readFileSync(path.join(wolfDir,"archive","memory",id+".md"),"utf8")});}
+  catch {res.status(404).json({error:"Archive not found"});}
+});
+app.post("/api/memory/restore/:id", (req,res)=>{
+  try {restoreMemory(wolfDir,String(req.params.id));usageCacheAt=0;res.json({status:"restored"});}
+  catch(error) {res.status(400).json({error:String(error)});}
+});
+
 // Context-health audit (J3): read-only checks on always-on context cost.
+// Expensive history/Git work runs off the daemon's event loop.
+let handoverWorkers=0;
+async function handoverJob(action:string,args:unknown={}) {
+  if(handoverWorkers>=2)throw new Error("Handover is busy; retry shortly");
+  handoverWorkers++;
+  try{return await new Promise<any>((resolve,reject)=>{
+    const worker=new Worker(new URL("../handoff/worker.js",import.meta.url),{workerData:{root:projectRoot,action,args}});
+    const timer=setTimeout(()=>{void worker.terminate();reject(new Error("Handover operation timed out"))},30000);
+    let received=false;
+    worker.once("message",message=>{received=true;clearTimeout(timer);message.error?reject(new Error(message.error)):resolve(message.result)});
+    worker.once("error",error=>{clearTimeout(timer);reject(error)});
+    worker.once("exit",code=>{clearTimeout(timer);if(!received)reject(new Error(`Handover worker exited ${code}`))});
+  })}finally{handoverWorkers--}
+}
+app.get("/api/handoff",async (_req,res)=>{try{res.json(await handoverJob("summary"))}catch(e){res.status(400).json({error:String(e)})}});
+app.get("/api/handoff/sessions",async (req,res)=>{try{res.json(await handoverJob("sessions",{agent:req.query.agent}))}catch(e){res.status(400).json({error:String(e)})}});
+app.get("/api/handoff/packet/:id",async (req,res)=>{try{res.json(await handoverJob("inspect",{id:req.params.id}))}catch(e){res.status(400).json({error:String(e)})}});
+app.get("/api/handoff/search",async (req,res)=>{try{res.json(await handoverJob("search",{query:req.query.q}))}catch(e){res.status(400).json({error:String(e)})}});
+for(const action of ["export","import","checkpoint","recover"]){
+  app.post(`/api/handoff/${action}`,async(req,res)=>{try{res.json(await handoverJob(action,req.body));usageCacheAt=0}catch(e){res.status(400).json({error:String(e)})}});
+}
+
 app.get("/api/context-health", (_req, res) => {
   try {
     res.json(auditContextHealth(projectRoot, wolfDir));
@@ -207,7 +280,7 @@ app.post("/api/cron/run/:taskId", (req, res) => {
 // SPA fallback
 app.get("/{*path}", (_req, res) => {
   const indexPath = path.join(dashboardDir, "index.html");
-  if (fs.existsSync(indexPath)) {
+  if (config.openwolf.dashboard.enabled && fs.existsSync(indexPath)) {
     res.sendFile(indexPath);
   } else {
     res.status(404).json({ error: "Dashboard not built. Run: pnpm build:dashboard" });
@@ -217,7 +290,8 @@ app.get("/{*path}", (_req, res) => {
 // Start HTTP server. OPENWOLF_DASHBOARD_PORT lets the launcher override the
 // configured port when it is already held by another project's daemon.
 const envPort = Number(process.env.OPENWOLF_DASHBOARD_PORT);
-const port = Number.isInteger(envPort) && envPort > 0 ? envPort : config.openwolf.dashboard.port;
+const selectedPort = config.openwolf.dashboard.enabled ? config.openwolf.dashboard.port : config.openwolf.daemon.port;
+const port = Number.isInteger(envPort) && envPort > 0 && envPort <= 65535 ? envPort : Number.isInteger(selectedPort) && selectedPort > 0 && selectedPort <= 65535 ? selectedPort : 18791;
 const host = config.openwolf.dashboard.host || "127.0.0.1";
 const server = app.listen(port, host, () => {
   logger.info(`Dashboard server listening on ${host}:${port}`);
@@ -327,7 +401,7 @@ function handleDashboardCommand(msg: { type: string; task_id?: string }): void {
         ];
         for (const file of wolfFiles) {
           try {
-            files[file] = fs.readFileSync(path.join(wolfDir, file), "utf-8");
+            files[file] = fs.readFileSync(path.join(file === "buglog.json" ? sharedWolfDir(wolfDir) : wolfDir, file), "utf-8");
           } catch {
             files[file] = "";
           }
@@ -349,21 +423,24 @@ if (config.openwolf.cron.enabled) {
 
 // File watcher
 startFileWatcher(wolfDir, logger, broadcast);
+const sourceWatcher = startSourceWatcher(projectRoot,wolfDir,logger);
+try { archiveMemory(wolfDir,7); } catch(e) { logger.warn(`Memory maintenance deferred: ${e}`); }
 
 // Health heartbeat
-const heartbeatInterval = config.openwolf.cron.heartbeat_interval_minutes * 60 * 1000;
+const minutes = config.openwolf.cron.heartbeat_interval_minutes;
+const heartbeatInterval = (Number.isFinite(minutes) && minutes > 0 ? minutes : 30) * 60000;
 const heartbeatTimer = setInterval(() => {
   const statePath = path.join(wolfDir, "cron-state.json");
   mutateJSON<Record<string, unknown>>(statePath, {}, 2000, (state) => {
     state.last_heartbeat = new Date().toISOString();
   });
-  broadcast({ type: "health", status: "healthy", uptime: Math.floor((Date.now() - startTime) / 1000) });
+  broadcast({ type: "health", status: getHealth(wolfDir,startTime).status, uptime: Math.floor((Date.now() - startTime) / 1000) });
 }, heartbeatInterval);
 
 // Update cron-state to running
 const cronStatePath = path.join(wolfDir, "cron-state.json");
 mutateJSON<Record<string, unknown>>(cronStatePath, {}, 2000, (cronState) => {
-  cronState.engine_status = "running";
+  cronState.engine_status = cronEngine ? "running" : "disabled";
   cronState.last_heartbeat = new Date().toISOString();
 });
 
@@ -376,6 +453,7 @@ function shutdown(): void {
   broadcast({ type: "daemon_stopping", timestamp: new Date().toISOString() });
 
   clearInterval(heartbeatTimer);
+  void sourceWatcher.close();
   if (cronEngine) cronEngine.stop();
 
   // Locked like every other cron-state writer: this one ran unlocked and

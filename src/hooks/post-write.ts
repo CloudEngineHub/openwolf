@@ -1,13 +1,17 @@
+import { persistObservation, reconcileReads } from "./event-journal.js";
+import * as crypto from "node:crypto";
+import { recordBug } from "./bug-journal.js";
+import { sharedWolfDir } from "./knowledge-root.js";
+import { nextBugId } from "./bug-id.js";
 import * as fs from "node:fs";
 import * as path from "node:path";
-import * as crypto from "node:crypto";
 import {
   getWolfDir, ensureWolfDir, readJSON, writeJSON, readBugLogFile, readMarkdown,
   extractDescription, estimateTokens, appendMarkdown, timeShort, readStdin, normalizePath,
   isSensitiveFile, getProjectDir, emitHookJSON, recordInjection, hookMain, getSessionFilePath
 } from "./shared.js";
 import { loadStoreReconciled, saveStore, renderToFile, sha256 } from "./anatomy-store.js";
-import { withAnatomyLock, mutateJSON, HOOK_LOCK_BUDGET_MS } from "./anatomy-lock.js";
+import { withAnatomyLock, withFileLock, mutateJSON, HOOK_LOCK_BUDGET_MS } from "./anatomy-lock.js";
 import { extractSymbols, symbolsSupported, SYMBOL_MIN_TOKENS } from "./symbol-extractor.js";
 
 // File types where a value/string change is normal content editing, not a bug
@@ -52,7 +56,7 @@ async function main(): Promise<void> {
   const projectRoot = getProjectDir();
 
   const raw = await readStdin();
-  let input: { tool_name?: string; tool_input?: { file_path?: string; path?: string; content?: string; old_string?: string; new_string?: string }; session_id?: string };
+  let input: { tool_use_id?: string; tool_name?: string; tool_input?: { file_path?: string; path?: string; content?: string; old_string?: string; new_string?: string }; session_id?: string };
   try {
     input = JSON.parse(raw);
   } catch {
@@ -184,7 +188,7 @@ async function main(): Promise<void> {
 
   // 3. Record in session tracker + track edit counts
   try {
-    const normalizedFile = normalizePath(filePath);
+    const normalizedFile = normalizePath(absolutePath);
     const action = toolName === "Write" ? "create" : "edit";
     const fileContent = input.tool_input?.content ?? "";
     const tokens = estimateTokens(fileContent || newStr, "code");
@@ -193,23 +197,12 @@ async function main(): Promise<void> {
     // files_written is an append, edit_counts an increment, edit_warned a
     // test-and-set: all three lose data under an unlocked read-modify-write,
     // and parallel Edit calls are ordinary agent behavior (#83).
+    persistObservation(sessionFile,{id:input.tool_use_id ?? crypto.randomUUID(),kind:"write",file:normalizedFile,action,tokens,editKey,at:new Date().toISOString()});
+    reconcileReads(sessionFile);
     let editWarn = "";
     mutateJSON<SessionData>(sessionFile, { files_written: [], edit_counts: {} }, HOOK_LOCK_BUDGET_MS, (session) => {
       if (!session.edit_counts) session.edit_counts = {};
       if (!Array.isArray(session.files_written)) session.files_written = [];
-
-      session.files_written.push({
-        file: normalizedFile,
-        action,
-        tokens,
-        at: new Date().toISOString(),
-      });
-
-      session.edit_counts[editKey] = (session.edit_counts[editKey] || 0) + 1;
-
-      if (session.files_read && session.files_read[normalizedFile]) {
-        delete session.files_read[normalizedFile];
-      }
 
       // Once per file per session: firing on the 3rd edit AND every edit after
       // it would hit ~39% of all write operations (measured) — pure noise.
@@ -371,50 +364,9 @@ function autoDetectBugFix(wolfDir: string, absolutePath: string, projectRoot: st
   // Respect an explicit opt-out in .wolf/config.json (default: enabled).
   if (!bugAutoDetectEnabled(wolfDir)) return;
 
-  const bugLogPath = path.join(wolfDir, "buglog.json");
-  const bugLog = readBugLogFile(wolfDir) as BugLog;
-  const relFile = normalizePath(path.relative(projectRoot, absolutePath));
-
-  // Detect what kind of fix this is
-  const detection = detectFixPattern(oldStr, newStr, ext, basename);
+  const detection = detectFixPattern(oldStr,newStr,ext,basename);
   if (!detection) return;
-
-  // Check for recent duplicate (same file + same category within 5 min)
-  const recentDupe = bugLog.bugs.find(b => {
-    if (path.basename(b.file) !== basename) return false;
-    if (!b.tags.includes("auto-detected")) return false;
-    if (!b.tags.includes(detection.category)) return false;
-    const bugTime = new Date(b.last_seen).getTime();
-    return (Date.now() - bugTime) < 5 * 60 * 1000;
-  });
-
-  if (recentDupe) {
-    recentDupe.occurrences++;
-    recentDupe.last_seen = new Date().toISOString();
-    // Append additional context
-    if (detection.context && !recentDupe.fix.includes(detection.context)) {
-      recentDupe.fix += ` | Also: ${detection.context}`;
-    }
-    writeJSON(bugLogPath, bugLog);
-    return;
-  }
-
-  const nextId = `bug-${String(bugLog.bugs.length + 1).padStart(3, "0")}`;
-
-  bugLog.bugs.push({
-    id: nextId,
-    timestamp: new Date().toISOString(),
-    error_message: detection.summary,
-    file: relFile,
-    root_cause: detection.rootCause,
-    fix: detection.fix,
-    tags: ["auto-detected", detection.category, ext.replace(".", "") || "unknown"],
-    related_bugs: [],
-    occurrences: 1,
-    last_seen: new Date().toISOString(),
-  });
-
-  writeJSON(bugLogPath, bugLog);
+  recordBug(wolfDir, {error_message:detection.summary,file:normalizePath(path.relative(projectRoot,absolutePath)),root_cause:detection.rootCause,fix:detection.fix,tags:["auto-detected",detection.category,ext.slice(1)||"unknown"],status:"candidate",observed_worktree:projectRoot});
 }
 
 interface FixDetection {

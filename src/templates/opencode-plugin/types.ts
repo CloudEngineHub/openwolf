@@ -26,6 +26,7 @@ export interface SessionState {
   reads_denied?: number
   denied_tokens_saved?: number
   cerebrum_warnings: number
+  injected_tokens_estimated?: number
   stop_count: number
 }
 

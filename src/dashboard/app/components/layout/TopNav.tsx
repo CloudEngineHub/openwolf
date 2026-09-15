@@ -8,6 +8,7 @@ const NAV_ITEMS = [
   { id: "activity", label: "Activity" },
   { id: "cron", label: "Cron" },
   { id: "cerebrum", label: "Cerebrum" },
+  { id: "handover", label: "Handover" },
   { id: "memory", label: "Memory" },
   { id: "anatomy", label: "Anatomy" },
   { id: "bugs", label: "Bugs" },

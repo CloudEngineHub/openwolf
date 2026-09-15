@@ -1,3 +1,4 @@
+import { archiveMemory } from "../hooks/memory-archive.js";
 import * as fs from "node:fs";
 import * as path from "node:path";
 import { execFileSync } from "node:child_process";
@@ -131,10 +132,8 @@ export class CronEngine {
   }
 
   private readManifest(): CronManifest {
-    return readJSON<CronManifest>(
-      path.join(this.wolfDir, "cron-manifest.json"),
-      { version: 1, tasks: [] }
-    );
+    const manifest = readJSON<CronManifest | null>(path.join(this.wolfDir,"cron-manifest.json"),null);
+    return {version:1,tasks:Array.isArray(manifest?.tasks) ? manifest.tasks.filter(t=>t && typeof t.id==="string" && typeof t.schedule==="string" && t.action) : []};
   }
 
   private readState(): CronState {
@@ -301,6 +300,9 @@ export class CronEngine {
   /** True when the anatomy index still matches the tree (2.4 stale gating). */
   private anatomyIsFresh(): boolean {
     try {
+      const scanState=readJSON<{last_scanned?:string}>(path.join(this.wolfDir,"_scan-state.json"),{});
+      const attempt=readJSON<{attempted_at?:string}>(path.join(this.wolfDir,"_scan-attempt.json"),{});
+      if (attempt.attempted_at && (!scanState.last_scanned || attempt.attempted_at>scanState.last_scanned)) return false;
       const store = loadStore(this.wolfDir);
       if (!store || Object.keys(store.files).length === 0) return false;
       // git HEAD moved since the last scan: branch switches/pulls add files
@@ -321,62 +323,7 @@ export class CronEngine {
   }
 
   private consolidateMemory(olderThanDays: number): void {
-    const memoryPath = path.join(this.wolfDir, "memory.md");
-    const content = readText(memoryPath);
-    if (!content) return;
-
-    const cutoff = new Date();
-    cutoff.setDate(cutoff.getDate() - olderThanDays);
-
-    const lines = content.split("\n");
-    const result: string[] = [];
-    let inOldSession = false;
-    let oldSessionLines: string[] = [];
-    let currentSessionDate: Date | null = null;
-
-    // Idempotent: a session already reduced to its "> Consolidated session"
-    // marker has zero table rows; recounting would rewrite it as "(0 actions)"
-    // and destroy the original count on every re-run.
-    const flushOldSession = () => {
-      if (!inOldSession || oldSessionLines.length === 0) return;
-      const existingMarker = oldSessionLines.find((l) => l.startsWith("> Consolidated session"));
-      if (existingMarker) {
-        result.push(existingMarker);
-        result.push("");
-        return;
-      }
-      const actionCount = oldSessionLines.filter((l) => l.startsWith("|") && !l.startsWith("|--") && !l.startsWith("| Time")).length;
-      result.push(`> Consolidated session (${actionCount} actions)`);
-      result.push("");
-    };
-
-    for (const line of lines) {
-      const sessionMatch = line.match(/^## Session: (\d{4}-\d{2}-\d{2})/);
-      if (sessionMatch) {
-        flushOldSession();
-
-        currentSessionDate = new Date(sessionMatch[1]);
-        if (currentSessionDate < cutoff) {
-          inOldSession = true;
-          oldSessionLines = [];
-          result.push(line); // Keep the header
-        } else {
-          inOldSession = false;
-          result.push(line);
-        }
-        continue;
-      }
-
-      if (inOldSession) {
-        oldSessionLines.push(line);
-      } else {
-        result.push(line);
-      }
-    }
-
-    flushOldSession();
-
-    writeText(memoryPath, result.join("\n"));
+    archiveMemory(this.wolfDir, olderThanDays);
   }
 
   private generateTokenReport(): void {

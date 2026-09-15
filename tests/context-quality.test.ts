@@ -143,7 +143,7 @@ describe("session-start digest (compiled)", { skip: !haveDist ? "dist not built"
       child.stdin!.end(JSON.stringify(payload));
     });
 
-  test("injects an index, real DNR rules, and no placeholder or nag text", async () => {
+  test("injects an index while unapproved durable rules remain excluded", async () => {
     const { root, hooksDir, wolfDir } = setup();
     fs.writeFileSync(path.join(wolfDir, "cerebrum.md"),
       `---\ndescription: learned preferences\n---\n# Cerebrum\n\n## Do-Not-Repeat\n- never use intval for marks\n- keep hooks dependency-free\n\n## Decision Log\n- stuff that pads the file length beyond the template threshold for the index line\n`);
@@ -154,7 +154,7 @@ describe("session-start digest (compiled)", { skip: !haveDist ? "dist not built"
 
     const out = await run(hooksDir, root, { source: "startup", session_id: "dg-100" });
     const ctx = JSON.parse(out).hookSpecificOutput.additionalContext as string;
-    assert.ok(ctx.includes("never use intval"), "top DNR rules injected");
+    assert.ok(!ctx.includes("never use intval"), "unapproved DNR rules excluded");
     assert.ok(ctx.includes(".wolf/cerebrum.md:"), "index line for cerebrum");
     assert.ok(ctx.includes("openwolf bug search") || ctx.includes("buglog.json"), "buglog pointer");
     assert.ok(!ctx.includes("may be stale"), "staleness nag deleted");
@@ -180,7 +180,7 @@ describe("session-start digest (compiled)", { skip: !haveDist ? "dist not built"
     const out = await run(hooksDir, root, { source: "compact", session_id: "cp-100" });
     const ctx = JSON.parse(out).hookSpecificOutput.additionalContext as string;
     assert.ok(ctx.includes("Session in progress"), "in-flight state restored");
-    assert.ok(ctx.includes("rule alpha") || ctx.includes("rule beta"), "decay rules re-injected");
+    assert.ok(!ctx.includes("rule alpha") && !ctx.includes("rule beta"), "unapproved decay rules excluded");
     assert.ok(ctx.includes("strict null checks"), "paths-scoped rule restored (documented compaction loss)");
   });
 });

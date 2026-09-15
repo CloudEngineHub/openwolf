@@ -1,3 +1,4 @@
+import { pathToFileURL } from "node:url";
 import { test, describe } from "node:test";
 import * as assert from "node:assert";
 import * as fs from "node:fs";
@@ -55,6 +56,7 @@ describe("#92 scan file I/O (compiled)", { skip: !haveDist ? "dist not built" : 
     fs.cpSync(path.join(ROOT, "dist", "hooks"), path.join(stage, "hooks"), { recursive: true });
     fs.writeFileSync(path.join(stage, "package.json"), JSON.stringify({ type: "module" }));
 
+    fs.symlinkSync(path.join(ROOT, "node_modules"), path.join(stage, "node_modules"), "junction");
     const tallyPath = path.join(stage, "opens.log");
     const extractorPath = path.join(stage, "src", "scanner", "description-extractor.js");
     const extractorSrc = fs.readFileSync(extractorPath, "utf-8");
@@ -76,7 +78,7 @@ describe("#92 scan file I/O (compiled)", { skip: !haveDist ? "dist not built" : 
       fs.writeFileSync(path.join(root, n), `// ${n} does a thing\nexport const x = 1;\n`);
     }
 
-    const { scanProject } = await import(path.join(stage, "src", "scanner", "anatomy-scanner.js"));
+    const { scanProject } = await import(pathToFileURL(path.join(stage, "src", "scanner", "anatomy-scanner.js")).href);
     await scanProject(wolfDir, root);
 
     const store = JSON.parse(fs.readFileSync(path.join(wolfDir, "anatomy-index.json"), "utf-8"));

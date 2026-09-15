@@ -1,3 +1,4 @@
+import { pathToFileURL } from "node:url";
 import { test, describe } from "node:test";
 import * as assert from "node:assert";
 import * as fs from "node:fs";
@@ -101,7 +102,7 @@ describe("#85 anatomy freshness (compiled)", { skip: !haveDist ? "dist not built
       JSON.stringify({ pid: process.pid, hostname: os.hostname(), acquiredAt: Date.now() }),
     );
 
-    const { scanProject } = await import(DIST_SCANNER);
+    const { scanProject } = await import(pathToFileURL(DIST_SCANNER).href);
     await scanProject(wolfDir, root);
 
     assert.strictEqual(fs.existsSync(path.join(wolfDir, "anatomy.md")), false, "nothing was indexed");
@@ -118,7 +119,7 @@ describe("#85 anatomy freshness (compiled)", { skip: !haveDist ? "dist not built
     fs.mkdirSync(wolfDir, { recursive: true });
     fs.writeFileSync(path.join(root, "only-file.ts"), "export const x = 1;\n");
 
-    const { scanProject } = await import(DIST_SCANNER);
+    const { scanProject } = await import(pathToFileURL(DIST_SCANNER).href);
     await scanProject(wolfDir, root);
 
     assert.ok(fs.existsSync(path.join(wolfDir, "_scan-state.json")), "a real scan records freshness");
@@ -135,7 +136,7 @@ describe("#87 unknown cron task id (compiled)", { skip: !haveDist ? "dist not bu
       JSON.stringify({ version: 1, tasks: [{ id: "real-task", name: "Real", schedule: "0 * * * *", action: "scan", enabled: true }] }),
     );
 
-    const { CronEngine, CronTaskNotFoundError } = await import(DIST_CRON);
+    const { CronEngine, CronTaskNotFoundError } = await import(pathToFileURL(DIST_CRON).href);
     const engine = new CronEngine(wolfDir, root, { info() {}, warn() {}, error() {}, debug() {} }, () => {});
 
     await assert.rejects(
@@ -152,7 +153,7 @@ describe("#87 unknown cron task id (compiled)", { skip: !haveDist ? "dist not bu
 
 describe("#90 benchmark revision pinning (compiled)", { skip: !haveDist ? "dist not built" : false }, () => {
   test("both arms get the pinned commit even when the branch moves mid-run", async () => {
-    const { resolveRepoCommit, prepareRepoCheckout } = await import(DIST_BENCH);
+    const { resolveRepoCommit, prepareRepoCheckout } = await import(pathToFileURL(DIST_BENCH).href);
 
     const origin = fs.mkdtempSync(path.join(os.tmpdir(), "ow-bench-origin-"));
     const git = (args: string[]) => execFileSync("git", args, { cwd: origin, stdio: "pipe" });
@@ -180,7 +181,7 @@ describe("#90 benchmark revision pinning (compiled)", { skip: !haveDist ? "dist 
       execFileSync("git", ["rev-parse", "HEAD"], { cwd: dir, encoding: "utf-8" }).trim();
     assert.strictEqual(shaOf(armA), pinned);
     assert.strictEqual(shaOf(armB), pinned, "arm B must not drift onto the newer commit");
-    assert.strictEqual(fs.readFileSync(path.join(armA, "f.txt"), "utf-8"), "first\n");
-    assert.strictEqual(fs.readFileSync(path.join(armB, "f.txt"), "utf-8"), "first\n");
+    assert.strictEqual(fs.readFileSync(path.join(armA, "f.txt"), "utf-8").replace(/\r\n/g, "\n"), "first\n");
+    assert.strictEqual(fs.readFileSync(path.join(armB, "f.txt"), "utf-8").replace(/\r\n/g, "\n"), "first\n");
   });
 });

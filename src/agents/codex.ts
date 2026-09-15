@@ -27,16 +27,20 @@ function buildCodexHooks(projectRoot: string) {
         { matcher: "startup|resume|clear", hooks: [hookEntry(projectRoot, "session-start.js", 5, "OpenWolf session bootstrap")] },
       ],
       PreToolUse: [
+        { matcher: "Bash", hooks: [hookEntry(projectRoot, "pre-bash.js", 5, "OpenWolf shell precheck")] },
         { matcher: "Read", hooks: [hookEntry(projectRoot, "pre-read.js", 5, "OpenWolf read precheck")] },
         { matcher: "Edit|Write|MultiEdit|apply_patch", hooks: [hookEntry(projectRoot, "pre-write.js", 5, "OpenWolf write precheck")] },
       ],
       PostToolUse: [
+        { matcher: "Bash", hooks: [hookEntry(projectRoot, "post-bash.js", 10, "OpenWolf shell tracking")] },
         { matcher: "Read", hooks: [hookEntry(projectRoot, "post-read.js", 5, "OpenWolf read tracking")] },
         { matcher: "Edit|Write|MultiEdit|apply_patch", hooks: [hookEntry(projectRoot, "post-write.js", 10, "OpenWolf anatomy update")] },
       ],
       PreCompact: [
         { matcher: "", hooks: [hookEntry(projectRoot, "precompact.js", 5, "OpenWolf compaction snapshot")] },
       ],
+      SessionEnd: [{ matcher: "", hooks: [hookEntry(projectRoot, "session-end.js", 3, "OpenWolf final flush")] }],
+      UserPromptSubmit: [{ matcher: "", hooks: [hookEntry(projectRoot, "user-prompt-submit.js", 5, "OpenWolf context refresh")] }],
       Stop: [
         { matcher: "", hooks: [hookEntry(projectRoot, "stop.js", 10, "OpenWolf session wrap-up")] },
       ],

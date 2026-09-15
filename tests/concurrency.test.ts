@@ -1,3 +1,4 @@
+import { pathToFileURL } from "node:url";
 import { test, describe } from "node:test";
 import * as assert from "node:assert";
 import * as fs from "node:fs";
@@ -5,7 +6,7 @@ import * as os from "node:os";
 import * as path from "node:path";
 import { execFile } from "node:child_process";
 
-import { mutateJSON, HOOK_LOCK_BUDGET_MS } from "../src/hooks/anatomy-lock.ts";
+import { mutateJSON, HOOK_LOCK_BUDGET_MS } from "../dist/hooks/anatomy-lock.js";
 
 // P1 (davdittrich): atomic writes prevent torn files, never lost updates.
 // #83 parallel hooks lose session-state updates
@@ -40,6 +41,7 @@ function runProcess(args: string[], opts: { cwd?: string; env?: NodeJS.ProcessEn
     const child = execFile(process.execPath, args, { cwd: opts.cwd, env: opts.env, timeout: 30000 }, (err) =>
       err ? reject(err) : resolve(),
     );
+    child.stdin!.on("error", err => { if ((err as NodeJS.ErrnoException).code !== "EPIPE") reject(err); });
     child.stdin!.end(opts.stdin ?? "");
   });
 }
@@ -142,7 +144,7 @@ describe("concurrent registry (compiled)", { skip: !haveDist ? "dist not built" 
         runProcess(
           [
             "-e",
-            `import(${JSON.stringify(DIST_REGISTRY)}).then(m => m.registerProject(${JSON.stringify(r)}, "p${i}", "2.5.0"))`,
+            `import(${JSON.stringify(pathToFileURL(DIST_REGISTRY).href)}).then(m => m.registerProject(${JSON.stringify(r)}, "p${i}", "2.5.0"))`,
           ],
           { env: { ...process.env, HOME: home, USERPROFILE: home } },
         ),
@@ -163,7 +165,7 @@ describe("concurrent registry (compiled)", { skip: !haveDist ? "dist not built" 
     const roots = Array.from({ length: 20 }, (_, i) => path.join(home, "projects", `p${i}`));
     for (const [i, r] of roots.entries()) {
       await runProcess(
-        ["-e", `import(${JSON.stringify(DIST_REGISTRY)}).then(m => m.registerProject(${JSON.stringify(r)}, "p${i}", "2.5.0"))`],
+        ["-e", `import(${JSON.stringify(pathToFileURL(DIST_REGISTRY).href)}).then(m => m.registerProject(${JSON.stringify(r)}, "p${i}", "2.5.0"))`],
         { env: { ...process.env, HOME: home, USERPROFILE: home } },
       );
     }
@@ -171,12 +173,12 @@ describe("concurrent registry (compiled)", { skip: !haveDist ? "dist not built" 
     // Unregister the first 10 while registering 10 more, all at once.
     await Promise.all([
       ...roots.slice(0, 10).map((r) =>
-        runProcess(["-e", `import(${JSON.stringify(DIST_REGISTRY)}).then(m => m.unregisterProject(${JSON.stringify(r)}))`],
+        runProcess(["-e", `import(${JSON.stringify(pathToFileURL(DIST_REGISTRY).href)}).then(m => m.unregisterProject(${JSON.stringify(r)}))`],
           { env: { ...process.env, HOME: home, USERPROFILE: home } }),
       ),
       ...Array.from({ length: 10 }, (_, i) =>
         runProcess(
-          ["-e", `import(${JSON.stringify(DIST_REGISTRY)}).then(m => m.registerProject(${JSON.stringify(path.join(home, "projects", `late${i}`))}, "late${i}", "2.5.0"))`],
+          ["-e", `import(${JSON.stringify(pathToFileURL(DIST_REGISTRY).href)}).then(m => m.registerProject(${JSON.stringify(path.join(home, "projects", `late${i}`))}, "late${i}", "2.5.0"))`],
           { env: { ...process.env, HOME: home, USERPROFILE: home } },
         ),
       ),
@@ -210,7 +212,7 @@ describe("cron state lock (compiled)", { skip: !haveDist ? "dist not built" : fa
     await new Promise<void>((resolve) => {
       const child = execFile(
         process.execPath,
-        ["-e", `import(${JSON.stringify(DIST_CRON_CMD)}).then(m=>m.cronRetry("nightly-scan")).then(()=>process.exit(process.exitCode ?? 0))`],
+        ["-e", `import(${JSON.stringify(pathToFileURL(DIST_CRON_CMD).href)}).then(m=>m.cronRetry("nightly-scan")).then(()=>process.exit(process.exitCode ?? 0))`],
         { cwd: root, timeout: 30000 },
         (err, _out, errOut) => { stderr = errOut ?? ""; code = err ? (err as NodeJS.ErrnoException & { code?: number }).code ?? 1 : 0; resolve(); },
       );
@@ -239,7 +241,7 @@ describe("cron state lock (compiled)", { skip: !haveDist ? "dist not built" : fa
       }),
     );
 
-    await runProcess(["-e", `import(${JSON.stringify(DIST_CRON_CMD)}).then(m=>m.cronRetry("nightly-scan"))`], { cwd: root });
+    await runProcess(["-e", `import(${JSON.stringify(pathToFileURL(DIST_CRON_CMD).href)}).then(m=>m.cronRetry("nightly-scan"))`], { cwd: root });
 
     const after = JSON.parse(fs.readFileSync(statePath, "utf-8"));
     assert.strictEqual(after.dead_letter_queue.length, 0);

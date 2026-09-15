@@ -1,6 +1,7 @@
+import type { ProjectCost } from "../lib/pricing.js";
 import { useState, useEffect, useCallback, useRef } from "react";
 import { dashboardFetch, WolfClient } from "../lib/wolf-client.js";
-import { parseAnatomy, parseMemory, parseCerebrum } from "../lib/file-parsers.js";
+import { parseAnatomy, parseMemory, parseCerebrum, parseCronState } from "../lib/file-parsers.js";
 import type { AnatomyEntry, MemorySession, CerebrumData } from "../lib/file-parsers.js";
 
 export interface RealUsage {
@@ -129,7 +130,19 @@ interface ProjectMeta {
   root: string;
 }
 
+export interface RecordedUsage {
+  updates?: {installed:string;policy:string;checkedAt?:number;latest?:string;selected?:string;status?:string;detail?:string};
+  maintenance?: {errors:string[]};
+  memory?: {archives:Array<{id:string;title:string;bytes:number;restorable:boolean}>;trust:{status:string;reason:string;approved_by?:string;approved_at?:string};archive_preview:{archived:string[];retained:number}};
+  scanned_at: string;
+  totals: { total_tokens: number | null; input_tokens: number | null; output_tokens: number | null; cached_input_tokens: number | null };
+  by_agent: Record<string, {total_tokens: number | null; input_tokens: number | null; output_tokens: number | null; cached_input_tokens: number | null}>;
+  coverage: Record<string, {status: string; records: number; sources: number; diagnostics: string[]}>;
+  costs: ProjectCost & {assumptions: string[]};
+  record_count: number;
+}
 export interface WolfData {
+  recordedUsage: RecordedUsage | null;
   anatomy: { entries: AnatomyEntry[]; metadata: { files: number; hits: number; misses: number } };
   cerebrum: CerebrumData;
   memory: MemorySession[];
@@ -151,6 +164,7 @@ export interface WolfData {
 }
 
 export function useWolfData(): WolfData {
+  const [recordedUsage, setRecordedUsage] = useState<RecordedUsage | null>(null);
   const [loading, setLoading] = useState(true);
   const [anatomy, setAnatomy] = useState<WolfData["anatomy"]>({ entries: [], metadata: { files: 0, hits: 0, misses: 0 } });
   const [cerebrum, setCerebrum] = useState<CerebrumData>({ preferences: [], learnings: [], doNotRepeat: [], decisions: [], lastUpdated: "" });
@@ -176,6 +190,9 @@ export function useWolfData(): WolfData {
   const anatomyFromIndex = useRef(false);
 
   const processFiles = useCallback((files: Record<string, string>) => {
+    if (files["usage-report.json"]) {
+      try { const u = JSON.parse(files["usage-report.json"]); if (u.coverage && u.costs) setRecordedUsage(u); } catch {}
+    }
     if (files["anatomy-index.json"]) {
       try {
         const store = JSON.parse(files["anatomy-index.json"]);
@@ -199,13 +216,13 @@ export function useWolfData(): WolfData {
         if (files["anatomy.md"] && !anatomyFromIndex.current) setAnatomy(parseAnatomy(files["anatomy.md"]));
       }
     } else if (files["anatomy.md"] && !anatomyFromIndex.current) setAnatomy(parseAnatomy(files["anatomy.md"]));
-    if (files["cerebrum.md"]) setCerebrum(parseCerebrum(files["cerebrum.md"]));
-    if (files["memory.md"]) setMemory(parseMemory(files["memory.md"]));
+    if (files["cerebrum.md"] !== undefined) setCerebrum(parseCerebrum(files["cerebrum.md"]));
+    if (files["memory.md"] !== undefined) setMemory(parseMemory(files["memory.md"]));
     if (files["token-ledger.json"]) {
       try { setTokenLedger(JSON.parse(files["token-ledger.json"])); } catch {}
     }
     if (files["cron-state.json"]) {
-      try { setCronState(JSON.parse(files["cron-state.json"])); } catch {}
+      try { setCronState(parseCronState(files["cron-state.json"])); } catch {}
     }
     if (files["cron-manifest.json"]) {
       try { setCronManifest(JSON.parse(files["cron-manifest.json"])); } catch {}
@@ -225,7 +242,7 @@ export function useWolfData(): WolfData {
         setConfig({ agents: cfg?.openwolf?.agents ?? ["claude"], context: cfg?.openwolf?.context, reads: cfg?.openwolf?.reads });
       } catch {}
     }
-    if (files["STATUS.md"] !== undefined && files["STATUS.md"] !== "") setStatusDoc(files["STATUS.md"]);
+    if (files["STATUS.md"] !== undefined) setStatusDoc(files["STATUS.md"]);
     if (files["_scan-state.json"]) {
       try { setScanState(JSON.parse(files["_scan-state.json"])); } catch {}
     }
@@ -274,6 +291,14 @@ export function useWolfData(): WolfData {
       .then(c => { if (c && Array.isArray(c.findings)) setContextHealth(c); })
       .catch(() => {});
 
+    let disposed = false;
+    const refresh = () => {
+      void dashboardFetch("/api/files").then(r => r.ok ? r.json() : null).then(files => {if (!disposed && files) processFiles(files);}).catch(()=>{});
+      return dashboardFetch("/api/usage").then(r => r.ok ? r.json() : null)
+        .then(u => { if (!disposed && u?.coverage && u?.costs) setRecordedUsage(u); }).catch(() => {});
+    };
+    void refresh();
+    const refreshTimer = setInterval(refresh, 15000);
     // WebSocket
     const wsClient = new WolfClient();
     wsClient.connect();
@@ -291,8 +316,8 @@ export function useWolfData(): WolfData {
       }
     });
 
-    return () => wsClient.disconnect();
+    return () => { disposed = true; clearInterval(refreshTimer); wsClient.disconnect(); };
   }, [processFiles]);
 
-  return { anatomy, cerebrum, memory, tokenLedger, cronState, cronManifest, buglog, health, identity, project, config, contextHealth, hookHealth, statusDoc, scanState, loading, authError, client };
+  return { recordedUsage, anatomy, cerebrum, memory, tokenLedger, cronState, cronManifest, buglog, health, identity, project, config, contextHealth, hookHealth, statusDoc, scanState, loading, authError, client };
 }
