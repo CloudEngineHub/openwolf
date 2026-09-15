@@ -1,73 +1,62 @@
-# OpenWolf
+<h1 align="center">OpenWolf</h1>
 
-**Project memory and context tools for coding agents.**
+<p align="center">
+  <strong>Keep project memory across your coding agents.</strong>
+</p>
 
-OpenWolf keeps task notes, project maps and known fixes in a local `.wolf/` folder. Claude Code, Codex and OpenCode can use this information across coding sessions. It helps an agent find relevant code, recover saved work and avoid repeating unnecessary reads.
+<p align="center">
+  OpenWolf keeps task context, project maps and known fixes in one local folder.<br />
+  Help Claude Code, Codex and OpenCode continue saved work and find relevant code.<br />
+  Reduce repeated context and review recorded token usage by agent and model.<br />
+  Memory and indexing run locally without extra model calls.
+</p>
 
-The dashboard shows project memory, recorded token usage, model cost estimates and OpenWolf activity. You can inspect the files behind each feature.
+<p align="center">
+  <sub><b>Hooks:</b> Claude Code, Codex CLI &nbsp;·&nbsp; <b>Plugin:</b> OpenCode &nbsp;·&nbsp; <b>Compatible hooks:</b> Grok Build &nbsp;·&nbsp; <b>Context only:</b> Cursor, Gemini CLI, Antigravity</sub>
+</p>
 
-[Website](https://openwolf.com) · [Getting started](https://openwolf.com/getting-started) · [Commands](docs/commands.md) · [Contributor credits](CREDITS.md)
+<p align="center">
+  <a href="https://www.npmjs.com/package/openwolf"><img src="https://img.shields.io/npm/v/openwolf?color=cb3837&label=npm" alt="npm version" /></a>
+  <a href="https://www.npmjs.com/package/openwolf"><img src="https://img.shields.io/npm/dm/openwolf?color=2ea44f&label=downloads" alt="npm downloads" /></a>
+  <a href="https://github.com/cytostack/openwolf/stargazers"><img src="https://img.shields.io/github/stars/cytostack/openwolf?color=444&label=stars" alt="GitHub stars" /></a>
+  <a href="LICENSE"><img src="https://img.shields.io/badge/license-AGPL--3.0-blue" alt="License" /></a>
+  <a href="https://nodejs.org"><img src="https://img.shields.io/badge/node-%3E%3D20-2ea44f" alt="Node.js" /></a>
+</p>
 
-[![npm version](https://img.shields.io/npm/v/openwolf?color=cb3837&label=npm)](https://www.npmjs.com/package/openwolf)
-[![License: AGPL-3.0](https://img.shields.io/badge/license-AGPL--3.0-blue)](LICENSE)
-[![Node.js 20 or later](https://img.shields.io/badge/node-%3E%3D20-2ea44f)](https://nodejs.org)
+<p align="center">
+  <img src="assets/openwolf-dashboard.png" alt="" width="900" />
+</p>
 
-> This README describes the 2.5.2 release candidate. The npm badge shows the published version. Handover packets, recorded usage reports, session updates and activity notices described here require 2.5.2. See the [release checks and limits](docs/release-2.5.2.md).
+| Without OpenWolf | With OpenWolf |
+|------------------|---------------|
+| A new session may need the same project explanation again | Saved task context, project notes and known fixes remain in `.wolf/` |
+| Switching agents can leave unfinished work in the previous conversation | Explicit Claude and Codex handover packets carry selected saved context |
+| Usage records are spread across agent sessions | Available token counters and API cost estimates are grouped by agent and model |
+| Older session notes make useful information harder to find | Eligible old notes are archived with verified restore pointers |
+| Repeated file reads and large command results use session space | Read guidance and supported output controls help reduce repeated context |
 
-## How OpenWolf helps
+## What it does
 
-### Continue work in another session
+A coding session produces useful context: the task objective, files changed,
+failed tests and the next action. That information can be difficult to recover
+after compaction, a restart or a change of agent. Large file reads and command
+results can also fill a session with repeated text.
 
-Save the task objective, completed work, open problems and next action in a checkpoint. Supported Claude Code and Codex hooks can return that saved context at the next relevant session boundary, including after compaction.
+OpenWolf stores selected context beside your project and connects to the
+session and tool events your coding agent supports:
 
-For a handover between Claude and Codex, select a saved session, export a packet and import it into the receiving session. OpenWolf checks the project, source records and repository changes before import. This reduces the need to explain the same project again.
+- Keep the objective, completed work, unresolved problems and next action in
+  a checkpoint. Supported Claude and Codex hooks can restore saved context.
+- Find files and symbols through a project map with descriptions, line ranges
+  and import relationships. Partial scans preserve earlier entries.
+- Save project notes and known fixes for later sessions. Archive eligible old
+  session notes while retaining active, latest and pinned notes.
+- Identify repeated reads of unchanged files. Supported Claude hooks can
+  shorten selected large Bash results and retain the original output locally.
+- Review available provider token counters, model cost estimates, hook health
+  and completed OpenWolf activity in the dashboard.
 
-A handover uses saved messages and tool results. It does not access private reasoning or reproduce every part of another agent's live context. Imports are explicit and do not approve actions.
-
-### Find the relevant code before reading files
-
-OpenWolf builds a project map with file descriptions, symbols, line ranges and import relationships. An agent can look up a function or inspect a focused map before opening large files.
-
-```bash
-openwolf find validateToken
-openwolf find --file src/auth.ts
-openwolf map --focus auth
-```
-
-The index refreshes after supported file edits and through background monitoring. A partial scan preserves earlier entries and reports incomplete coverage.
-
-### Reduce repeated context
-
-Read hooks can identify repeated full reads of unchanged files. On supported Claude Code hooks, the Bash output governor can shorten selected large command results and keep the original output in a local cache. Test and build output are advisory-only by default.
-
-These features can reduce the amount of repeated text in a session. Their effect depends on the agent, task and configuration. Output-size estimates are separate from recorded provider tokens. OpenWolf does not promise a fixed percentage of token savings.
-
-### Keep useful memory and archive old sessions
-
-Project notes, conventions and bug fixes remain available between sessions. Relevant previous fixes can be retrieved before an edit. Eligible older session notes are archived with verified restore pointers. The latest session, pinned notes and tracked active sessions are retained.
-
-Saved notes are evidence. Automatic injection of approved durable instructions requires a protected installation reviewed by an independent administrator. A normal user-owned npm installation does not enable that authority.
-
-### See token usage by agent and model
-
-```bash
-openwolf usage report --json
-openwolf dashboard
-```
-
-OpenWolf reads available usage counters from Claude transcripts, Codex session records and the OpenCode plugin. It reconciles repeated records and separates fresh input, cached input, cache writes and output for pricing.
-
-The report applies the relevant provider's model rates. The amount is a current API list-price estimate, not a subscription bill. Missing counters, unknown models and pricing assumptions are shown. Reading a file or estimating a checkpoint's size is not treated as a provider usage record.
-
-### Notice useful work without repeated messages
-
-OpenWolf can show a short notice after a completed operation, such as restoring task context or archiving old notes. The default mode limits message frequency. Claude status-line commands are preserved, Codex can show recovery notices, and OpenCode can show an informational toast. Grok activity stays in the dashboard.
-
-Compatible stable hook and plugin updates can be prepared in the background for new sessions. Major upgrades are notification-only by default. A running session keeps its selected runtime. This does not replace the global CLI or a running dashboard daemon.
-
-## Install
-
-You need Node.js 20 or later and a supported coding agent. OpenWolf runs on Linux, macOS and Windows.
+## Quick start
 
 ```bash
 npm install -g openwolf
@@ -75,89 +64,208 @@ cd your-project
 openwolf init
 ```
 
-This installs the version currently published on npm. `init` detects installed agents. You can also select them:
+`init` detects installed agents and sets up their project integration.
+Complete any project or hook trust review shown by your agent, then start a
+new session. You can select agents with `--agent claude codex opencode`.
+
+## Supported agents
+
+| Agent | Integration |
+|-------|-------------|
+| Claude Code | Lifecycle hooks, read guidance, Bash output controls and skills |
+| Codex CLI | Project hooks and `AGENTS.md`: saved task recovery and supported session and tool events |
+| OpenCode | Native plugin and `AGENTS.md`: session and tool events, usage records and activity toasts |
+| Grok Build | Enabled Claude-compatible hook discovery; activity notices stay in the dashboard |
+| Cursor | Rules file (context only) |
+| Gemini CLI | `GEMINI.md` block (context only) |
+| Antigravity | `AGENTS.md` block (context only) |
+
+Agents use the project's `.wolf/` directory. The generated `.gitignore`
+excludes local runtime data. Review notes, bug records and indexed content
+before sharing them. Hook coverage depends on the installed agent version.
+See the [integration guide](docs/hooks.md) for details.
+
+## How it works
+
+`openwolf init` creates `.wolf/` and registers supported hooks or a plugin.
+Memory, indexing and usage processing run locally without extra model calls.
+The optional background update worker contacts npm to check for new runtimes.
+
+| File | Purpose |
+|------|---------|
+| `anatomy-index.json` | Project index: file descriptions, sizes, symbols and imports |
+| `cerebrum.md` | Candidate preferences, conventions and recurring corrections |
+| `STATUS.md` | Current project status and unfinished work |
+| `buglog.json` | Searchable records of problems and fixes |
+| `memory.md` | Session notes and outcomes |
+| `token-ledger.json` | Operational records and separate content-size estimates |
+| `hooks/` | Installed lifecycle hooks and session state |
+| `cache/bash/` | Preserved originals of shortened Bash output |
+| `handoff/` | Task checkpoints, source references and handover packets |
+| `archive/` | Older session notes with verified restore pointers |
+| `usage/`, `activity/` | Recorded usage and completed OpenWolf actions |
+
+During a session:
+
+- **Session start.** Load a short project index and available saved task
+  evidence. New sessions can select a verified compatible runtime update.
+- **Before reads.** Identify eligible repeated reads and offer symbol guidance
+  for large indexed files. Changed files and ranged reads are handled separately.
+- **After Bash.** Supported Claude hooks can shorten selected output above an
+  estimated size threshold. The original stays in a local cache. Test and
+  build output are advisory-only by default.
+- **Every 25 tool batches.** Supported Claude events can repeat selected
+  approved rules within a size budget. Durable instruction injection requires
+  an independently protected installation and administrator review.
+- **On compaction.** Save a checkpoint for supported recovery paths. Recovery
+  uses persisted task evidence; it cannot reproduce every part of live context.
+- **On stop.** Record available usage and session observations. Eligible
+  activity notices report completed work within the configured message limit.
+
+## Measurement
 
 ```bash
-openwolf init --agent claude codex opencode
-openwolf status
+openwolf report
 ```
 
-Accept any project or hook trust review shown by your agent. OpenWolf does not bypass those controls. Then start a new agent session.
+Example from a checked Codex session, shown in a shortened format:
 
-## Agent support
+```
+  Recorded provider usage
+    Input tokens:           50,393
+      Cached input:         28,800
+      Fresh input:          21,593
+    Output tokens:             146
+      Reasoning tokens:         80
+    Total tokens:           50,539
 
-| Agent | Integration and limits |
-| --- | --- |
-| Claude Code | Lifecycle hooks, read guidance, Bash output controls and skills. Durable instruction injection requires protected approval. |
-| Codex CLI | Project hooks and `AGENTS.md`. Supports saved task recovery and session tracking where the installed Codex version delivers the relevant events. |
-| OpenCode | Native plugin for session and tool events, recorded usage and activity toasts. It does not provide all Claude hook behaviour. |
-| Grok Build | Uses enabled Claude-compatible hook discovery. No duplicate hook registration. Activity notices are dashboard-only. |
-| Cursor, Gemini CLI, Antigravity | Project instructions only. They do not receive the full hook integration. |
+  Cost calculation
+    Fresh input:            model input rate
+    Cached input:           model cached-input rate
+    Output:                 model output rate
 
-Support depends on the agent version, enabled features and tool payloads. See [hook coverage](docs/hooks.md) and [native validation results](docs/release-2.5.2.md).
+  Coverage
+    Cached input is included in input tokens.
+    Reasoning is included in output tokens in this record.
+    Content-size estimates are reported separately.
+```
 
-## What is stored
+How to read the reports:
 
-| Location inside `.wolf/` | Purpose |
-| --- | --- |
-| `anatomy-index.json`, `anatomy.md` | Structured project map and its readable view |
-| `memory.md`, `STATUS.md` | Session notes and current project status |
-| `cerebrum.md` | Candidate conventions, preferences and recurring corrections |
-| `buglog.json` | Known problems, causes and fixes |
-| `handoff/` | Saved checkpoints, source references and handover packets |
-| `archive/` | Restorable older memory |
-| `usage/`, `token-ledger.json` | Recorded usage and separate operational estimates |
-| `activity/`, `hooks/` | Local activity receipts, hook runtime and session state |
-| `config.json` | Project settings |
+1. Recorded usage comes from available Claude transcripts, Codex session
+   records and OpenCode plugin records. Repeated records are reconciled.
+   Missing counters remain unavailable rather than being reported as zero.
+2. Cost estimates use the relevant provider and model rates, including
+   separate cache categories where available. They represent API list prices,
+   not subscription charges. Unknown models and pricing assumptions are shown.
+3. Local estimates describe content size and output changes. They are separate
+   from provider counters and do not prove a fixed amount of token savings.
 
-The generated `.gitignore` excludes local runtime data. Review project notes and indexed content before committing or sharing them. Credentials and sensitive paths are excluded where detected; automatic filtering is not a guarantee that all private information has been removed.
+`openwolf usage report --json` provides the recorded-usage report.
+`openwolf bench --repo <fixture> --yes` compares supported coding tasks with
+and without OpenWolf. It uses real model access and can consume paid usage.
 
-## Daily commands
+## Reliability
 
-| Command | Use |
-| --- | --- |
-| `openwolf status` | Check the current project's installation and health |
-| `openwolf scan` | Refresh the project map |
-| `openwolf handoff list` | Find saved Claude and Codex sessions for this project |
-| `openwolf handoff search "query"` | Retrieve relevant saved evidence |
-| `openwolf bug search "error"` | Search previous problems and fixes |
-| `openwolf usage reconcile` | Refresh the shared recorded-usage report |
-| `openwolf dashboard` | Open the local dashboard |
-| `openwolf operations doctor` | Check runtime, memory authority and update readiness |
+Hook heartbeats, runtime checks and dashboard health help identify missing
+or failing integrations. Project updates check installed hook modules and
+report errors. Concurrent writes use journals or locks where required, and
+incomplete project scans retain entries they did not reach.
 
-The [command reference](docs/commands.md) covers checkpoints, handover import, archives and backups.
+Compatible stable hook and plugin updates can be prepared in the background
+for new sessions. Major upgrades are notification-only by default. A running
+session keeps its selected runtime. This does not replace the global CLI or
+a running dashboard daemon. See [automatic updates](docs/automatic-updates.md).
 
-## Update an existing project
+## Security
 
-After installing a new package version, preview and apply the project refresh:
+- The dashboard binds to `127.0.0.1` by default and requires a project token.
+- Hooks do not approve tool calls. Permissions remain with the agent and user.
+- Handover imports check project identity, source records and repository drift.
+- Sensitive-file exclusions and path checks reduce accidental exposure. Review
+  saved content before sharing it; automatic filtering has limits.
+- Saved notes do not approve themselves. Automatic durable instruction
+  injection requires independent administrator review and a protected runtime.
+
+## Skills
+
+Available through the supported agent integration:
+
+- `/handoff` helps update `STATUS.md` with current work and open items.
+- `/security-audit` guides a project review and records findings in the bug log.
+- `/reframe` guides interface review, framework selection and migration work.
+
+Skills guide your coding agent and use its normal model budget. For an explicit
+Claude and Codex transfer, use the [handover commands](docs/commands.md).
+OpenWolf can read supported local session records used for Claude recovery;
+it does not run Claude's `/resume` inside Codex or access private reasoning.
+
+## Dashboard
 
 ```bash
-npm install -g openwolf
-openwolf update --dry-run
-openwolf update
+openwolf dashboard
 ```
 
-Restart project daemons and start new agent sessions. Existing 2.5.1 installations need this refresh once to acquire the 2.5.2 updater. Review [update and restore instructions](docs/updating.md) before changing several registered projects.
+The local dashboard shows project memory, the code index, handover records,
+recorded token usage and API cost estimates by agent and model. Usage coverage
+and missing data remain visible.
 
-## Local processing and control
+Activity history shows completed OpenWolf work, such as saved checkpoints,
+restored context and archived notes. Hook health and update status show which
+runtime is installed and whether a newer compatible runtime is ready. Data
+refreshes while the dashboard is open. Restart the daemon after a package
+upgrade to load updated dashboard code.
 
-OpenWolf's memory, indexing and usage reports run locally. They do not send project content to an OpenWolf service or make extra model calls. The optional update worker contacts the npm registry. Your coding agent still uses its own model provider.
+## Commands
 
-The dashboard binds to the local machine by default and requires a project token. Tool permissions remain with the agent and the user. Protected durable memory needs independent administrator setup; project files cannot approve themselves.
+```
+openwolf init               Set up .wolf/ and detected agents
+openwolf status             Check installation and hook health
+openwolf scan               Refresh the project index
+openwolf scan --check       Check index freshness without writing
+openwolf find <query>       Find an indexed symbol or file
+openwolf find --file <p>    Show one file's description and symbol map
+openwolf map                Show a focused project overview
+openwolf report             Review operational records and usage
+openwolf usage report       Report available provider token counters
+openwolf handoff list       Find saved Claude and Codex sessions
+openwolf handoff search <q> Search saved task evidence
+openwolf memory archive     Archive eligible older session notes
+openwolf bench              Compare supported tasks (--yes required)
+openwolf bug search <term>  Search known problems and fixes
+openwolf dashboard          Open the local dashboard
+openwolf cron list          List scheduled maintenance tasks
+openwolf update             Refresh registered projects from the installed package
+openwolf self-update        Check npm and prepare a compatible project runtime
+openwolf restore [backup]   List backups or restore the selected snapshot
+```
 
-## Validation
+## Requirements
 
-The 2.5.2 candidate passed 322 tests on Linux, macOS and Windows, plus package installation, upgrade and daemon checks. Native Codex checkpoint recovery was checked through resume and compaction. OpenCode notifications and Grok startup were also checked.
+Node.js 20 or later and at least one supported agent. OpenWolf runs on macOS,
+Linux and Windows. Bug-log search uses Node's built-in SQLite where available
+and falls back to a simpler matcher otherwise.
 
-A full live Claude to Codex to Claude coding handover and broader long-session quality and token-saving comparisons remain unverified. See the [release record](docs/release-2.5.2.md) for the exact scope.
+## Limitations
 
-## Contributing and credits
+- Recorded usage is limited to the counters each agent saves. Local
+  character-ratio estimates are not exact provider token counts.
+- Hook and display support differ by agent and version. Claude output controls
+  are not available through every other integration.
+- Handover transfers selected saved evidence. A full live Claude to Codex to
+  Claude coding handover and broader token-efficiency comparisons remain
+  unverified. See the [validation record](docs/release-2.5.2.md).
+- Protected durable memory needs independent administrator setup. Ordinary
+  project maps, checkpoints, archival and activity reporting work without it.
 
-[Report a problem](https://github.com/cytostack/openwolf/issues) or read the [contribution guide](CONTRIBUTING.md).
+[Report a problem](https://github.com/cytostack/openwolf/issues).
 
-OpenWolf was created by Farhan Palathinkal at [Cytostack](https://github.com/cytostack). [CREDITS.md](CREDITS.md) and the [issue and PR audit](docs/audit/README.md) distinguish reporters, PR submitters, original authors and co-authors. Adapted work is not described as a merged PR.
+## Contributors
 
-The contributor links below are retained from the repository's existing acknowledgements. They are not a list of current repository access permissions.
+Contributor acknowledgements are retained below. The [credits](CREDITS.md)
+and [issue and PR audit](docs/audit/README.md) distinguish reporters, PR
+submitters, original authors and co-authors. Adapted work is identified
+separately from merged contributions.
 
 | | | | | |
 |:-:|:-:|:-:|:-:|:-:|
@@ -170,4 +278,8 @@ The contributor links below are retained from the repository's existing acknowle
 
 ## License
 
-[AGPL-3.0-only](LICENSE). Copyright 2026 Cytostack Pvt Ltd.
+[AGPL-3.0](LICENSE)
+
+## Author
+
+Created by Farhan Palathinkal, [Cytostack](https://github.com/cytostack)
