@@ -4,7 +4,7 @@ import tailwindcss from "@tailwindcss/vite";
 export default defineConfig({
   title: "OpenWolf",
   description:
-    "openwolf keeps one project memory across Claude Code, Codex and OpenCode, and measures what each session actually cost. Local, open source, no API calls.",
+    "Local project memory and context tools for coding agents. Continue saved work, find relevant code and review recorded token usage.",
   head: [
     ["link", { rel: "icon", type: "image/svg+xml", href: "/wolf.svg" }],
     ["link", { rel: "canonical", href: "https://openwolf.com" }],
@@ -38,7 +38,7 @@ export default defineConfig({
       "meta",
       {
         property: "og:title",
-        content: "OpenWolf: portable project memory and measured token usage for coding agents",
+        content: "OpenWolf: project memory and context tools for coding agents",
       },
     ],
     [
@@ -46,7 +46,7 @@ export default defineConfig({
       {
         property: "og:description",
         content:
-          "openwolf keeps one project memory across Claude Code, Codex and OpenCode, and measures what each session actually cost. Local, open source, no API calls.",
+          "Local project memory and context tools for coding agents. Continue saved work, find relevant code and review recorded token usage.",
       },
     ],
     // Twitter Card
@@ -55,7 +55,7 @@ export default defineConfig({
       "meta",
       {
         name: "twitter:title",
-        content: "OpenWolf: portable project memory and measured token usage for coding agents",
+        content: "OpenWolf: project memory and context tools for coding agents",
       },
     ],
     [
@@ -63,7 +63,7 @@ export default defineConfig({
       {
         name: "twitter:description",
         content:
-          "openwolf keeps one project memory across Claude Code, Codex and OpenCode, and measures what each session actually cost. Local, open source, no API calls.",
+          "Local project memory and context tools for coding agents. Continue saved work, find relevant code and review recorded token usage.",
       },
     ],
     // Additional SEO
@@ -108,7 +108,10 @@ export default defineConfig({
       {
         text: "Features",
         items: [
-          { text: "Reframe", link: "/reframe" },
+          { text: "Handover and recovery", link: "/claude-codex-handoff-plan" },
+          { text: "Session activity", link: "/session-visibility-plan" },
+          { text: "Automatic updates", link: "/automatic-updates" },
+          { text: "Interface review", link: "/reframe" },
         ],
       },
       {
@@ -118,6 +121,9 @@ export default defineConfig({
           { text: "Configuration", link: "/configuration" },
           { text: "Update & Restore", link: "/updating" },
           { text: "Troubleshooting", link: "/troubleshooting" },
+          { text: "Operations", link: "/repair-operations" },
+          { text: "2.5.2 release checks", link: "/release-2.5.2" },
+          { text: "Issue and contributor audit", link: "/audit/README" },
         ],
       },
     ],

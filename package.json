@@ -1,7 +1,7 @@
 {
   "name": "openwolf",
   "version": "2.5.1",
-  "description": "One project memory across Claude Code, Codex and OpenCode. Token usage measured, not estimated. Zero API calls.",
+  "description": "Local project memory, context tools and recorded token usage for coding agents.",
   "type": "module",
   "bin": {
     "openwolf": "dist/bin/openwolf.js"

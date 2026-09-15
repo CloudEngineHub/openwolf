@@ -1,218 +1,143 @@
-# Commands
+# Command reference
 
-Complete reference for the OpenWolf CLI.
+Run commands from the project directory unless a command explicitly selects registered projects. This reference covers the 2.5.2 candidate. Use `openwolf --version` and `openwolf <command> --help` to check your installed CLI.
 
-## `openwolf init`
-
-Initialize OpenWolf in the current project.
+## Installation and status
 
 ```bash
-openwolf init                          # auto-detect installed agents (default)
-openwolf init --agent codex opencode   # wire exactly these agents
-openwolf init --agent all              # wire every supported agent
-openwolf init --agent claude           # Claude Code only, skip detection
+openwolf init
+openwolf init --agent claude codex opencode
+openwolf status
+openwolf status --all
+openwolf operations doctor
 ```
 
-What it does:
+`init` creates project memory and registers selected agents. `status` checks the installation. `operations doctor` also reports memory authority and update readiness. Existing malformed settings are preserved and reported for repair.
 
-1. Detects the project root (`.git`, `package.json`, `Cargo.toml`, and so on)
-2. Creates `.wolf/` with the state files, the durable index, and a
-   `.gitignore` splitting committed state from machine-local runtime
-3. Copies the hook scripts to `.wolf/hooks/` and registers 12 hooks in
-   `.claude/settings.json`
-4. Auto-detects other installed agents (Codex, OpenCode, Gemini CLI, Cursor)
-   and wires each one
-5. Installs the skills (`/handoff`, `/security-audit`, `/reframe`,
-   `/designqc`) for every wired agent, plus the `openwolf` protocol skill
-   for Claude Code
-6. Writes a five-line `CLAUDE.md` stub and `.claude/rules/openwolf.md`
-7. Runs the initial anatomy scan (descriptions, symbols, import graph)
-
-Re-running init is safe: templates refresh, learned data is preserved, and
-existing hook entries in `.claude/settings.json` are merged, not replaced.
-
----
-
-## `openwolf status`
-
-Health, stats, and file integrity: core files present, all hook scripts
-present, agent registrations, token stats, index size, daemon state.
-
----
-
-## `openwolf scan`
-
-Force a full anatomy rescan.
+## Project map
 
 ```bash
 openwolf scan
-```
-
-Rescans descriptions, token estimates, tree-sitter symbols, and the import
-graph. Lockfiles, caches, minified files, and agent-config directories are
-excluded automatically. Normally you never need this: the post-write hook
-updates entries incrementally, and the daemon rescans when the index is
-actually stale.
-
-### `openwolf scan --check`
-
-Exits 1 if the index no longer matches the tree. CI-friendly:
-
-```bash
-openwolf scan --check || echo "index out of date"
-```
-
----
-
-## `openwolf find <query>`
-
-Locate a symbol or file from the index alone. Results are ranked by match
-quality, then import-graph importance, and the output is capped near 1,000
-tokens so agents can use it instead of grepping the tree.
-
-```bash
+openwolf scan --check
 openwolf find validateToken
+openwolf find --file src/auth.ts
+openwolf map --focus auth,jwt --budget 1000
 ```
 
-```
-src/auth/token.ts:82-140 method Auth.validateToken ~450 tok
-src/auth/token.ts:5-160 class Auth ~1,240 tok
-src/middleware/verify.ts file ~380 tok Token verification middleware
-```
+`scan` refreshes eligible index entries. `scan --check` checks freshness without writing and exits with a failure status when the index does not match. `find` searches indexed paths and symbols. `map` returns a focused overview within an estimated token budget.
 
-### `openwolf find --file <path>`
-
-Full index detail for one file: description, size, importance, and every
-symbol with its line range. The cheap replacement for reading the file, or
-the index, whole.
-
----
-
-## `openwolf map`
-
-A token-budgeted overview of the most important files, ranked by
-personalized PageRank over the import graph. The ranking is seeded by files
-your recent sessions touched and by `--focus` terms, then fitted to the
-budget by binary search.
+## Recorded usage
 
 ```bash
-openwolf map                    # ~1k tokens (2k when no session seeds exist)
-openwolf map --focus auth,jwt   # bias the ranking toward these terms
-openwolf map --budget 500       # explicit output budget
-```
-
----
-
-## `openwolf report`
-
-The token report, hardest numbers first:
-
-- **Measured**: real usage scanned from every project transcript right now,
-  per model, subagent sidechains included
-- **Bash governor**: original output versus what entered context, measured
-  at the rewrite point
-- **Cache rebuilds**: the last 7 days of prompt-cache invalidations with
-  their triggers (model switch, compaction, version change, expiry) and
-  token cost
-- **Estimates**: clearly labeled heuristics, including OpenWolf's own
-  injection cost
-
-```bash
+openwolf usage report --json
+openwolf usage report --agent codex --json
+openwolf usage reconcile
 openwolf report
 ```
 
----
+`usage report` reads available Claude, Codex and OpenCode records and reports coverage. `usage reconcile` persists the shared report and recovers retained observations. `report` also shows the operational ledger and estimates. None of these commands starts a model conversation.
 
-## `openwolf bench`
+## Save a checkpoint
 
-The A/B benchmark: the same task set against two fresh clones of a fixture
-repo, one with OpenWolf and one bare, via headless runs.
+Create a JSON file with the task fields you want to save:
 
-```bash
-openwolf bench --repo /path/to/fixture --yes
-openwolf bench --repo <git-url> --task bugfix --repeats 5 --yes
+```json
+{
+  "objective": "Fix expired-session handling",
+  "next_action": "Run the authentication tests",
+  "unresolved": ["The expired-session case is still failing"],
+  "completed": ["Updated the token validation check"]
+}
 ```
 
-Reports medians per token dimension (input, output, cache read, cache
-write), task completion, and the bash re-run rate. Spends real API budget;
-refuses to run without `--yes`. Raw results are written to a JSON file.
+Use the actual receiving agent session ID:
 
----
+```bash
+openwolf handoff checkpoint --agent codex --session SESSION_ID --file checkpoint.json
+```
 
-## `openwolf bug search <term>`
+## Inspect and transfer a session
 
-Full-text search over the bug memory, relevance ranked (SQLite FTS on Node
-22.5+, substring fallback below).
+```bash
+openwolf handoff list --from claude
+openwolf handoff read --from claude --session SOURCE_ID
+openwolf handoff export --from claude --session SOURCE_ID --to codex --preview
+openwolf handoff export --from claude --session SOURCE_ID --to codex
+openwolf handoff inspect PACKET_ID
+openwolf handoff import PACKET_ID --to codex --session RECEIVING_ID
+```
+
+Replace the capitalised values with IDs from the current project. Inspect the preview before writing a packet, then inspect the packet before import. Import checks identity, source records and repository drift. `--allow-drift` is for explicitly reviewed historical evidence; it is not a repair for changed or missing source records.
+
+```bash
+openwolf handoff recover --from codex --session SESSION_ID
+openwolf handoff search "expired session"
+```
+
+Recovery uses saved records when observations are missing. Search returns relevant saved evidence. See [handover details](claude-codex-handoff-plan.md).
+
+## Session notes and archives
+
+```bash
+openwolf memory log --session SESSION_ID --summary "Updated token validation" --files src/auth.ts --outcome "Expired-session test still fails"
+openwolf memory archive --days 7 --dry-run
+openwolf memory archive --days 7
+openwolf memory restore ARCHIVE_ID
+openwolf maintenance --dry-run
+```
+
+Archive previews do not write. Archival retains the latest block, pinned notes and tracked active sessions. Restore verifies the stored content before changing active memory. `maintenance` combines memory maintenance and usage reconciliation; inspect its preview first.
+
+## Durable memory review
+
+```bash
+openwolf memory review --json
+openwolf operations prepare --output NEW_REVIEW_DIRECTORY
+```
+
+These commands produce review material. They do not grant authority. `memory approve` and `memory revoke` are independent administrator operations for a protected deployment. Follow the [operations guide](repair-operations.md).
+
+## Dashboard and daemon
+
+```bash
+openwolf dashboard
+openwolf daemon status
+openwolf daemon start
+openwolf daemon stop
+openwolf daemon restart
+openwolf daemon logs
+```
+
+The dashboard can start a local daemon without PM2. Persistent daemon management uses the supported PM2 integration where installed. Stop commands verify daemon ownership rather than stopping any process that happens to use a port.
+
+## Updates and backups
+
+```bash
+openwolf update --list
+openwolf update --dry-run
+openwolf update --project my-app
+openwolf self-update --status
+openwolf self-update
+openwolf restore
+```
+
+`update` refreshes registered projects from the package already installed on your machine. `self-update` checks npm and prepares a compatible project runtime under the configured policy. It does not replace the global CLI. `restore` lists backups; `restore BACKUP_NAME` restores the selected snapshot and can replace newer project state.
+
+## Bugs and scheduled tasks
 
 ```bash
 openwolf bug search "cannot read properties"
+openwolf cron list
+openwolf cron run TASK_ID
+openwolf cron retry TASK_ID
+openwolf cron enable TASK_ID
+openwolf cron disable TASK_ID
 ```
 
----
-
-## `openwolf dashboard`
-
-Open the dashboard. Starts the daemon automatically if it is not running; no
-PM2 required. Each project gets its own port and token.
-
----
-
-## `openwolf daemon`
+## Benchmarks
 
 ```bash
-openwolf daemon start     # persistent daemon via PM2
-openwolf daemon stop      # stops PM2 or forked daemons alike
-openwolf daemon restart
-openwolf daemon logs      # last 50 lines
+openwolf bench --repo /path/to/fixture --yes
 ```
 
-The daemon handles stale-gated anatomy rescans, measured-usage refresh,
-memory consolidation, and the dashboard server. It makes no network calls.
-
----
-
-## `openwolf cron`
-
-```bash
-openwolf cron list        # tasks, schedules, last runs
-openwolf cron run <id>    # trigger now (works without the daemon)
-openwolf cron retry <id>  # clear a task from the dead letter queue
-```
-
----
-
-## `openwolf update`
-
-Update every registered project to the installed OpenWolf version.
-
-```bash
-openwolf update                   # all projects
-openwolf update --project my-app  # one project (partial match)
-openwolf update --dry-run         # preview
-openwolf update --list            # show registered projects
-```
-
-Each update takes a timestamped backup first, merges new config defaults
-without touching your values, removes dead weight only when it is verifiably
-untouched template content, and then verifies the hook install with a
-per-hook selfcheck. A failed verification fails the update loudly instead of
-leaving a broken install.
-
----
-
-## `openwolf restore [backup]`
-
-List backups (no argument) or restore `.wolf/` from one:
-
-```bash
-openwolf restore
-openwolf restore 2026-08-20T1655
-```
-
----
-
-## `openwolf --version`
-
-```bash
-openwolf --version
-```
+The benchmark runs coding tasks with and without OpenWolf through the supported benchmark runner. It uses real model access and can consume paid usage. It requires `--yes`. Results apply to those tasks and runs, not every project or agent.

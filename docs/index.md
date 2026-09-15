@@ -1,6 +1,6 @@
 ---
 layout: home
-title: "OpenWolf: portable project memory and measured token usage for coding agents"
+title: "OpenWolf: project memory and context tools for coding agents"
 titleTemplate: false
 ---
 

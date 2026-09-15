@@ -1,0 +1,1110 @@
+{
+  "118": [
+    {
+      "sha": "d08b4c8ca734bc4da79ab187c51cf2224dcd51b5",
+      "author_login": "lojasmm-jonathan",
+      "author_name": "Jonathan Pereira",
+      "committer_login": "lojasmm-jonathan",
+      "subject": "fix(hooks): cap decay_reinjection note size in post-batch",
+      "coauthor_names": []
+    }
+  ],
+  "117": [
+    {
+      "sha": "8caba25e292dd7fb9c2cf771937f87f43da32b86",
+      "author_login": "lojasmm-jonathan",
+      "author_name": "Jonathan Pereira",
+      "committer_login": "lojasmm-jonathan",
+      "subject": "fix(hooks): guard pre-write basename against missing bug.file",
+      "coauthor_names": []
+    }
+  ],
+  "104": [
+    {
+      "sha": "7ce4ab508e5e0dc584dc55134ebe7b8cb02c1871",
+      "author_login": "smasoftware",
+      "author_name": "jasolarte",
+      "committer_login": "smasoftware",
+      "subject": "fix: multi-writer safety for sessions sharing one .wolf + venv hard-excludes",
+      "coauthor_names": [
+        "Claude Fable 5"
+      ]
+    },
+    {
+      "sha": "0896e902976f5f123244b5035c3d04a11195062d",
+      "author_login": "smasoftware",
+      "author_name": "jasolarte",
+      "committer_login": "smasoftware",
+      "subject": "feat(anatomy): opt-in extra_roots for sibling repos outside the project root",
+      "coauthor_names": [
+        "Claude Fable 5"
+      ]
+    },
+    {
+      "sha": "d1444b532175fe94d073a8e7890c397d51d701ff",
+      "author_login": "smasoftware",
+      "author_name": "jasolarte",
+      "committer_login": "smasoftware",
+      "subject": "release: 2.6.0",
+      "coauthor_names": [
+        "Claude Fable 5"
+      ]
+    }
+  ],
+  "96": [
+    {
+      "sha": "6d2f217883af7192a6e239ff4581036b50c21c1f",
+      "author_login": "davdittrich",
+      "author_name": "Dennis Alexis Valin Dittrich",
+      "committer_login": "davdittrich",
+      "subject": "fix(hooks): recover per-project accounting",
+      "coauthor_names": []
+    },
+    {
+      "sha": "8354f82f799660db1163adae2360afffbcc0982e",
+      "author_login": "davdittrich",
+      "author_name": "Dennis Alexis Valin Dittrich",
+      "committer_login": "davdittrich",
+      "subject": "fix(hooks): honor canonical Codex hook payloads",
+      "coauthor_names": []
+    },
+    {
+      "sha": "7d8d4a8b73c77153ca55a3422fb759569b0c2fa2",
+      "author_login": "davdittrich",
+      "author_name": "Dennis Alexis Valin Dittrich",
+      "committer_login": "davdittrich",
+      "subject": "fix(hooks): normalize recovered session accounting",
+      "coauthor_names": []
+    }
+  ],
+  "95": [
+    {
+      "sha": "b3447f2dd05a468e895b8f2d78e93af41fef3916",
+      "author_login": "davdittrich",
+      "author_name": "Dennis Alexis Valin Dittrich",
+      "committer_login": "davdittrich",
+      "subject": "fix: normalize dashboard cron state collections",
+      "coauthor_names": []
+    }
+  ],
+  "74": [
+    {
+      "sha": "8c2d51a48d3105e2aea1232deff2843a158d3357",
+      "author_login": "goashem",
+      "author_name": "goashem",
+      "committer_login": "goashem",
+      "subject": "fix(hooks): install every hook module, not a hardcoded list",
+      "coauthor_names": [
+        "Claude Opus 5"
+      ]
+    }
+  ],
+  "72": [
+    {
+      "sha": "6da3b7e20e538fbc952ee3014a325dccb38e4565",
+      "author_login": "liveoakwag",
+      "author_name": "LiveOak",
+      "committer_login": "liveoakwag",
+      "subject": "fix(install): derive the hook list from what ships, and detect unloadable hooks",
+      "coauthor_names": [
+        "Claude Opus 5 (1M context)"
+      ]
+    }
+  ],
+  "71": [
+    {
+      "sha": "75f2b022bf599919ca3f27ab4631a57ef13e5eeb",
+      "author_login": "liveoakwag",
+      "author_name": "LiveOak",
+      "committer_login": "liveoakwag",
+      "subject": "fix(session): scope write tracking by session, and stop wiping live sessions",
+      "coauthor_names": [
+        "Claude Opus 5 (1M context)"
+      ]
+    }
+  ],
+  "70": [
+    {
+      "sha": "785604172e5f1f6d10fbc46376d2e5d13efe63e0",
+      "author_login": "liveoakwag",
+      "author_name": "LiveOak",
+      "committer_login": "liveoakwag",
+      "subject": "fix(anatomy): never delete entries a capped scan did not reach",
+      "coauthor_names": [
+        "Claude Opus 5 (1M context)"
+      ]
+    }
+  ],
+  "69": [
+    {
+      "sha": "8b6e51b228b82634ec945933f9e9224718415231",
+      "author_login": "liveoakwag",
+      "author_name": "LiveOak",
+      "committer_login": "liveoakwag",
+      "subject": "fix(buglog): allocate bug ids from the high-water mark, not the array length",
+      "coauthor_names": [
+        "Claude Opus 5 (1M context)"
+      ]
+    }
+  ],
+  "67": [
+    {
+      "sha": "ce3e0808fbf09bff35d83a3ab53d333539806c4a",
+      "author_login": null,
+      "author_name": "Olga Cheraneva",
+      "committer_login": null,
+      "subject": "fix(deps): patch ws/qs CVEs and pin GitHub Actions to commit SHAs",
+      "coauthor_names": []
+    }
+  ],
+  "66": [
+    {
+      "sha": "f843a68c00dcfcfb4add6f6ba1ddabf579c32988",
+      "author_login": "liveoakwag",
+      "author_name": "liveoakwag",
+      "committer_login": "liveoakwag",
+      "subject": "fix(anatomy): keep entries the parser used to silently drop",
+      "coauthor_names": []
+    },
+    {
+      "sha": "cdf394713334eb59ab4638d72736ff129498d354",
+      "author_login": "liveoakwag",
+      "author_name": "liveoakwag",
+      "committer_login": "liveoakwag",
+      "subject": "fix(anatomy): resolve symlinks before the outside-root guard",
+      "coauthor_names": []
+    }
+  ],
+  "65": [
+    {
+      "sha": "b18e3aed852c0749b272595d4fef77133a6489f8",
+      "author_login": "octo-patch",
+      "author_name": "octo-patch",
+      "committer_login": "octo-patch",
+      "subject": "feat(cron): add configurable inference provider for AI tasks",
+      "coauthor_names": []
+    },
+    {
+      "sha": "06271b83e123c2c46e623d9570159820afd3b8fc",
+      "author_login": "octo-patch",
+      "author_name": "octo-patch",
+      "committer_login": "octo-patch",
+      "subject": "feat(cron): add complete MiniMax model metadata",
+      "coauthor_names": []
+    }
+  ],
+  "60": [
+    {
+      "sha": "4c5b289d322570b2904d068dc7d34aa4d25939c6",
+      "author_login": "AdarshJ173",
+      "author_name": "A.Adarsh Jagannath",
+      "committer_login": "AdarshJ173",
+      "subject": "fix(pre-read): skip repeated-read warning when file was modified since last read",
+      "coauthor_names": []
+    }
+  ],
+  "59": [
+    {
+      "sha": "c62aff56d3f12dace4f53083b1f14b7bd17018c4",
+      "author_login": "lshgdut",
+      "author_name": "wenhua",
+      "committer_login": "lshgdut",
+      "subject": "feat: add getProjectDir to convert absolute paths to project-relative for ledger portability",
+      "coauthor_names": []
+    }
+  ],
+  "58": [
+    {
+      "sha": "1ba9e591840c7823037c8035c7c084b09989058d",
+      "author_login": "oiahoon",
+      "author_name": "Joey@macstudio",
+      "committer_login": "oiahoon",
+      "subject": "fix: allow rereads after file changes",
+      "coauthor_names": []
+    }
+  ],
+  "51": [
+    {
+      "sha": "f6e75725a72cfddfba3260ac2ead2fae70ac9ca1",
+      "author_login": "albertomenache",
+      "author_name": "Alberto Menache",
+      "committer_login": "albertomenache",
+      "subject": "fix: parseAnatomy tolerates CRLF line endings (fixes #50)",
+      "coauthor_names": []
+    }
+  ],
+  "42": [
+    {
+      "sha": "3feebf7fce8fdb111f262b1527b7c8e7a0518cbd",
+      "author_login": "Mizuho0329",
+      "author_name": "ManniX-ITA",
+      "committer_login": "Mizuho0329",
+      "subject": "feat(windows): wrap .wolf hook commands in wscript+VBS to hide console flash",
+      "coauthor_names": []
+    }
+  ],
+  "39": [
+    {
+      "sha": "bddf6902ddf81d6df2ab9181557b74ceae0eea3b",
+      "author_login": "ChasLui",
+      "author_name": "ChasLui",
+      "committer_login": "ChasLui",
+      "subject": "docs(adr): ADR-001 multi-agent runtime + agents/ skeleton",
+      "coauthor_names": []
+    },
+    {
+      "sha": "be6c54e389c9e567b9fd43bac8db7e3398d453f5",
+      "author_login": "ChasLui",
+      "author_name": "ChasLui",
+      "committer_login": "ChasLui",
+      "subject": "feat(agents): Phase 1a \u2014 Claude/Codex/Gemini adapter skeletons",
+      "coauthor_names": []
+    },
+    {
+      "sha": "13e3d6662932ce6c7162c418fa6d676c6f6410da",
+      "author_login": "ChasLui",
+      "author_name": "ChasLui",
+      "committer_login": "ChasLui",
+      "subject": "feat(agents): Phase 1b \u2014 Codex/Gemini installGlobal real impl + init --agent flag",
+      "coauthor_names": []
+    },
+    {
+      "sha": "963fbc8d157436203c19db946b897c71a5256aaf",
+      "author_login": "ChasLui",
+      "author_name": "ChasLui",
+      "committer_login": "ChasLui",
+      "subject": "fix(agents): bundle full OpenWolf snippet via const, drop fs lookup",
+      "coauthor_names": []
+    },
+    {
+      "sha": "981084f9888f78f51f77595c0373f43fc331745c",
+      "author_login": "ChasLui",
+      "author_name": "ChasLui",
+      "committer_login": "ChasLui",
+      "subject": "feat(agents): Phase 2 \u2014 OpenClaw + OpenCode adapters",
+      "coauthor_names": []
+    },
+    {
+      "sha": "c08bb69d1804ac8c283ccb76749485922805c113",
+      "author_login": "ChasLui",
+      "author_name": "ChasLui",
+      "committer_login": "ChasLui",
+      "subject": "feat(agents): Phase 3 \u2014 Hermes Python plugin + adapter",
+      "coauthor_names": []
+    },
+    {
+      "sha": "a40b0dddf9416ec7450e096ea50b1e454e993b03",
+      "author_login": "ChasLui",
+      "author_name": "ChasLui",
+      "committer_login": "ChasLui",
+      "subject": "chore(agents/hermes/python): gitignore pip install -e artifacts",
+      "coauthor_names": []
+    },
+    {
+      "sha": "db60152c0c1c36b3c2f0aa48aaa64af063537df7",
+      "author_login": "ChasLui",
+      "author_name": "ChasLui",
+      "committer_login": "ChasLui",
+      "subject": "docs: PR description draft for upstream cytostack/openwolf",
+      "coauthor_names": []
+    },
+    {
+      "sha": "adef463c5317c983ec687074d0f6cadb31f2baf4",
+      "author_login": "ChasLui",
+      "author_name": "ChasLui",
+      "committer_login": "ChasLui",
+      "subject": "ci(hermes): GitHub Actions Trusted Publishing + RELEASE.md",
+      "coauthor_names": []
+    },
+    {
+      "sha": "bdd4b9663754882b2787639bad9986f5f5f72cef",
+      "author_login": "ChasLui",
+      "author_name": "ChasLui",
+      "committer_login": "ChasLui",
+      "subject": "feat(agents): Phase 5 \u2014 pi-mono / cline / cursor adapters",
+      "coauthor_names": []
+    },
+    {
+      "sha": "e115b3fbf5041cdab54355de4df99884e4a70a64",
+      "author_login": "ChasLui",
+      "author_name": "ChasLui",
+      "committer_login": "ChasLui",
+      "subject": "ci(hermes): use PYPI_API_TOKEN secret for publish (Trusted Publishing TODO)",
+      "coauthor_names": []
+    },
+    {
+      "sha": "48c7a3e7e4c3c352edf22341fa7bb6512759ad8a",
+      "author_login": "ChasLui",
+      "author_name": "ChasLui",
+      "committer_login": "ChasLui",
+      "subject": "ci: drop TODO marker in publish workflow comment",
+      "coauthor_names": []
+    },
+    {
+      "sha": "d5821fede860737db84042394498d6737664e066",
+      "author_login": "ChasLui",
+      "author_name": "ChasLui",
+      "committer_login": "ChasLui",
+      "subject": "ci(hermes): switch publish to PyPI Trusted Publishing (OIDC)",
+      "coauthor_names": []
+    },
+    {
+      "sha": "7a6bd7a71801ee0718b9d221c4e3dbc2d28b11fb",
+      "author_login": "ChasLui",
+      "author_name": "ChasLui",
+      "committer_login": "ChasLui",
+      "subject": "docs: refresh UPSTREAM-PR for Phase 5 + Hermes PyPI 0.1.0",
+      "coauthor_names": []
+    }
+  ],
+  "36": [
+    {
+      "sha": "23bfabb9181ab1e8bdcc5dda3c05e48c031dfdec",
+      "author_login": null,
+      "author_name": "nottyjay",
+      "committer_login": null,
+      "subject": "feat: add codex hook integration",
+      "coauthor_names": []
+    },
+    {
+      "sha": "54a0ae4b332a151a8e087fbf5d6f2629db931bc7",
+      "author_login": null,
+      "author_name": "nottyjay",
+      "committer_login": null,
+      "subject": "Fix Codex hook paths for non-git projects",
+      "coauthor_names": []
+    },
+    {
+      "sha": "a230430cc8788d3b2931ebe0b7cfc1626ef4b39f",
+      "author_login": null,
+      "author_name": "nottyjay",
+      "committer_login": null,
+      "subject": "change name",
+      "coauthor_names": []
+    },
+    {
+      "sha": "9e24b688ad27f7b194c160829d8b4d26a253fc84",
+      "author_login": null,
+      "author_name": "nottyjay",
+      "committer_login": null,
+      "subject": "fix: Claude Code hook compatibility with new hook system",
+      "coauthor_names": []
+    },
+    {
+      "sha": "f3023024426e6742737191d604bb10e66c681604",
+      "author_login": null,
+      "author_name": "nottyjay",
+      "committer_login": null,
+      "subject": "chore: bump version to 1.0.6",
+      "coauthor_names": []
+    },
+    {
+      "sha": "4b553cae8a0a71e5cfeb8ec99728c1ba0606f1a1",
+      "author_login": null,
+      "author_name": "Nottyjay",
+      "committer_login": null,
+      "subject": "sync: upstream business features from cytostack/openwolf",
+      "coauthor_names": []
+    },
+    {
+      "sha": "9a93b4bd18a142220f2c58c304810eefc1caac17",
+      "author_login": null,
+      "author_name": "Nottyjay",
+      "committer_login": null,
+      "subject": "docs: add Japanese and Russian READMEs with cross-language links",
+      "coauthor_names": []
+    },
+    {
+      "sha": "9ff5e2d174d417895f17b64c02161517e425aff3",
+      "author_login": null,
+      "author_name": "Nottyjay",
+      "committer_login": null,
+      "subject": "1.0.7",
+      "coauthor_names": []
+    },
+    {
+      "sha": "200dc56f7e4338b63a51ba550fa1f04a31f36a16",
+      "author_login": null,
+      "author_name": "Nottyjay",
+      "committer_login": null,
+      "subject": "1.1.0",
+      "coauthor_names": []
+    },
+    {
+      "sha": "6f850cd3bfbb3abec146e79f55afc215026d203b",
+      "author_login": null,
+      "author_name": "nottyjay",
+      "committer_login": null,
+      "subject": "chore: sync upstream 2.5.1 and release 1.1.1",
+      "coauthor_names": []
+    },
+    {
+      "sha": "781837b228ea694b2a0308b705a35db42d8b7df3",
+      "author_login": null,
+      "author_name": "nottyjay",
+      "committer_login": null,
+      "subject": "docs: clarify agent-specific initialization",
+      "coauthor_names": []
+    },
+    {
+      "sha": "b070402862fb7911a396a979bc88b18ba6ea2f85",
+      "author_login": null,
+      "author_name": "nottyjay",
+      "committer_login": null,
+      "subject": "chore: prepare release 1.1.2",
+      "coauthor_names": []
+    },
+    {
+      "sha": "de0f2aadf10b9b0deae0521e4e04d71d50e387cf",
+      "author_login": null,
+      "author_name": "nottyjay",
+      "committer_login": null,
+      "subject": "chore: prepare release 1.1.3",
+      "coauthor_names": []
+    }
+  ],
+  "35": [
+    {
+      "sha": "b1a7fc1e831d12e26ad7a4ed73126e56be36dcac",
+      "author_login": "yhyu13",
+      "author_name": "yhyu13",
+      "committer_login": "yhyu13",
+      "subject": "feat: add hippocampus memory system (Phase 1)",
+      "coauthor_names": [
+        "Claude Opus 4.7"
+      ]
+    },
+    {
+      "sha": "2bfcda0f27a7048f66bb41a138be6c900bc66fe8",
+      "author_login": "yhyu13",
+      "author_name": "yhyu13",
+      "committer_login": "yhyu13",
+      "subject": "feat: add Phase 1 hippocampus test suite (98 tests)",
+      "coauthor_names": [
+        "Claude Opus 4.7"
+      ]
+    },
+    {
+      "sha": "0121b59061775d98701dab543d40737c88d2bd85",
+      "author_login": "yhyu13",
+      "author_name": "yhyu13",
+      "committer_login": "yhyu13",
+      "subject": "feat: add Phase 2 hippocampus recall system (109 tests)",
+      "coauthor_names": [
+        "Claude Opus 4.7"
+      ]
+    },
+    {
+      "sha": "ac7f69340d2802f9433cef739c5f2ffd51290d94",
+      "author_login": "yhyu13",
+      "author_name": "yhyu13",
+      "committer_login": "yhyu13",
+      "subject": "chore: remove stray .js files from src/ and add gitignore rule",
+      "coauthor_names": [
+        "Claude Opus 4.7"
+      ]
+    },
+    {
+      "sha": "6c6f01049f2819c5de9f742b4fe8e7828b59e206",
+      "author_login": "yhyu13",
+      "author_name": "yhyu13",
+      "committer_login": "yhyu13",
+      "subject": "docs: add hippocampus usage learnings + type export cleanup",
+      "coauthor_names": [
+        "Claude Opus 4.7"
+      ]
+    },
+    {
+      "sha": "19f1453a3ea359f08209a0c39ec27988c6554169",
+      "author_login": "yhyu13",
+      "author_name": "yhyu13",
+      "committer_login": "yhyu13",
+      "subject": "feat: add Phase 3 hippocampus consolidation system",
+      "coauthor_names": [
+        "Claude Opus 4.7"
+      ]
+    },
+    {
+      "sha": "359a4f99211ad77e710e64be08a8d2707554b0dc",
+      "author_login": "yhyu13",
+      "author_name": "yhyu13",
+      "committer_login": "yhyu13",
+      "subject": "docs: update README with hippocampus features + add local install script",
+      "coauthor_names": [
+        "Claude Opus 4.7"
+      ]
+    },
+    {
+      "sha": "2b12adc6d011ff9e95670f6360ada2def5599451",
+      "author_login": "yhyu13",
+      "author_name": "yhyu13",
+      "committer_login": "yhyu13",
+      "subject": "fix(hippocampus): install module in init and add context-aware recall to hooks",
+      "coauthor_names": [
+        "Claude Opus 4.7"
+      ]
+    },
+    {
+      "sha": "1f25813b74f9c51dfeb1b551f82a6aace2fbbc4a",
+      "author_login": "yhxd123",
+      "author_name": "yhxd123",
+      "committer_login": "yhxd123",
+      "subject": "Merge branch 'main' of https://github.com/cytostack/openwolf into merge/cytostack-main",
+      "coauthor_names": []
+    },
+    {
+      "sha": "07e78cc4460cce6262e60e85d0dac82ce1269048",
+      "author_login": "yhxd123",
+      "author_name": "yhxd123",
+      "committer_login": "yhxd123",
+      "subject": "feat(hippocampus): harden storage and add truth maintenance",
+      "coauthor_names": [
+        "Claude"
+      ]
+    },
+    {
+      "sha": "37495feb3f4664541d0ea9503c1a7191c65a7d9d",
+      "author_login": "yhxd123",
+      "author_name": "yhxd123",
+      "committer_login": "yhxd123",
+      "subject": "chore(security): remediate dependency advisories",
+      "coauthor_names": [
+        "Claude"
+      ]
+    },
+    {
+      "sha": "ef5453f4eac3d1529323fb60596e89f7b3850720",
+      "author_login": "yhxd123",
+      "author_name": "yhxd123",
+      "committer_login": "yhxd123",
+      "subject": "Merge branch 'feat/hippocampus-hardening'",
+      "coauthor_names": [
+        "Claude"
+      ]
+    },
+    {
+      "sha": "6b59b00f36e9a6c635ba32a40fd4bcad2cb26ad1",
+      "author_login": "yhyu13",
+      "author_name": "yhyu13",
+      "committer_login": "yhyu13",
+      "subject": "feat(hippocampus): addMany batching + self-test report",
+      "coauthor_names": []
+    },
+    {
+      "sha": "f92a15badc0d5b111260519df111135ce9729ec3",
+      "author_login": "yhyu13",
+      "author_name": "yhyu13",
+      "committer_login": "yhyu13",
+      "subject": "Merge branch 'feat/hippocampus-addmany' into main",
+      "coauthor_names": []
+    },
+    {
+      "sha": "279a332a415c9e0320d5903091cb3ce3d4171e4d",
+      "author_login": "yhyu13",
+      "author_name": "yhyu13",
+      "committer_login": "yhyu13",
+      "subject": "docs: add openwolf-dogfood-journey.md (what / why / how, with mermaid)",
+      "coauthor_names": []
+    },
+    {
+      "sha": "d38a7d8bf4d6658ef62c68046785d981a88a1504",
+      "author_login": "yhxd123",
+      "author_name": "yhxd123",
+      "committer_login": "yhxd123",
+      "subject": "feat: kilo harness adapter and hippocampus impact measurement",
+      "coauthor_names": []
+    },
+    {
+      "sha": "413f2ed2b3e96381593da93f447f0321c2e6a50e",
+      "author_login": "yhxd123",
+      "author_name": "yhxd123",
+      "committer_login": "yhxd123",
+      "subject": "docs: \u66f4\u65b0 JOURNEY\uff08\u98ce\u9669\u7f6e\u9876\u3001Kilo dogfood \u4e0e session.created \u4fee\u590d\uff09",
+      "coauthor_names": []
+    },
+    {
+      "sha": "bd75fcee40ed4e791907d424408d70441d675052",
+      "author_login": "yhxd123",
+      "author_name": "yhxd123",
+      "committer_login": "yhxd123",
+      "subject": "fix(hooks): make countSemanticEntries time-independent via injectable now",
+      "coauthor_names": []
+    },
+    {
+      "sha": "ac6cb439d4b20c3658b1f857dac385b32150766b",
+      "author_login": "yhxd123",
+      "author_name": "yhxd123",
+      "committer_login": "yhxd123",
+      "subject": "feat(benchmark): add coverage/perf/outcome harness + plan + docs",
+      "coauthor_names": []
+    },
+    {
+      "sha": "3e5d7b068dc18d2c80717e1fed575f88b5202ecb",
+      "author_login": "yhxd123",
+      "author_name": "yhxd123",
+      "committer_login": "yhxd123",
+      "subject": "feat(sdd): spec-driven development layer (state machine, skills, CLI, hooks)",
+      "coauthor_names": []
+    },
+    {
+      "sha": "16c7a20aeb40fe8e85691219cbc341d84545421e",
+      "author_login": "yhxd123",
+      "author_name": "yhxd123",
+      "committer_login": "yhxd123",
+      "subject": "fix(sdd): warn when STATUS.md doesn't mention the active spec",
+      "coauthor_names": []
+    },
+    {
+      "sha": "44297d4c844dee0c4425bdafbb4efc5d8e9bba60",
+      "author_login": "yhxd123",
+      "author_name": "yhxd123",
+      "committer_login": "yhxd123",
+      "subject": "fix(sdd): ship spec runtime in copyHookScripts; add spec status --json",
+      "coauthor_names": []
+    },
+    {
+      "sha": "aa6bce2ec7599d095575edc7b5ddaeb60d00444b",
+      "author_login": "yhxd123",
+      "author_name": "yhxd123",
+      "committer_login": "yhxd123",
+      "subject": "feat(hippocampus): trajectory matching \u2014 predict bad next-step from action sequence",
+      "coauthor_names": []
+    },
+    {
+      "sha": "9a17a61bbc8cc586d107af642d8f3988bd32ecec",
+      "author_login": "yhxd123",
+      "author_name": "yhxd123",
+      "committer_login": "yhxd123",
+      "subject": "docs+fix(sdd): journey \u00a716, valence-detection README, benchmark refresh, export status-check",
+      "coauthor_names": []
+    },
+    {
+      "sha": "13e314c0d3f9b76a22a471034b1f4f9a131e9c2d",
+      "author_login": "yhxd123",
+      "author_name": "yhxd123",
+      "committer_login": "yhxd123",
+      "subject": "refactor(hippocampus): remove dead is_recurring event field",
+      "coauthor_names": []
+    },
+    {
+      "sha": "9a06ef0b829d9a58382cedd706b5152a39c642f3",
+      "author_login": "yhxd123",
+      "author_name": "yhxd123",
+      "committer_login": "yhxd123",
+      "subject": "bench: add trajectory matching coverage + perf ops",
+      "coauthor_names": []
+    },
+    {
+      "sha": "f25748b9c1377c4ae2aae09641a3cbd3db88d22e",
+      "author_login": "yhxd123",
+      "author_name": "yhxd123",
+      "committer_login": "yhxd123",
+      "subject": "refactor(hippocampus): remove dead first_event_id event field",
+      "coauthor_names": []
+    },
+    {
+      "sha": "7333a3951270b29b13e70f14ce3fbed8d456e001",
+      "author_login": "yhxd123",
+      "author_name": "yhxd123",
+      "committer_login": "yhxd123",
+      "subject": "docs(journey): record trajectory wrap-up, dead-field retirement, brainstorm (\u00a717)",
+      "coauthor_names": []
+    },
+    {
+      "sha": "aeeee6602b284b12ab70fe04bd0d8e36e3e10484",
+      "author_login": "yhxd123",
+      "author_name": "yhxd123",
+      "committer_login": "yhxd123",
+      "subject": "docs: brainstorm 100 improvement ideas + P0 implementation plan (16 code items)",
+      "coauthor_names": []
+    },
+    {
+      "sha": "c2f2bbafac8bcac7d3cbf6233249fb746f8709c2",
+      "author_login": "yhxd123",
+      "author_name": "yhxd123",
+      "committer_login": "yhxd123",
+      "subject": "test(hippocampus): add concurrent N-events regression; falsify P0-58",
+      "coauthor_names": []
+    },
+    {
+      "sha": "800426094056c2a2f3fc39d1d10c8a4e1f5912b2",
+      "author_login": "yhxd123",
+      "author_name": "yhxd123",
+      "committer_login": "yhxd123",
+      "subject": "feat(scanner): extract C/C++ class/function descriptions for large codebases",
+      "coauthor_names": []
+    },
+    {
+      "sha": "caabb09de044e8a5fe04c0abe1e271bcfc1515e2",
+      "author_login": "yhxd123",
+      "author_name": "yhxd123",
+      "committer_login": "yhxd123",
+      "subject": "feat(hippocampus): stamp turn_in_session in-store; trajectory sorts by turn",
+      "coauthor_names": []
+    },
+    {
+      "sha": "72f640a80be89d7a54ac3404d8d312298d81e2ef",
+      "author_login": "yhxd123",
+      "author_name": "yhxd123",
+      "committer_login": "yhxd123",
+      "subject": "feat(scanner): flag anatomy truncation when file count exceeds max_files",
+      "coauthor_names": []
+    },
+    {
+      "sha": "02bd8c20290d3e5775fdcce3577e054d2d1f17e1",
+      "author_login": "yhxd123",
+      "author_name": "yhxd123",
+      "committer_login": "yhxd123",
+      "subject": "feat(cli): start daemon without pm2 via detached fork",
+      "coauthor_names": []
+    },
+    {
+      "sha": "eb1591c1c9dfe3c40852e151e64b8e3dc3f289f2",
+      "author_login": "yhxd123",
+      "author_name": "yhxd123",
+      "committer_login": "yhxd123",
+      "subject": "fix(cli): dedupe copyHookScripts; update.ts now ships user-prompt + post-test",
+      "coauthor_names": []
+    },
+    {
+      "sha": "0a6b40291a0d8fb69bb7495421ce72becd6250f9",
+      "author_login": "yhxd123",
+      "author_name": "yhxd123",
+      "committer_login": "yhxd123",
+      "subject": "test(claims): lock EVIDENCE_WEIGHTS ladder and evidenceStrength = weight x authority",
+      "coauthor_names": []
+    },
+    {
+      "sha": "5a00a370850e09e3c57b1a42a332ac8a21112ca2",
+      "author_login": "yhxd123",
+      "author_name": "yhxd123",
+      "committer_login": "yhxd123",
+      "subject": "docs: journey \u00a718 (P0 execution), tasks-100, P0-5 plan v2, brainstorm distribution fix",
+      "coauthor_names": []
+    },
+    {
+      "sha": "42f42c01008e6e9f4886950f9a13cfe666693d6a",
+      "author_login": "yhxd123",
+      "author_name": "yhxd123",
+      "committer_login": "yhxd123",
+      "subject": "refactor(benchmark): extract computeOutcome pure fn; test both rate formulas",
+      "coauthor_names": []
+    },
+    {
+      "sha": "e218116629088f8a5685fc2015098742bae284dd",
+      "author_login": "yhxd123",
+      "author_name": "yhxd123",
+      "committer_login": "yhxd123",
+      "subject": "feat(hooks): redact secrets before writing events to memory",
+      "coauthor_names": []
+    },
+    {
+      "sha": "3f3ed523a05c5af9fcd28938777685a2b6729150",
+      "author_login": "yhxd123",
+      "author_name": "yhxd123",
+      "committer_login": "yhxd123",
+      "subject": "feat(hooks,scanner): block .pypirc/kubeconfig/.dockercfg from memory; lock isSensitiveFile",
+      "coauthor_names": []
+    },
+    {
+      "sha": "8e16d6ac3c746ece2c1d904b2521f4688b8ed078",
+      "author_login": "yhxd123",
+      "author_name": "yhxd123",
+      "committer_login": "yhxd123",
+      "subject": "ci: add test + coverage gate workflow (60% statement threshold)",
+      "coauthor_names": []
+    },
+    {
+      "sha": "1b6419677d4255982b1801d18bade7e983712a16",
+      "author_login": "yhxd123",
+      "author_name": "yhxd123",
+      "committer_login": "yhxd123",
+      "subject": "test(hooks): lock estimateTokens ratios; document uncalibrated boundary",
+      "coauthor_names": []
+    },
+    {
+      "sha": "5ee945adf510e411d450bf61893d0ce5470bdab2",
+      "author_login": "yhxd123",
+      "author_name": "yhxd123",
+      "committer_login": "yhxd123",
+      "subject": "feat(hippocampus): schema 1->2 migration strips retired outcome fields",
+      "coauthor_names": []
+    },
+    {
+      "sha": "c7753dc7aab2a0738ea0323576f1eeed858dd09a",
+      "author_login": "yhxd123",
+      "author_name": "yhxd123",
+      "committer_login": "yhxd123",
+      "subject": "feat(cli): add openwolf doctor health check",
+      "coauthor_names": []
+    },
+    {
+      "sha": "b5b5ff757ca23fc414fc848275caa46ac894a330",
+      "author_login": "yhxd123",
+      "author_name": "yhxd123",
+      "committer_login": "yhxd123",
+      "subject": "feat(agents): canonical session-id fallback chain; unify opencode plugin",
+      "coauthor_names": []
+    },
+    {
+      "sha": "53d0b6696429e0e908b18e26f8a720a2c1eb2aac",
+      "author_login": "yhxd123",
+      "author_name": "yhxd123",
+      "committer_login": "yhxd123",
+      "subject": "feat(specs): openwolf spec status --sync writes active-spec block to STATUS.md",
+      "coauthor_names": []
+    },
+    {
+      "sha": "9cb685a0dc6340654bfa81188f2e5671d74de4c5",
+      "author_login": "yhxd123",
+      "author_name": "yhxd123",
+      "committer_login": "yhxd123",
+      "subject": "feat(daemon): ai_task HITL gate + configurable timeout",
+      "coauthor_names": []
+    },
+    {
+      "sha": "b6ae3d001bc7d3f3d5584b2397de1d4e853d59e3",
+      "author_login": "yhxd123",
+      "author_name": "yhxd123",
+      "committer_login": "yhxd123",
+      "subject": "fix(fs-safe): fsync before rename in writeJSON for crash consistency",
+      "coauthor_names": []
+    },
+    {
+      "sha": "d057698bad03a1c5a9fbd633458249378e604af3",
+      "author_login": "yhxd123",
+      "author_name": "yhxd123",
+      "committer_login": "yhxd123",
+      "subject": "test(scripts): dogfood harness drives real hooks to first non-zero recurrence_rate",
+      "coauthor_names": []
+    },
+    {
+      "sha": "f571e7b708a3b70eca1151ea8232308b7fe1d539",
+      "author_login": "yhxd123",
+      "author_name": "yhxd123",
+      "committer_login": "yhxd123",
+      "subject": "docs: journey \u00a719 (P0 complete + dogfood), README updates, Chinese README",
+      "coauthor_names": []
+    },
+    {
+      "sha": "44f67ff4e5f74c866339162268d0c3e3692c7403",
+      "author_login": "yhxd123",
+      "author_name": "yhxd123",
+      "committer_login": "yhxd123",
+      "subject": "docs: dashboard quality-enhancement brainstorm (100 ideas P0-P2, taste view)",
+      "coauthor_names": []
+    },
+    {
+      "sha": "0ea31a847df758a694e9fd9b2f36be70bbda583a",
+      "author_login": "yhxd123",
+      "author_name": "yhxd123",
+      "committer_login": "yhxd123",
+      "subject": "feat(dashboard): P0 quality pass \u2014 a11y, color-line fixes, shared components",
+      "coauthor_names": []
+    },
+    {
+      "sha": "6963c948c027aab76d07091d783bdb77f93a308d",
+      "author_login": "yhxd123",
+      "author_name": "yhxd123",
+      "committer_login": "yhxd123",
+      "subject": "feat(score): deterministic dashboard taste score for multi-agent competition",
+      "coauthor_names": []
+    },
+    {
+      "sha": "5feb0d8e98298f8cd7b7776bad2886bef2d09da1",
+      "author_login": "yhxd123",
+      "author_name": "yhxd123",
+      "committer_login": "yhxd123",
+      "subject": "feat(dashboard): crash onMouseEnter hover to CSS; taste score 78 -> 82",
+      "coauthor_names": []
+    },
+    {
+      "sha": "bab6c463a4b8b587c1a71c0af1093223b5ea6f49",
+      "author_login": "yhxd123",
+      "author_name": "yhxd123",
+      "committer_login": "yhxd123",
+      "subject": "feat(score): coverage-style checks to deter fill-in gaming; taste gate in AGENTS.md",
+      "coauthor_names": []
+    },
+    {
+      "sha": "0b8e661334c7e4058c680a5e06d8fd7c0051aeff",
+      "author_login": "yhxd123",
+      "author_name": "yhxd123",
+      "committer_login": "yhxd123",
+      "subject": "a11y: remove stray focus:outline-none reference, taste score 82->87 (a11y 20/25->25/25)",
+      "coauthor_names": []
+    },
+    {
+      "sha": "c3cac652b20ebd8760360a2315d929b3b74b8d20",
+      "author_login": "yhxd123",
+      "author_name": "yhxd123",
+      "committer_login": "yhxd123",
+      "subject": "dashboard(state): add ErrorBoundary lift state coverage 7/10 to 10/10 (score 82->85)",
+      "coauthor_names": []
+    },
+    {
+      "sha": "476caf1341e21dd603a939c87caf166e6e822bf9",
+      "author_login": "yhxd123",
+      "author_name": "yhxd123",
+      "committer_login": "yhxd123",
+      "subject": "fix(score): strip comments before scoring so comment literals don't trip checks",
+      "coauthor_names": []
+    },
+    {
+      "sha": "b6598e3f1c43a98f622b7a87e1e1b211b0421673",
+      "author_login": "yhxd123",
+      "author_name": "yhxd123",
+      "committer_login": "yhxd123",
+      "subject": "refactor(dashboard): extract WdTable + convert accordions to CollapseCard; taste 82->92",
+      "coauthor_names": []
+    },
+    {
+      "sha": "f9f1205df0d520ac0b7148055433713479d99a46",
+      "author_login": "yhxd123",
+      "author_name": "yhxd123",
+      "committer_login": "yhxd123",
+      "subject": "Merge branch 'taste/component-dry'",
+      "coauthor_names": []
+    },
+    {
+      "sha": "d49311de169734d36586fc69ec47e9f9fcf07754",
+      "author_login": "yhxd123",
+      "author_name": "yhxd123",
+      "committer_login": "yhxd123",
+      "subject": "Merge branch 'taste/a11y'",
+      "coauthor_names": []
+    },
+    {
+      "sha": "be2195712c7725edeb6e535ae997d9b5bf1b24f8",
+      "author_login": "yhxd123",
+      "author_name": "yhxd123",
+      "committer_login": "yhxd123",
+      "subject": "Merge branch 'taste/state'",
+      "coauthor_names": []
+    },
+    {
+      "sha": "9f8a542b77e0b69e8392e19ba24a78cb956560f7",
+      "author_login": "yhxd123",
+      "author_name": "yhxd123",
+      "committer_login": "yhxd123",
+      "subject": "fix(score+emoji): normalize windows paths, purge icon emoji -> taste 100/100",
+      "coauthor_names": []
+    },
+    {
+      "sha": "889f6070c83599f4a3b8903fbbfd87a327faef31",
+      "author_login": "yhxd123",
+      "author_name": "yhxd123",
+      "committer_login": "yhxd123",
+      "subject": "feat(score): add Design Token Hygiene dimension (total 100 -> 120)",
+      "coauthor_names": []
+    },
+    {
+      "sha": "c6124adfd55198d380016f1439f21fabb9e028f2",
+      "author_login": "yhxd123",
+      "author_name": "yhxd123",
+      "committer_login": "yhxd123",
+      "subject": "feat(score): token-hygiene 3->20 via @theme registration, WdTable caption, and inline var(--) -> wd-* class extraction",
+      "coauthor_names": []
+    },
+    {
+      "sha": "bdb5d6af2e0519e6d0ebd8f0576881a4cfd9270c",
+      "author_login": "yhxd123",
+      "author_name": "yhxd123",
+      "committer_login": "yhxd123",
+      "subject": "feat(score): add Engineering Rigor dimension (120 -> 140)",
+      "coauthor_names": []
+    },
+    {
+      "sha": "0797e684d7dd86e56dbf64ae4a94f0613d7a8200",
+      "author_login": "yhxd123",
+      "author_name": "yhxd123",
+      "committer_login": "yhxd123",
+      "subject": "feat(score): engineering 6->20 via inline style and any cleanup",
+      "coauthor_names": []
+    },
+    {
+      "sha": "fa9800be867dabc256a432d5109bb14036adbc03",
+      "author_login": "yhxd123",
+      "author_name": "yhxd123",
+      "committer_login": "yhxd123",
+      "subject": "feat(score+daemon): anti-Goodhart functionality score + daemon port pre-check",
+      "coauthor_names": []
+    },
+    {
+      "sha": "0344ca3413b02895411587bf071aa9663059791f",
+      "author_login": "yhxd123",
+      "author_name": "yhxd123",
+      "committer_login": "yhxd123",
+      "subject": "feat(score): OFS D1 aggregates REAL dogfood across all registered projects",
+      "coauthor_names": []
+    },
+    {
+      "sha": "c0b2ddacafd23b744f0c8e5678ab6a40fddf8451",
+      "author_login": "yhxd123",
+      "author_name": "yhxd123",
+      "committer_login": "yhxd123",
+      "subject": "fix(hooks): recurrence recall uses exact path match so root-file penalties are countable",
+      "coauthor_names": []
+    },
+    {
+      "sha": "c4889d6bc058cecdefe64c195c9e45b5b6118920",
+      "author_login": "yhxd123",
+      "author_name": "yhxd123",
+      "committer_login": "yhxd123",
+      "subject": "fix(hooks): recurrence recall uses exact path so root-file penalties are countable",
+      "coauthor_names": []
+    }
+  ],
+  "34": [
+    {
+      "sha": "8a1f509317d5d2801cecefa2187a74ba50761d42",
+      "author_login": "riverwolf67",
+      "author_name": "river wolf",
+      "committer_login": "riverwolf67",
+      "subject": "security: patch command injection, path traversal, and unauthorized access",
+      "coauthor_names": []
+    }
+  ],
+  "32": [
+    {
+      "sha": "5a0880bf3550b3eeef7777e3abb59f11678d989c",
+      "author_login": "mann1x",
+      "author_name": "ManniX-ITA",
+      "committer_login": "mann1x",
+      "subject": "init/update: tag hook entries with _managedBy: \"openwolf\"",
+      "coauthor_names": []
+    }
+  ],
+  "26": [
+    {
+      "sha": "87b718467fcfc5445a5076aed9b82da3d83a8cb4",
+      "author_login": "pixelbacon",
+      "author_name": "Michael Minor",
+      "committer_login": "pixelbacon",
+      "subject": "fix: use safe config access with defaults in CLI and daemon",
+      "coauthor_names": [
+        "Claude Opus 4.7 (1M context)"
+      ]
+    }
+  ],
+  "9": [
+    {
+      "sha": "e34d844692f7cc6eae2ed237ebc58869387a181d",
+      "author_login": "alfasin",
+      "author_name": "Nir Alfasi",
+      "committer_login": "alfasin",
+      "subject": "feat: add OpenCode plugin support",
+      "coauthor_names": []
+    }
+  ],
+  "4": [
+    {
+      "sha": "d1166548bf207e471523bf643b3f7abb0a4075c8",
+      "author_login": "MyEditHub",
+      "author_name": "Antonio Prebisalic",
+      "committer_login": "MyEditHub",
+      "subject": "Fix dashboard bugs: Run Now, AI Insights, token chart, Design QC, project switching, cron logging",
+      "coauthor_names": []
+    }
+  ]
+}
