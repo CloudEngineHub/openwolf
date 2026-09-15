@@ -1,84 +1,57 @@
-# Update and Restore
+# Update and restore
 
-How to keep OpenWolf current across projects and recover from problems.
+There are two update paths. A package update changes the CLI installed on your machine. A session runtime update prepares hooks and plugin code for new sessions in one project.
 
-## `openwolf update`
-
-Updates every registered project (or one) to the installed OpenWolf version.
+## Update the package and registered projects
 
 ```bash
-openwolf update
-openwolf update --project my-app   # partial name match
-openwolf update --dry-run          # preview, touch nothing
-openwolf update --list             # show registered projects
-```
-
-### What it does, in order
-
-1. **Backup.** A timestamped copy of `.wolf/` is created before anything
-   changes. `openwolf restore` rolls back to any of them.
-2. **Config merge.** Newly introduced settings are added to your
-   `config.json` without touching existing values. Ports, budgets, and
-   custom excludes survive every update.
-3. **Dead-weight cleanup.** Files shipped by older versions that your
-   project never used are removed, but only when they are byte-identical to
-   our templates or verifiably empty stubs. Anything you edited stays.
-4. **Hook refresh.** All hook scripts are replaced with the current
-   versions, and OpenWolf's entries in `.claude/settings.json` are updated.
-   Your own hook entries are never touched.
-5. **Install verification.** Every hook file must exist, and every
-   registered hook must pass a selfcheck (its imports must load). A failure
-   fails the whole project update loudly. This exists because a missing
-   dependency file once broke a hook silently for three weeks; now that
-   class of failure is caught at install time, at session start, and on the
-   dashboard.
-6. **Adapters and skills.** The agents recorded in your config
-   (Codex, OpenCode, Gemini, Cursor) are re-wired, and the skills are
-   refreshed. Customized skill files are left alone.
-7. **State migrations.** One-time repairs and migrations (ledger corrections,
-   snippet upgrades) run idempotently. A legacy `CLAUDE.md` snippet is
-   replaced with the current stub only when it is byte-identical to
-   something we shipped.
-8. **Memory sync.** On Claude Code, the cerebrum syncs with native
-   auto-memory in both directions.
-
-### What is never overwritten
-
-`config.json`, `cerebrum.md`, `memory.md`, `buglog.json`, `anatomy.md` and
-the index, `STATUS.md`, and any custom files you added to `.wolf/`.
-
-## `openwolf restore [backup]`
-
-```bash
-openwolf restore                    # list available backups
-openwolf restore 2026-08-20T1655    # restore this one
-```
-
-Restores `.wolf/` (and the backed-up `.claude` settings and rules) from the
-snapshot. Restoring replaces current state including user data, so check the
-timestamp before you pull the trigger.
-
-## Registered projects
-
-Every `openwolf init` registers the project path. `openwolf update` iterates
-that registry and skips paths that no longer exist.
-
-```bash
+npm install -g openwolf
+openwolf --version
 openwolf update --list
+openwolf update --dry-run
+openwolf update
 ```
 
-## One global install
+This installs the version currently published on npm. The 2.5.2 candidate is available on its [release branch](https://github.com/cytostack/openwolf/tree/release/openwolf-2.5.2) until publication.
 
-Keep exactly one global OpenWolf on your machine. If an old copy lingers on
-another Node installation (for example under `/usr/local` from a pre-nvm
-setup), your shell can resolve it first and an `openwolf update` from an old
-version will downgrade your projects' hooks. Check with:
+`openwolf update` refreshes registered projects from the installed package. Use `--project my-app` to select a project by partial name. Review the dry run before updating several projects.
+
+The update creates a backup, merges new configuration defaults, refreshes OpenWolf runtime files and agent registrations, and checks that the installed hooks can load. It preserves existing custom settings where supported and reports malformed files for repair. Selected migrations can change generated state, so review the update result and backup.
+
+Restart each project's daemon and start new agent sessions to load the new code. Existing 2.5.1 installations need this package refresh once to acquire the 2.5.2 runtime updater.
+
+## Automatic session runtime updates
+
+The default `compatible` policy checks npm in the background and prepares supported stable releases in the same major version. For a 0.x release, the minor version must also match. Major updates produce a notice.
+
+A new session can use the verified runtime. A running or resumed session keeps its selected version. These updates do not replace the global CLI, restart a daemon or replace a custom Claude status-line command.
 
 ```bash
-which openwolf && openwolf --version
+openwolf self-update --status
+openwolf self-update
 ```
 
-If the version is older than you installed, remove the stale copy (the path
-`which` printed) and run `hash -r`. A downgraded project is fully repaired
-by running `openwolf update` again from the current version; backups from
-before the downgrade also remain available.
+The first command reads cached status. The second checks the registry under the configured policy. Network or verification failures retain the working runtime. See [automatic update details](automatic-updates.md).
+
+## Restore a backup
+
+```bash
+openwolf restore
+openwolf restore BACKUP_NAME
+```
+
+The first command lists backups. Replace `BACKUP_NAME` with a listed snapshot. Restoration can replace newer `.wolf/` data and backed-up Claude settings, so inspect the snapshot before proceeding.
+
+For a single archived memory block, use `openwolf memory restore ARCHIVE_ID` instead of restoring the whole project snapshot.
+
+## Check which CLI is running
+
+Multiple Node installations can expose different OpenWolf versions.
+
+```bash
+openwolf --version
+```
+
+Use `command -v openwolf` on Linux or macOS, `where.exe openwolf` in Windows Command Prompt, or `Get-Command openwolf` in PowerShell. Update the package associated with the Node installation you intend to use. Do not delete an executable solely because its version differs from another installation.
+
+Protected administrator-managed runtimes have a separate update process. Project settings cannot authorise replacement of that protected runtime.

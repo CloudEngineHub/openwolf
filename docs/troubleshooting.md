@@ -1,131 +1,69 @@
 # Troubleshooting
 
-Common issues and their solutions.
-
-## Hooks not firing
-
-**Symptom:** No digest at session start, no tracking, no memory entries.
-
-**Diagnosis first:** OpenWolf can tell you what is wrong.
+Start with the installed version and project health:
 
 ```bash
+openwolf --version
 openwolf status
+openwolf operations doctor
 ```
 
-Checks that the hook scripts exist and the agent registrations are in place.
-Then look at hook health: every hook writes a heartbeat to
-`.wolf/hooks/_heartbeat.json` with its last success, last error, and
-consecutive failures. The dashboard's context-health card shows failing
-hooks with the actual error, and the session-start digest itself reports a
-degraded install.
+## A documented command is missing
 
-**Fix:** `openwolf update` reinstalls the hooks and then verifies the
-install with a per-hook selfcheck. If verification fails, the error names
-the broken file.
+These pages describe the 2.5.2 candidate. Compare your installed version with the [npm package](https://www.npmjs.com/package/openwolf) and [release record](release-2.5.2.md). A package version on a release branch is not necessarily published on npm.
 
-## `openwolf update` downgraded my projects
+## Hooks are not running
 
-**Symptom:** After running `openwolf update`, projects show an older
-version and features disappear.
+Confirm that the project was initialised for the intended agent. Check the agent's project trust, hook settings and version support. Inspect `.wolf/hooks/_heartbeat.json` and the agent's own logs.
 
-**Cause:** A stale global install on another Node installation (for example
-under `/usr/local` from a pre-nvm setup) resolved first in your shell, and
-its old `update` overwrote the hooks with old versions.
+After installing the intended package, use `openwolf update --dry-run`, refresh the selected project and begin a new session. If settings contain invalid JSON or TOML, repair the reported file without discarding unrelated settings. See [hook coverage](hooks.md).
 
-**Fix:**
+## No OpenWolf notice appears
 
-```bash
-which openwolf && openwolf --version
-```
+Quiet mode limits frequency and shows only selected completed actions. Several operations may be combined into one notice. A custom Claude status line is preserved. Grok and headless sessions use dashboard history rather than terminal activity notices.
 
-If the version is old, delete the binary and package at the path `which`
-printed, run `hash -r`, then run `openwolf update` from the current install.
-Everything is restored; user data was never touched and backups exist from
-before the downgrade.
+Check `openwolf.visibility.mode` and the dashboard activity card. No notice does not, by itself, mean that a hook failed. See [session visibility](session-visibility-plan.md).
 
-## The dashboard hero shows 0 tokens kept out of context
+## Token totals differ from the agent's summary
 
-**Cause:** Nothing has been governed yet. The number accumulates as the Bash
-governor condenses oversized output (results over 2,000 tokens), and it only
-ever shows measured deltas, never estimates. Short sessions with small
-outputs legitimately show 0.
+Check whether the summary separates cached input from fresh input. OpenWolf's recorded input total includes both. Reasoning is included in output where reported, so adding it again would count it twice.
 
-**Check:** run a command with big output through your agent (a broad grep,
-a `git show` of a large commit) and watch `openwolf report`'s governor
-section.
+Run `openwolf usage report --json` and review coverage diagnostics. Missing records, an unknown model or a changed transcript format can produce partial totals. Local file-size estimates are not provider usage counters.
 
-## Governed output lost something the model needed
+## Costs differ from a bill or subscription allowance
 
-**Symptom:** The agent re-runs a command to recover detail after
-condensation.
+OpenWolf estimates current API list-price costs for recorded models. Subscription limits, negotiated prices, historical rates, tools and taxes can differ. Review the stated pricing assumptions and unpriced records in the dashboard.
 
-**Fix:** The full output is always preserved at `.wolf/cache/bash/<id>.log`
-and the condensed result points at it, so the model can read the log instead
-of re-running. If a command family is condensed too aggressively for your
-workflow, set it to `"suggest"` or `"off"` in `openwolf.bash.governor.families`.
-Test and build output is suggest-only by default for exactly this reason.
+## A handover import is rejected
 
-## A cron task fails with "ai_task is no longer supported"
+Check the selected project, source session, branch and packet. Changed or deleted source records prevent verification. Repository changes can make a packet historical. Inspect the evidence before using `--allow-drift`; that option does not override source-integrity checks.
 
-**Cause:** A `.wolf/cron-manifest.json` written before 2.5 still lists the
-weekly cerebrum-reflection or project-suggestions task. Those were the only
-things in OpenWolf that ever called a model, and they are gone.
+OpenWolf cannot recover a conversation that the source agent never saved. It cannot access private model reasoning. Read [handover limits](claude-codex-handoff-plan.md).
 
-**Fix:** Run `openwolf update`, or delete the `ai_task` entries from
-`.wolf/cron-manifest.json` by hand. Nothing else depends on them.
+## Memory authority is unavailable
 
-## Dashboard shows the wrong project, or a 401
+This is expected in a normal user-owned npm installation. Durable instruction authority requires an independent administrator, protected runtime files and managed agent settings. A review manifest is preparation material, not approval. Regular checkpoints and project maps remain usable.
 
-**Cause:** Port collision between projects (common on 1.x upgrades), or a
-stale token in the URL.
+## The project map is empty or incomplete
 
-**Fix:** `openwolf update` assigns every project a unique port pair.
-`openwolf dashboard` always opens the right port with a fresh token.
+Confirm the project root, exclude rules and scan limits in `.wolf/config.json`. Run `openwolf scan` and inspect the result. A partial scan can keep earlier entries without declaring the map complete. Very small files may have a description without extracted symbols.
 
-## Port already in use
+## Shortened output lacks a needed detail
 
-`openwolf dashboard` starts on a free port automatically when the configured
-one is taken. To pin a specific port, set `openwolf.dashboard.port` in
-`.wolf/config.json`.
+Use the original-output pointer included in the result when the cache copy is available. Change the relevant `bash.governor.families` value to `suggest` or `off` if shortening is unsuitable. Test and build output are advisory-only by default.
 
-## Anatomy scan finds 0 files
+## The dashboard shows an error or old content
 
-**Cause:** Wrong project root, or everything excluded.
+Reopen it with `openwolf dashboard` from the correct project. Check the project identity and token in that launch. After a package update, restart the project daemon to load the new backend and pages.
 
-**Fix:** Check `anatomy.exclude_patterns` in `.wolf/config.json`. Note that
-lockfiles, caches, minified files, and agent-config directories are excluded
-built-in and never appear in the index.
+A port already in use may belong to another project or application. OpenWolf checks daemon ownership before stopping a process. Do not stop an unrelated process only because it uses the expected port. Inspect `openwolf daemon status` and `openwolf daemon logs`.
 
-## `scan --check` exits 1
+## A runtime update fails
 
-Expected: exit 1 means the index no longer matches the tree. Run
-`openwolf scan` and re-check. Useful as a CI gate for committed indexes.
+Check `openwolf self-update --status`. The current runtime is retained if the registry is unavailable, npm cannot be found beside Node, or verification fails. A resumed session intentionally keeps its selected version. Do not delete a release directory that an active session may use.
 
-## `openwolf find` returns nothing for a symbol I can see
+## A legacy scheduled task reports `ai_task is no longer supported`
 
-Symbols are extracted for files above ~500 estimated tokens; very small
-files are indexed with a description only. Path queries still match
-(`openwolf find --file <path>` shows what the index holds for any file). If
-a large file is missing symbols, run `openwolf scan` to refresh the
-tree-sitter pass.
+Old projects may contain retired model-based maintenance tasks. Preview a project update and inspect the affected cron entries. Current OpenWolf memory maintenance uses local operations without background model calls.
 
-## Daemon will not stop
-
-`openwolf daemon stop` handles both PM2-managed and forked daemons, falling
-back to killing the process on the dashboard port. Manual fallback:
-
-::: code-group
-```bash [macOS/Linux]
-lsof -ti :<port> | xargs kill
-```
-
-```bash [Windows]
-netstat -ano -p tcp | findstr :<port>
-taskkill /PID <pid> /F
-```
-:::
-
-## Commands say "OpenWolf not initialized"
-
-The project has no `.wolf/` directory. Run `openwolf init` in the project
-root.
+When reporting a problem, include the OpenWolf and agent versions, operating system, command, expected result and a minimal reproduction. Remove tokens, credentials and private project content from logs.

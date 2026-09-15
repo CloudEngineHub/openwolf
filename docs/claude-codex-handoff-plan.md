@@ -1,6 +1,6 @@
 # Claude ↔ Codex handover and long-session memory
 
-Status: implemented in the working tree. Local Claude/Codex readers, read-only Codex app-server inspection, explicit immutable handover packets, active checkpoints/recovery, passive evidence search and the Handover dashboard are available after installing this build. Automatic import remains off. A native Codex turn recovered a saved checkpoint without file reads during 2.5.2 validation. The full native Claude→Codex→Claude coding round trip remains blocked by the owner's expired Claude subscription. Independent administrator deployment is still required to activate protected durable instruction authority. See the [release verification record](release-2.5.2.md) for the remaining checks; neither full native validation nor protected deployment is claimed complete.
+Status: implemented in the 2.5.2 candidate on the [release branch](https://github.com/cytostack/openwolf/tree/release/openwolf-2.5.2). Local Claude/Codex readers, read-only Codex app-server inspection, explicit immutable handover packets, active checkpoints/recovery, passive evidence search and the Handover dashboard are available after installing this build. Automatic import remains off. A native Codex turn recovered a saved checkpoint without file reads during 2.5.2 validation. The full native Claude→Codex→Claude coding round trip remains blocked by unavailable Claude model access. Independent administrator deployment is still required to activate protected durable instruction authority. See the [release verification record](release-2.5.2.md) for the remaining checks; neither full native validation nor protected deployment is claimed complete.
 
 ## Implemented workflow
 
@@ -53,7 +53,7 @@ Use three distinct stores:
 
 A transcript is evidence, not permission to perform actions or a source of automatically trusted instructions. Quoted tool output, repository content, imported role labels and approval-looking strings cannot grant authority. Keep approval decisions outside agent-writable memory.
 
-## Milestone 1 — Source discovery and versioned readers
+## Milestone 1: Source discovery and versioned readers
 
 Implement a read-only `SessionSource` interface returning metadata, paginated observable events and coverage diagnostics. Start with Claude project JSONL and Codex app-server reads; reuse the project's canonical root and worktree identity. Avoid scanning unrelated projects when a session is selected. Do not modify source transcripts.
 
@@ -63,7 +63,7 @@ Codex discovery must distinguish thread ID, session ID, fork ancestry and compac
 
 Acceptance: synthetic fixtures for every supported schema; replay produces the same event graph; truncation leaves a recoverable prefix and an explicit gap; a sibling project or worktree cannot be silently selected.
 
-## Milestone 2 — Evidence-backed handover packets
+## Milestone 2: Evidence-backed handover packets
 
 Introduce an immutable, content-addressed packet with:
 
@@ -82,7 +82,7 @@ Implemented command family: `handoff list`, `handoff export --from claude --sess
 
 Acceptance: Claude → Codex → Claude preserves the objective, next action and evidence links; changed branches or dirty diffs visibly invalidate relevant claims; no hidden or unsupported state is invented.
 
-## Milestone 3 — Active Codex memory during long sessions
+## Milestone 3: Active Codex memory during long sessions
 
 Checkpoint at completed subtasks, test runs, failed approaches, compaction, handover and session end. Use a deterministic event reducer for factual state. Let the active coding agent write semantic summaries through the existing session-keyed memory command; do not add background model calls.
 
@@ -92,7 +92,7 @@ The proposed trigger budget is configurable and evaluated against actual harness
 
 Acceptance: 100+ turn fixture with several compactions, restarts and model changes; no loss of unresolved tasks, no duplicate completed work, no repeated full-packet injection without changes; a missed hook recovers without a model API call.
 
-## Milestone 4 — Passive retrieval and contradiction handling
+## Milestone 4: Passive retrieval and contradiction handling
 
 Index evidence by repository/worktree, task, symbol/path, timestamp and source session. Rank relevant, recent evidence above broad historical material. Combine path/symbol matches with causal links to edits/tests and approved decisions. Return short excerpts and stable pointers rather than entire transcripts.
 
@@ -100,7 +100,7 @@ Preserve contrary observations. A later failed test can invalidate an earlier �
 
 Acceptance: retrieval identifies the specific earlier fix and test for a changed symbol; unrelated history stays out; stale evidence and conflicting decisions are visible; worktree-local outcomes do not overwrite another branch's active state.
 
-## Milestone 5 — Dashboard and measured evaluation
+## Milestone 5: Dashboard and measured evaluation
 
 Add a Handover view showing source/destination, selected session, branch/HEAD, freshness, coverage gaps, packet contents and exact evidence links. Active Memory shows current objective, checkpoint age, unresolved work and injection history. Passive Memory shows retrieval results, archives and supersession links. Durable Memory shows candidate/approved/revoked status and named reviewer.
 

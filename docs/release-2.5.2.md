@@ -1,6 +1,6 @@
 # OpenWolf 2.5.2 release verification
 
-The 2.5.2 release candidate passed automated build, regression, package-install, upgrade and daemon checks across Linux, macOS and Windows. Native Codex recovery and OpenCode notifications were also verified. The full live Claude/Codex round trip remains unavailable because the owner's Claude subscription expired.
+The 2.5.2 release candidate passed automated build, regression, package-install, upgrade and daemon checks across Linux, macOS and Windows. Native Codex recovery and OpenCode notifications were also verified. The full live Claude/Codex round trip remains unavailable because Claude model access was unavailable.
 
 Scope: context handover and recovery, recorded usage/pricing, durable journals and archival, safe anatomy refresh, compatible runtime updates, quiet activity receipts and synchronized dashboard content. Contributor roles and original commit attribution are retained in CREDITS.md and docs/audit/.
 
@@ -8,7 +8,7 @@ Protected durable memory remains disabled in ordinary user-owned npm installatio
 
 Existing 2.5.1 installations require a package refresh and `openwolf update` once to acquire the updater/bootstrap changes. Restart project daemons and start new sessions. Later compatible runtime updates prepare hooks/plugins for new sessions; they do not update the global CLI or a running daemon.
 
-## Verified locally — 2026-09-15
+## Verified locally: 2026-09-15
 
 - macOS, Node 24.15.0: production build, plugin/dashboard type checks, documentation build and all 322 tests in 72 suites passed without failures or skips.
 - Actual npm tarball installation and published 2.5.1 → candidate 2.5.2 upgrade passed on Node 24.15.0 and Node 20.20.2. Existing memory and a custom Claude status command survived. Claude/Codex/OpenCode helpers were refreshed; Grok added no duplicate registration.
@@ -25,7 +25,7 @@ The Linux/macOS/Windows Node 24 matrix and Linux Node 20 runtime job are defined
 
 Windows validation found and verified fixes for ordinary-file owner ID zero incorrectly disabling runtime updates, and a native watcher crash when using abbreviated project paths. The daemon now resolves the native project path before starting watchers. ESM file URLs and platform-correct shell-path, line-ending and transcript-path fixtures also passed. The package smoke test checks the daemon's canonical project identity as well as authenticated activity and restart persistence.
 
-The live Claude → Codex → Claude coding round trip, Claude status-line rendering, compaction/restart checks for the other native harnesses, and paired long-session quality/token-efficiency evaluation remain outstanding. The owner confirmed that the Claude subscription is over; no additional credential or subscription setup is assumed. Deterministic handover/recovery tests and a native Codex resume/compaction check do not substitute for those evaluations. Automatic handover import stays off.
+The live Claude → Codex → Claude coding round trip, Claude status-line rendering, compaction/restart checks for the other native harnesses, and paired long-session quality/token-efficiency evaluation remain outstanding. Deterministic handover/recovery tests and a native Codex resume/compaction check do not substitute for those evaluations. Automatic handover import stays off.
 
 Protected durable instruction authority remains unavailable until independent administrator deployment and review. `openwolf operations prepare --output <new-directory>` creates a versioned deployment review manifest; it does not provision or approve the protected runtime. Ordinary handover evidence and activity features remain usable without it.
 

@@ -1,53 +1,28 @@
 # Configuration
 
-OpenWolf is configured through `.wolf/config.json`. Every setting has a
-sensible default; nothing needs changing for normal use. `openwolf update`
-merges newly introduced keys into existing configs without touching your
-values.
+Project settings are stored in `.wolf/config.json` under `openwolf`. A package update adds new defaults while preserving existing values. Use the installed template as the complete reference.
+
+## Read guidance
+
+| Setting | Default | Effect |
+| --- | --- | --- |
+| `reads.duplicate_mode` | `warn` | Advise on eligible repeated full reads. `deny` denies once with a retry path. `off` disables the check. |
+| `reads.skeleton_hints` | `true` | Offer symbol outlines for eligible large indexed files. |
+
+Ranged reads and changed files are handled separately from unchanged full reads. Results depend on the agent delivering the relevant tool event.
+
+## Command output
+
+| Setting | Default | Effect |
+| --- | --- | --- |
+| `bash.filter_mode` | `suggest` | Suggest output limits before selected commands. |
+| `bash.governor.mode` | `replace` | Request supported output replacement. Alternatives are `suggest` and `off`. |
+| `bash.governor.threshold_tokens` | `2000` | Estimated output size above which controls may apply. |
+
+Default command-family settings:
 
 ```json
 {
-  "version": 1,
-  "openwolf": {
-    "enabled": true,
-    "reads": { ... },
-    "bash": { ... },
-    "context": { ... },
-    "anatomy": { ... },
-    "token_audit": { ... },
-    "cron": { ... },
-    "memory": { ... },
-    "cerebrum": { ... },
-    "daemon": { ... },
-    "dashboard": { ... }
-  }
-}
-```
-
-## `reads`
-
-Duplicate-read handling and read hints.
-
-| Key | Default | Description |
-|-----|---------|-------------|
-| `duplicate_mode` | `"warn"` | `"warn"` advises on duplicate full reads; `"deny"` blocks each duplicate once (with a pass-through retry so the model is never stranded); `"off"` disables |
-| `skeleton_hints` | `true` | For large indexed files, serve a signature outline in the pre-read hint instead of the largest-sections line |
-
-## `bash`
-
-The Bash channel: the pre-run suggestion filter and the output governor.
-
-| Key | Default | Description |
-|-----|---------|-------------|
-| `filter_mode` | `"suggest"` | Pre-run note for flood-prone commands: `"suggest"` or `"off"` |
-| `governor.mode` | `"replace"` | Master switch: `"replace"`, `"suggest"`, or `"off"` |
-| `governor.threshold_tokens` | `2000` | Only results above this size are governed |
-| `governor.families` | *(below)* | Per-family action override |
-
-Default family actions:
-
-```json
-"families": {
   "grep_flood": "replace",
   "file_print": "replace",
   "git_show": "replace",
@@ -57,71 +32,57 @@ Default family actions:
 }
 ```
 
-Only the three losslessly recoverable families replace by default. Test and
-build output is never replaced unless you opt in, and stderr is never
-modified by any family. Full outputs are always preserved at
-`.wolf/cache/bash/`.
+Place these values under `openwolf.bash.governor.families`. Replacement depends on supported Claude hook output. A cache pointer accompanies a preserved original. Standard error is not rewritten.
 
-## `context`
+## Context and project notes
 
-Session digest, rule re-injection, and state budgets.
+| Setting | Default | Effect |
+| --- | --- | --- |
+| `context.session_digest_budget_tokens` | `1500` | Estimated size limit for the startup digest. |
+| `context.budgets` | Per agent | Override the digest budget for a named agent. |
+| `context.reinjection_interval` | `25` | Interval for selected approved rules on supported tool-batch events. `0` disables it. |
+| `context.state_budgets` | Cerebrum: 2000; STATUS: 1000 | Estimated budgets used for size warnings. |
+| `memory.consolidation_after_days` | `7` | Age used by configured memory maintenance tasks. |
+| `cerebrum.max_tokens` | `2000` | Target size for candidate convention notes. |
 
-| Key | Default | Description |
-|-----|---------|-------------|
-| `session_digest_budget_tokens` | `1500` | Upper bound for the session-start injection (the index targets ~400) |
-| `budgets` | per agent | Per-agent digest budgets (`claude` 1500, `codex` 1200, `cursor` 800, ...) |
-| `reinjection_interval` | `25` | Re-surface the top Do-Not-Repeat rules every N tool batches; `0` disables |
-| `state_budgets` | `{".wolf/cerebrum.md": 2000, ".wolf/STATUS.md": 1000}` | Token budgets enforced with one warning per session on over-budget writes |
+Archival retains the latest block, pinned notes and tracked active sessions. It keeps restore pointers rather than deleting their history. The explicit `memory archive --days` command sets the age for that run. Protected approval is required for automatic durable instruction injection.
 
-## `anatomy`
+## Project scanning
 
-The project scanner.
+| Setting | Default | Effect |
+| --- | --- | --- |
+| `anatomy.auto_scan_on_init` | `true` | Scan during initial setup. |
+| `anatomy.rescan_interval_hours` | `6` | Scheduled rescan interval. |
+| `anatomy.max_description_length` | `100` | Maximum description length in characters. |
+| `anatomy.max_files` | `500` | Scan limit. A limited scan must not be reported as complete. |
+| `anatomy.exclude_patterns` | Template list | Exclude specified paths and patterns. |
+| `anatomy.respect_gitignore` | `true` | Apply repository ignore rules. |
 
-| Key | Default | Description |
-|-----|---------|-------------|
-| `auto_scan_on_init` | `true` | Run a full scan during `openwolf init` |
-| `rescan_interval_hours` | `6` | Daemon rescan cadence. Rescans are skipped when the index is provably fresh (stat sweep + git HEAD) |
-| `max_description_length` | `100` | Max characters per file description |
-| `max_files` | `500` | Stop scanning after this many files |
-| `exclude_patterns` | node_modules, .git, dist, ... | Directories and globs to skip |
+Built-in exclusions also cover common generated files, caches and agent configuration paths. Review the resulting index before sharing it.
 
-Lockfiles, OS junk, caches, coverage, minified files, and agent-config
-directories (`.claude`, `.codex`, and friends) are excluded built-in,
-regardless of this list.
+## Usage estimates
 
-## `token_audit`
+`token_audit.chars_per_token_code` defaults to `3.5`; `chars_per_token_prose` defaults to `4.0`. These ratios estimate local content size. They do not change recorded provider counters. The dashboard keeps estimates and recorded usage separate.
 
-| Key | Default | Description |
-|-----|---------|-------------|
-| `enabled` | `true` | Token tracking |
-| `chars_per_token_code` | `3.5` | Estimation ratio for code |
-| `chars_per_token_prose` | `4.0` | Estimation ratio for prose |
-| `waste_threshold_percent` | `15` | Waste-alert threshold |
+## Activity and updates
 
-Estimates are the softest tier; measured and verified numbers come from
-transcripts and are unaffected by these ratios.
+```json
+{
+  "openwolf": {
+    "visibility": { "mode": "quiet" },
+    "updates": { "mode": "compatible" }
+  }
+}
+```
 
-## `cron`
+This is a partial example. Merge it into the existing configuration.
 
-| Key | Default | Description |
-|-----|---------|-------------|
-| `enabled` | `true` | Scheduled tasks |
-| `max_retry_attempts` | `3` | Retries before dead-lettering |
+Visibility modes are `quiet`, `verbose` and `off`. `OPENWOLF_VISIBILITY=off` disables new receipts and notices for that process. Functional protection and update policy are separate settings.
 
-## `memory` and `cerebrum`
+Update modes are `compatible`, `all`, `notify` and `off`. The default prepares compatible stable runtimes for new sessions and reports major upgrades without installing them. `OPENWOLF_NO_UPDATE=1` disables checks and new runtime selection for that process. Existing session pins remain in place. See [automatic updates](automatic-updates.md).
 
-| Key | Default | Description |
-|-----|---------|-------------|
-| `memory.consolidation_after_days` | `7` | Compress session blocks older than this |
-| `cerebrum.max_tokens` | `2000` | Target size for cerebrum.md |
+## Daemon and dashboard
 
-## `daemon` and `dashboard`
+The dashboard is enabled by default and binds to `127.0.0.1`. Port settings are `dashboard.port` and `daemon.port`; setup and launch can select available project ports. Keep the project token private.
 
-| Key | Default | Description |
-|-----|---------|-------------|
-| `daemon.port` | per project | Daemon HTTP API port |
-| `dashboard.port` | per project | Dashboard HTTP and WebSocket port |
-| `dashboard.enabled` | `true` | Serve the dashboard |
-
-Ports are assigned per project at init so multiple dashboards never collide,
-and they survive updates.
+`cron.enabled` controls scheduled tasks. Retry and heartbeat settings are in `cron`. Restart the daemon after changes that affect its runtime configuration. Data polling does not apply every configuration change to a running process.
